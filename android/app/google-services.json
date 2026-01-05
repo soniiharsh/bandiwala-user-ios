@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "905053340668",
+    "project_id": "bandiwala-a7ff8",
+    "storage_bucket": "bandiwala-a7ff8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:905053340668:android:3d5a9c78304ae278232879",
+        "android_client_info": {
+          "package_name": "com.bandiwala.user"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBFKc5_h_lRkqgAyngfUROMczmuL1jp90g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:905053340668:android:4cf771a6c484c151232879",
+        "android_client_info": {
+          "package_name": "com.example.bandiwala_user"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBFKc5_h_lRkqgAyngfUROMczmuL1jp90g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:905053340668:android:09c62863279ee8cc232879",
+        "android_client_info": {
+          "package_name": "com.example.bandiwala_vendor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBFKc5_h_lRkqgAyngfUROMczmuL1jp90g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
