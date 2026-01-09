@@ -2,7 +2,7 @@ name: bandiwala_user
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.9.2
@@ -41,15 +41,13 @@ dependencies:
   geocoding: ^4.0.0
   speech_to_text: ^7.3.0
   shared_preferences: ^2.5.4
-  flutter_map: ^8.2.2   # Latest stable release as of late 2025 :contentReference[oaicite:0]{index=0}
+  flutter_map: ^8.2.2 # Latest stable release as of late 2025 :contentReference[oaicite:0]{index=0}
   latlong2: ^0.9.1
   razorpay_flutter: ^1.4.0
   url_launcher: ^6.3.2
   firebase_storage: ^13.0.5
   cached_network_image: ^3.4.1
   sms_autofill: ^2.4.1
-
-
 
 dev_dependencies:
   flutter_test:
@@ -68,7 +66,6 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
@@ -77,7 +74,7 @@ flutter:
   assets:
     - assets/images/splash.png
 
-    - assets/images/1.png  # ✅ Add your images here
+    - assets/images/1.png # ✅ Add your images here
     - assets/images/2.png
     - assets/images/3.png
     - assets/images/Biriyani.png
