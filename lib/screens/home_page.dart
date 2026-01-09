@@ -1,12 +1,16 @@
+// ============ home_page.dart ============
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 import 'settings_screen.dart';
 import 'bottom_navigation.dart';
 import 'top_bar.dart';
 import 'vendor_items_page.dart';
-import 'cart_screen.dart';   // must contain class CartScreen
-import 'help_screen.dart';  // must contain class HelpScreen
+import 'cart_screen.dart';
+import 'help_screen.dart';
+import 'promotional.dart';
 
 class HomePage extends StatefulWidget {
   final String? phoneNumber;
@@ -19,25 +23,48 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
 
+  // ✅ Handle Android back button
+  Future<bool> _onWillPop() async {
+    if (_currentIndex != 0) {
+      // If not on home tab, go to home tab
+      setState(() => _currentIndex = 0);
+      return false; // Don't exit app
+    }
+    return true; // Exit app if already on home tab
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
       _HomeTab(phoneNumber: widget.phoneNumber),
-      const CartScreen(),
+      CartScreen(
+        onBackToHome: () {
+          setState(() => _currentIndex = 0);
+        },
+      ),
       const HelpScreen(),
     ];
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: pages,
-      ),
-      bottomNavigationBar: BandiwalaBottomNavigation(
-        currentIndex: _currentIndex,
-        onItemSelected: (idx) {
-          setState(() => _currentIndex = idx);
-        },
+    return PopScope(
+      canPop: _currentIndex == 0, // Only allow exit if on home tab
+      onPopInvokedWithResult: (bool didPop, dynamic result) {
+        if (!didPop && _currentIndex != 0) {
+          // Switch to home tab instead of exiting
+          setState(() => _currentIndex = 0);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: IndexedStack(
+          index: _currentIndex,
+          children: pages,
+        ),
+        bottomNavigationBar: BandiwalaBottomNavigation(
+          currentIndex: _currentIndex,
+          onItemSelected: (idx) {
+            setState(() => _currentIndex = idx);
+          },
+        ),
       ),
     );
   }
@@ -45,10 +72,8 @@ class _HomePageState extends State<HomePage> {
 
 class _HomeTab extends StatelessWidget {
   final String? phoneNumber;
-  const _HomeTab({this.phoneNumber});
 
-  // You can delete this if unused
-  static const Color bandiwalaYellow = Color(0xFFFFC107);
+  const _HomeTab({this.phoneNumber});
 
   @override
   Widget build(BuildContext context) {
@@ -56,12 +81,13 @@ class _HomeTab extends StatelessWidget {
       child: Column(
         children: [
           BandiwalaTopBar(phoneNumber: phoneNumber),
-          const SizedBox(height: 8),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: const [
-                SizedBox(height: 8),
+                SizedBox(height: 12),
+                PromotionalBanner(),
+                SizedBox(height: 16),
                 Text(
                   'Vendors near you',
                   style: TextStyle(
@@ -138,7 +164,90 @@ class _VendorsList extends StatelessWidget {
   }
 }
 
-class _VendorCard extends StatelessWidget {
+class WishlistVendor {
+  final String vendorId;
+  final String name;
+  final String imageUrl;
+  final String address;
+  final String category;
+  final double rating;
+
+  WishlistVendor({
+    required this.vendorId,
+    required this.name,
+    required this.imageUrl,
+    required this.address,
+    required this.category,
+    required this.rating,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'vendorId': vendorId,
+    'name': name,
+    'imageUrl': imageUrl,
+    'address': address,
+    'category': category,
+    'rating': rating,
+  };
+
+  factory WishlistVendor.fromJson(Map<String, dynamic> json) => WishlistVendor(
+    vendorId: json['vendorId'],
+    name: json['name'],
+    imageUrl: json['imageUrl'],
+    address: json['address'],
+    category: json['category'],
+    rating: json['rating'].toDouble(),
+  );
+}
+
+class WishlistManager {
+  static const String _key = 'wishlist_vendors';
+
+  static Future<List<WishlistVendor>> getWishlist() async {
+    final prefs = await SharedPreferences.getInstance();
+    final wishlistJson = prefs.getStringList(_key) ?? [];
+    return wishlistJson
+        .map((json) => WishlistVendor.fromJson(jsonDecode(json)))
+        .toList();
+  }
+
+  static Future<bool> isInWishlist(String vendorId) async {
+    final wishlist = await getWishlist();
+    return wishlist.any((v) => v.vendorId == vendorId);
+  }
+
+  static Future<void> addToWishlist(WishlistVendor vendor) async {
+    final prefs = await SharedPreferences.getInstance();
+    final wishlist = await getWishlist();
+
+    if (wishlist.any((v) => v.vendorId == vendor.vendorId)) {
+      return;
+    }
+
+    wishlist.insert(0, vendor);
+    final wishlistJson = wishlist.map((v) => jsonEncode(v.toJson())).toList();
+    await prefs.setStringList(_key, wishlistJson);
+  }
+
+  static Future<void> removeFromWishlist(String vendorId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final wishlist = await getWishlist();
+    wishlist.removeWhere((v) => v.vendorId == vendorId);
+    final wishlistJson = wishlist.map((v) => jsonEncode(v.toJson())).toList();
+    await prefs.setStringList(_key, wishlistJson);
+  }
+
+  static Future<void> toggleWishlist(WishlistVendor vendor) async {
+    final isInList = await isInWishlist(vendor.vendorId);
+    if (isInList) {
+      await removeFromWishlist(vendor.vendorId);
+    } else {
+      await addToWishlist(vendor);
+    }
+  }
+}
+
+class _VendorCard extends StatefulWidget {
   final String vendorId;
   final String name;
   final String imageUrl;
@@ -158,19 +267,78 @@ class _VendorCard extends StatelessWidget {
   });
 
   @override
+  State<_VendorCard> createState() => _VendorCardState();
+}
+
+class _VendorCardState extends State<_VendorCard> {
+  bool _isInWishlist = false;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkWishlistStatus();
+  }
+
+  Future<void> _checkWishlistStatus() async {
+    final isInList = await WishlistManager.isInWishlist(widget.vendorId);
+    if (mounted) {
+      setState(() => _isInWishlist = isInList);
+    }
+  }
+
+  Future<void> _toggleWishlist() async {
+    setState(() => _isLoading = true);
+
+    final vendor = WishlistVendor(
+      vendorId: widget.vendorId,
+      name: widget.name,
+      imageUrl: widget.imageUrl,
+      address: widget.address,
+      category: widget.category,
+      rating: widget.rating,
+    );
+
+    await WishlistManager.toggleWishlist(vendor);
+
+    final isInList = await WishlistManager.isInWishlist(widget.vendorId);
+
+    if (mounted) {
+      setState(() {
+        _isInWishlist = isInList;
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isInList
+                ? '${widget.name} added to wishlist'
+                : '${widget.name} removed from wishlist',
+          ),
+          backgroundColor: isInList ? Colors.green : Colors.grey.shade700,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      ignoring: !isAvailable,
+      ignoring: !widget.isAvailable,
       child: Stack(
         children: [
           GestureDetector(
-            onTap: isAvailable
+            onTap: widget.isAvailable
                 ? () {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => VendorItemsPage(
-                    vendorId: vendorId,
-                    vendorName: name,
+                    vendorId: widget.vendorId,
+                    vendorName: widget.name,
                   ),
                 ),
               );
@@ -191,9 +359,9 @@ class _VendorCard extends StatelessWidget {
                   SizedBox(
                     height: 160,
                     width: double.infinity,
-                    child: imageUrl.isNotEmpty
+                    child: widget.imageUrl.isNotEmpty
                         ? Image.network(
-                      imageUrl,
+                      widget.imageUrl,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         color: Colors.grey.shade200,
@@ -219,7 +387,7 @@ class _VendorCard extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                name,
+                                widget.name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -229,10 +397,26 @@ class _VendorCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 6),
-                            Icon(
-                              Icons.favorite_border,
-                              size: 18,
-                              color: Colors.grey.shade600,
+                            GestureDetector(
+                              onTap: _isLoading ? null : _toggleWishlist,
+                              child: _isLoading
+                                  ? SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.grey.shade600,
+                                ),
+                              )
+                                  : Icon(
+                                _isInWishlist
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                size: 20,
+                                color: _isInWishlist
+                                    ? Colors.red
+                                    : Colors.grey.shade600,
+                              ),
                             ),
                           ],
                         ),
@@ -257,7 +441,7 @@ class _VendorCard extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 3),
                                   Text(
-                                    rating.toStringAsFixed(1),
+                                    widget.rating.toStringAsFixed(1),
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 11,
@@ -270,7 +454,7 @@ class _VendorCard extends StatelessWidget {
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                address,
+                                widget.address,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -283,7 +467,7 @@ class _VendorCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          category,
+                          widget.category,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -298,7 +482,7 @@ class _VendorCard extends StatelessWidget {
               ),
             ),
           ),
-          if (!isAvailable)
+          if (!widget.isAvailable)
             Positioned.fill(
               child: Container(
                 color: Colors.black.withOpacity(0.55),

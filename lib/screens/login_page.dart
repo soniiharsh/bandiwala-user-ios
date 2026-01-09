@@ -22,8 +22,6 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
-    // 🔥 Disable app verification for testing (optional - for development only)
-    // _auth.setSettings(appVerificationDisabledForTesting: true);
   }
 
   String? _validatePhone(String? value) {
@@ -38,6 +36,18 @@ class _LoginPageState extends State<LoginPage> {
     return null;
   }
 
+  // ✅ Guest Login Function
+  void _continueAsGuest() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const HomePage(
+          phoneNumber: 'GUEST',
+        ),
+      ),
+    );
+  }
+
   Future<void> _sendOTP() async {
     if (_formKey.currentState?.validate() ?? false) {
       setState(() {
@@ -45,11 +55,9 @@ class _LoginPageState extends State<LoginPage> {
       });
 
       try {
-        // 🔥 Force reCAPTCHA bypass by using forceResendingToken (Android) or silent push (iOS)
         await _auth.verifyPhoneNumber(
           phoneNumber: '+91${_phoneController.text.trim()}',
 
-          // 🔥 Auto-sign in on Android (SMS auto-retrieval)
           verificationCompleted: (PhoneAuthCredential credential) async {
             try {
               await _auth.signInWithCredential(credential);
@@ -83,7 +91,6 @@ class _LoginPageState extends State<LoginPage> {
             }
           },
 
-          // 🔥 Error handling
           verificationFailed: (FirebaseAuthException e) {
             setState(() {
               _isLoading = false;
@@ -112,7 +119,6 @@ class _LoginPageState extends State<LoginPage> {
             }
           },
 
-          // 🔥 OTP sent successfully
           codeSent: (String verificationId, int? resendToken) {
             setState(() {
               _verificationId = verificationId;
@@ -132,15 +138,13 @@ class _LoginPageState extends State<LoginPage> {
             }
           },
 
-          // 🔥 Timeout
           codeAutoRetrievalTimeout: (String verificationId) {
             setState(() {
               _verificationId = verificationId;
             });
           },
 
-          // 🔥 Timeout duration
-          timeout: const Duration(seconds: 120), // Increased to 120 seconds
+          timeout: const Duration(seconds: 120),
         );
       } catch (e) {
         setState(() {
@@ -289,6 +293,8 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         const SizedBox(height: 32),
+
+                        // ✅ Send OTP Button
                         SizedBox(
                           width: double.infinity,
                           height: 56,
@@ -301,7 +307,8 @@ class _LoginPageState extends State<LoginPage> {
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(18),
                               ),
-                              disabledBackgroundColor: bandiwalaYellow.withOpacity(0.6),
+                              disabledBackgroundColor:
+                              bandiwalaYellow.withOpacity(0.6),
                             ),
                             child: _isLoading
                                 ? const SizedBox(
@@ -323,7 +330,46 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 40),
+
+                        const SizedBox(height: 20),
+
+                        // ✅ NEW: Text-based Guest Login
+                        Center(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Want to login as guest?',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: _isLoading ? null : _continueAsGuest,
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Text(
+                                  'Click here',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: bandiwalaYellow,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
                         Center(
                           child: Text(
                             'By continuing, you agree to our Terms of Service\nand Privacy Policy',

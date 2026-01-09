@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:sms_autofill/sms_autofill.dart';
 import 'home_page.dart';
 
 class OTPVerifyScreen extends StatefulWidget {
@@ -18,7 +20,7 @@ class OTPVerifyScreen extends StatefulWidget {
   State<OTPVerifyScreen> createState() => _OTPVerifyScreenState();
 }
 
-class _OTPVerifyScreenState extends State<OTPVerifyScreen> {
+class _OTPVerifyScreenState extends State<OTPVerifyScreen> with CodeAutoFill {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _otpController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -28,15 +30,64 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> {
   int _resendTimer = 26;
   bool _canResend = false;
   Timer? _timer;
+  String? _otpCode;
 
   @override
   void initState() {
     super.initState();
     _startResendTimer();
+    _listenForOTP(); // ✅ System will request permission automatically
+  }
+
+  // ✅ Listen for incoming SMS OTP (system handles permission)
+  Future<void> _listenForOTP() async {
+    try {
+      // This will trigger system permission dialog automatically
+      listenForCode();
+
+      final signature = await SmsAutoFill().getAppSignature;
+      debugPrint('📱 App Signature: $signature');
+    } catch (e) {
+      debugPrint('❌ SMS AutoFill Error: $e');
+    }
+  }
+
+  // ✅ Called when OTP is auto-detected
+  @override
+  void codeUpdated() {
+    if (mounted && code != null && code!.length == 6) {
+      setState(() {
+        _otpCode = code;
+        _otpController.text = code!;
+      });
+
+      // Show success feedback
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Text('OTP detected automatically'),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      // Auto-verify after a short delay
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          _verifyOTP();
+        }
+      });
+    }
   }
 
   void _startResendTimer() {
-    _timer?.cancel(); // Cancel existing timer
+    _timer?.cancel();
     _resendTimer = 26;
     _canResend = false;
 
@@ -88,7 +139,6 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> {
       }
     } catch (e) {
       debugPrint('Customer creation failed: $e');
-      // Don't block navigation on customer creation failure
     }
   }
 
@@ -107,7 +157,6 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> {
 
       UserCredential userCredential = await _auth.signInWithCredential(credential);
 
-      // Create customer profile if needed
       await _createCustomerIfNeeded();
 
       if (!mounted) return;
@@ -194,8 +243,6 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> {
           }
         },
         codeSent: (String newVerificationId, int? resendToken) {
-          // IMPORTANT: Update verificationId for new OTP
-          // For simplicity, we'll pop and let LoginPage handle new flow
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -204,8 +251,8 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> {
               ),
             );
 
-            // Reset timer and UI
             _startResendTimer();
+            _listenForOTP();
           }
         },
         codeAutoRetrievalTimeout: (String verificationId) {},
@@ -233,6 +280,7 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> {
   void dispose() {
     _timer?.cancel();
     _otpController.dispose();
+    cancel();
     super.dispose();
   }
 
@@ -284,62 +332,55 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> {
                           textAlign: TextAlign.start,
                         ),
                         const SizedBox(height: 32),
+
+                        // ✅ Pin Field with visible cursor
                         Form(
                           key: _formKey,
-                          child: TextFormField(
+                          child: PinFieldAutoFill(
                             controller: _otpController,
-                            keyboardType: TextInputType.number,
-                            maxLength: 6,
-                            enabled: !_isLoading,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              letterSpacing: 12,
-                              fontWeight: FontWeight.w600,
+                            codeLength: 6,
+                            autoFocus: true,
+                            cursor: Cursor(
+                              width: 2,
+                              height: 24,
+                              color: bandiwalaYellow,
+                              radius: const Radius.circular(1),
+                              enabled: true,
                             ),
-                            validator: _validateOTP,
-                            decoration: InputDecoration(
-                              counterText: '',
-                              hintText: '••••••',
-                              hintStyle: TextStyle(
-                                color: Colors.grey.shade400,
-                                letterSpacing: 12,
-                                fontSize: 20,
+                            decoration: UnderlineDecoration(
+                              textStyle: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
                               ),
-                              filled: true,
-                              fillColor: Colors.grey.shade50,
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 18,
-                                horizontal: 12,
+                              colorBuilder: FixedColorBuilder(
+                                Colors.grey.shade300,
                               ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(18),
-                                borderSide: BorderSide(
-                                  color: Colors.grey.shade300,
-                                ),
+                              bgColorBuilder: FixedColorBuilder(
+                                Colors.transparent,
                               ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(18),
-                                borderSide: const BorderSide(
-                                  color: bandiwalaYellow,
-                                  width: 1.8,
-                                ),
-                              ),
-                              errorBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(18),
-                                borderSide: const BorderSide(
-                                  color: Colors.redAccent,
-                                ),
-                              ),
-                              focusedErrorBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(18),
-                                borderSide: const BorderSide(
-                                  color: Colors.redAccent,
-                                ),
-                              ),
+                              lineHeight: 2,
+                              lineStrokeCap: StrokeCap.round,
                             ),
+                            currentCode: _otpController.text,
+                            onCodeSubmitted: (code) {
+                              _verifyOTP();
+                            },
+                            onCodeChanged: (code) {
+                              if (code?.length == 6) {
+                                Future.delayed(
+                                  const Duration(milliseconds: 300),
+                                      () {
+                                    if (mounted) {
+                                      _verifyOTP();
+                                    }
+                                  },
+                                );
+                              }
+                            },
                           ),
                         ),
+
                         const SizedBox(height: 32),
                         SizedBox(
                           width: double.infinity,

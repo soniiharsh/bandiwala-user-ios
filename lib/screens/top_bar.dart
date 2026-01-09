@@ -4,6 +4,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:latlong2/latlong.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'settings_screen.dart';
 import 'location_picker_page.dart';
@@ -14,6 +15,7 @@ class SavedLocation {
   final double longitude;
   final String? houseNo;
   final String? phone;
+  final String? label;
 
   SavedLocation({
     required this.address,
@@ -21,6 +23,7 @@ class SavedLocation {
     required this.longitude,
     this.houseNo,
     this.phone,
+    this.label,
   });
 
   Map<String, dynamic> toJson() => {
@@ -29,6 +32,7 @@ class SavedLocation {
     'longitude': longitude,
     'houseNo': houseNo,
     'phone': phone,
+    'label': label,
   };
 
   factory SavedLocation.fromJson(Map<String, dynamic> json) => SavedLocation(
@@ -37,6 +41,7 @@ class SavedLocation {
     longitude: json['longitude'].toDouble(),
     houseNo: json['houseNo'],
     phone: json['phone'],
+    label: json['label'],
   );
 }
 
@@ -58,7 +63,8 @@ class BandiwalaTopBar extends StatefulWidget {
   State<BandiwalaTopBar> createState() => _BandiwalaTopBarState();
 }
 
-class _BandiwalaTopBarState extends State<BandiwalaTopBar> {
+class _BandiwalaTopBarState extends State<BandiwalaTopBar>
+    with WidgetsBindingObserver {
   static const Color bandiwalaYellow = Color(0xFFFFC107);
 
   // Hyderabad bounds
@@ -69,16 +75,51 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar> {
 
   String displayLocation = 'Fetching location...';
   bool isLocationError = false;
-  SavedLocation? _currentSavedLocation;
+  Position? _currentPosition;
   final stt.SpeechToText _speechToText = stt.SpeechToText();
   bool _speechEnabled = false;
   bool _isListening = false;
+  double _walletBalance = 0.0;
+
+  StreamSubscription<Position>? _positionStreamSubscription;
 
   @override
   void initState() {
     super.initState();
-    _initLocation();
+    WidgetsBinding.instance.addObserver(this);
     _initSpeech();
+    _startLocationUpdates();
+    _loadWalletBalance();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _positionStreamSubscription?.cancel();
+    _speechToText.stop();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      _startLocationUpdates();
+      _loadWalletBalance();
+    }
+  }
+
+  // ✅ Load wallet balance from SharedPreferences
+  Future<void> _loadWalletBalance() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final balance = prefs.getDouble('wallet_balance') ?? 0.0;
+      if (mounted) {
+        setState(() => _walletBalance = balance);
+      }
+    } catch (e) {
+      debugPrint('Error loading wallet balance: $e');
+    }
   }
 
   Future<void> _initSpeech() async {
@@ -96,44 +137,127 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar> {
     setState(() {});
   }
 
-  Future<void> _initLocation() async {
+  Future<void> _startLocationUpdates() async {
     try {
-      // First try to load saved location
-      await _loadSavedLocation();
-      if (_currentSavedLocation != null) return;
-
-      // Then try current location
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        setState(() => displayLocation = 'Enable location services');
+        setState(() {
+          displayLocation = 'Enable location services';
+          isLocationError = true;
+        });
+        widget.onLocationError?.call(true);
         return;
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.deniedForever) {
-        setState(() => displayLocation = 'Location permissions denied');
+        setState(() {
+          displayLocation = 'Location permissions denied';
+          isLocationError = true;
+        });
+        widget.onLocationError?.call(true);
         return;
       }
 
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          setState(() => displayLocation = 'Location permission needed');
+          setState(() {
+            displayLocation = 'Location permission needed';
+            isLocationError = true;
+          });
+          widget.onLocationError?.call(true);
           return;
         }
       }
 
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: Duration(seconds: 10),
+      await _getCurrentLocationOnce();
+
+      const LocationSettings locationSettings = LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
       );
 
-      final pos = LatLng(position.latitude, position.longitude);
-      await _updatePlaceInfo(pos);
+      await _positionStreamSubscription?.cancel();
+
+      _positionStreamSubscription =
+          Geolocator.getPositionStream(locationSettings: locationSettings)
+              .listen(
+                (Position position) {
+              _currentPosition = position;
+              _updateLocationDisplay(position);
+            },
+            onError: (error) {
+              debugPrint('Location stream error: $error');
+              setState(() {
+                displayLocation = 'Location error';
+                isLocationError = true;
+              });
+            },
+          );
     } catch (e) {
+      debugPrint('Error starting location updates: $e');
       setState(() {
-        displayLocation = 'Unable to fetch location';
+        displayLocation = 'Unable to get location';
+        isLocationError = true;
       });
+      widget.onLocationError?.call(true);
+    }
+  }
+
+  Future<void> _getCurrentLocationOnce() async {
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+
+      _currentPosition = position;
+      await _updateLocationDisplay(position);
+    } catch (e) {
+      debugPrint('Error getting initial location: $e');
+      setState(() => displayLocation = 'Getting location...');
+    }
+  }
+
+  Future<void> _updateLocationDisplay(Position position) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty && mounted) {
+        Placemark place = placemarks.first;
+
+        List<String> locationParts = [
+          place.subLocality,
+          place.locality,
+          place.street,
+        ]
+            .where((part) => part != null && part.trim().isNotEmpty)
+            .map((part) => part!)
+            .toList();
+
+        String placeName = locationParts.isNotEmpty
+            ? locationParts.first
+            : 'Current Location';
+
+        final isInServiceArea =
+        _isInHyderabad(position.latitude, position.longitude);
+
+        setState(() {
+          displayLocation = placeName;
+          isLocationError = !isInServiceArea;
+        });
+
+        widget.onLocationError?.call(!isInServiceArea);
+      }
+    } catch (e) {
+      debugPrint('Error updating location display: $e');
+      if (mounted) {
+        setState(() => displayLocation = 'Current Location');
+      }
     }
   }
 
@@ -144,82 +268,26 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar> {
         lng <= hyderabadMaxLng;
   }
 
-  Future<void> _updatePlaceInfo(LatLng position) async {
-    try {
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-
-      if (placemarks.isNotEmpty) {
-        Placemark place = placemarks.first;
-        List<String?> locationParts = [
-          place.street,
-          place.subLocality,
-          place.locality,
-          place.name,
-        ].where((part) => part != null && part.trim().isNotEmpty).toList();
-
-        String? placeName = locationParts.isNotEmpty
-            ? locationParts.first
-            : 'Current Location';
-
-        if (_isInHyderabad(position.latitude, position.longitude)) {
-          setState(() {
-            displayLocation = placeName!;
-            isLocationError = false;
-          });
-          widget.onLocationError?.call(false);
-        } else {
-          setState(() {
-            displayLocation = placeName!;
-            isLocationError = true;
-          });
-          widget.onLocationError?.call(true);
-        }
-      }
-    } catch (e) {
-      setState(() {
-        displayLocation = 'Current Location';
-      });
-    }
-  }
-
-  Future<void> _loadSavedLocation() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final locationsJson = prefs.getStringList('saved_locations') ?? [];
-      if (locationsJson.isNotEmpty) {
-        final location = SavedLocation.fromJson(
-          jsonDecode(locationsJson.first),
-        );
-        setState(() {
-          _currentSavedLocation = location;
-          displayLocation = location.address;
-          isLocationError = false;
-        });
-        widget.onLocationError?.call(false);
-      }
-    } catch (e) {
-      debugPrint('Error loading saved location: $e');
-    }
-  }
-
   Future<void> _showLocationPicker() async {
-    final result = await Navigator.push(
+    final result = await Navigator.push<SavedLocation>(
       context,
       MaterialPageRoute(
-        builder: (context) => LocationPickerPage(),
+        builder: (context) => const LocationPickerPage(),
       ),
     );
 
-    if (result != null && result is SavedLocation) {
-      setState(() {
-        _currentSavedLocation = result;
-        displayLocation = result.address;
-        isLocationError = false;
-      });
-      widget.onLocationError?.call(false);
+    if (result != null) {
+      _startLocationUpdates();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location saved! Showing live GPS position'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     }
   }
 
@@ -236,17 +304,41 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar> {
           child: Row(
             children: [
               Icon(
-                isLocationError ? Icons.error_outline : Icons.location_on_outlined,
-                color: isLocationError ? Colors.red : Colors.black87,
+                isLocationError
+                    ? Icons.error_outline
+                    : Icons.location_on_outlined,
+                color: isLocationError ? Colors.red : bandiwalaYellow, // ✅ Changed to yellow
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Deliver to',
-                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                    Row(
+                      children: [
+                        const Text(
+                          'Current Location',
+                          style: TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: bandiwalaYellow, // ✅ Changed to yellow
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Text(
+                          'LIVE',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: bandiwalaYellow, // ✅ Changed to yellow
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                     GestureDetector(
                       onTap: _showLocationPicker,
@@ -264,7 +356,7 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          Icon(
+                          const Icon(
                             Icons.keyboard_arrow_down_rounded,
                             size: 18,
                             color: Colors.black54,
@@ -275,22 +367,64 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar> {
                   ],
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 8),
+              // ✅ Wallet button with balance
+              InkWell(
+                onTap: () {
+                  // Navigate to wallet screen
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Wallet feature coming soon!'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.account_balance_wallet_outlined,
+                        color: Colors.black87,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '₹${_walletBalance.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
               InkWell(
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => SettingsScreen(phoneNumber: widget.phoneNumber),
+                    builder: (_) =>
+                        SettingsScreen(phoneNumber: widget.phoneNumber),
                   ),
                 ),
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  padding: EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade100,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.person_outline, color: Colors.black87),
+                  child:
+                  const Icon(Icons.person_outline, color: Colors.black87),
                 ),
               ),
             ],
@@ -302,7 +436,7 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar> {
             children: [
               Expanded(
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   height: 46,
                   decoration: BoxDecoration(
                     color: Colors.grey.shade100,
@@ -311,16 +445,17 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.search, color: Colors.grey, size: 22),
-                      SizedBox(width: 8),
+                      const Icon(Icons.search, color: Colors.grey, size: 22),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: widget.searchController,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             isCollapsed: true,
                             border: InputBorder.none,
                             hintText: 'Search street food, stalls...',
-                            hintStyle: TextStyle(fontSize: 13, color: Colors.grey),
+                            hintStyle:
+                            TextStyle(fontSize: 13, color: Colors.grey),
                           ),
                         ),
                       ),
@@ -328,7 +463,7 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar> {
                   ),
                 ),
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               InkWell(
                 onTap: _isListening ? _stopListening : _startListening,
                 borderRadius: BorderRadius.circular(12),
@@ -364,8 +499,8 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar> {
             }
           });
         },
-        listenFor: Duration(seconds: 10),
-        pauseFor: Duration(seconds: 3),
+        listenFor: const Duration(seconds: 10),
+        pauseFor: const Duration(seconds: 3),
         partialResults: true,
         localeId: 'en_IN',
         cancelOnError: true,
@@ -380,11 +515,5 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar> {
   void _stopListening() async {
     await _speechToText.stop();
     setState(() => _isListening = false);
-  }
-
-  @override
-  void dispose() {
-    _speechToText.stop();
-    super.dispose();
   }
 }

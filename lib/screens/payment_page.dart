@@ -1,4 +1,4 @@
-// ✅ COMPLETE PaymentPage.dart - ALL ERRORS FIXED + SUCCESS PAGE WORKS
+// ✅ COMPLETE PaymentPage.dart - Multi-Vendor Status Support + Fixed Layout
 import 'package:flutter/material.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -87,6 +87,7 @@ class _PaymentPageState extends State<PaymentPage> {
         'itemsByVendor': <String, dynamic>{},
       };
 
+      // Build nested map with vendor-specific status
       final Map<String, dynamic> cartCopy = {};
       for (final entry in cartStore.cartByVendor.entries) {
         final vendorId = entry.key;
@@ -98,15 +99,26 @@ class _PaymentPageState extends State<PaymentPage> {
               'quantity': item.quantity,
             })
         );
+
+        // Calculate vendor-specific subtotal
+        double vendorSubtotal = 0;
+        for (final item in entry.value.items) {
+          vendorSubtotal += item.price * item.quantity;
+        }
+
         cartCopy[vendorId] = {
           'vendorName': entry.value.vendorName,
           'items': itemsCopy,
+          'status': 'pending', // ✅ Individual vendor status
+          'vendorSubtotal': vendorSubtotal,
+          'orderReceivedAt': FieldValue.serverTimestamp(),
+          'statusUpdatedAt': FieldValue.serverTimestamp(),
         };
       }
       orderData['itemsByVendor'] = cartCopy;
 
       await FirebaseFirestore.instance.collection('orders').add(orderData);
-      debugPrint('✅ Order created: $orderId');
+      debugPrint('✅ Order created: $orderId with ${cartCopy.length} vendors');
       return orderId;
     } catch (e) {
       debugPrint('❌ Firestore error: $e');
@@ -206,22 +218,42 @@ class _PaymentPageState extends State<PaymentPage> {
         foregroundColor: Colors.black,
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(1.0),
-          child: ColoredBox(color: kBorderGrey),
+          child: ColoredBox(color: kBorderGrey, child: SizedBox(height: 1)),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: Column(
         children: [
-          _compactSummaryCard(),
-          const SizedBox(height: 12),
-          if (widget.deliveryAddress != null && widget.deliveryAddress!.isNotEmpty)
-            _compactAddressCard(),
-          const SizedBox(height: 12),
-          _compactPaymentMethod(),
-          const Spacer(),
-          _compactSecureBadge(),
-          const SizedBox(height: 12),
-          _compactPayButton(),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _compactSummaryCard(),
+                const SizedBox(height: 12),
+                if (widget.deliveryAddress != null && widget.deliveryAddress!.isNotEmpty)
+                  _compactAddressCard(),
+                const SizedBox(height: 12),
+                _compactPaymentMethod(),
+              ],
+            ),
+          ),
+          // ✅ Bottom section fixed at bottom
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: kWhite,
+              border: Border(top: BorderSide(color: kBorderGrey, width: 1)),
+            ),
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _compactSecureBadge(),
+                  const SizedBox(height: 12),
+                  _compactPayButton(),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -250,7 +282,9 @@ class _PaymentPageState extends State<PaymentPage> {
           _compactRow('Items', '₹${widget.amount.toStringAsFixed(0)}'),
           _compactRow('Delivery', '₹30'),
           _compactRow('Tax (5%)', '₹${taxAmount.toStringAsFixed(0)}'),
+          const SizedBox(height: 8),
           Container(height: 1, color: kBorderGrey),
+          const SizedBox(height: 8),
           _compactRow('Total', '₹${totalPayable.toStringAsFixed(0)}', bold: true),
         ],
       ),
@@ -281,7 +315,7 @@ class _PaymentPageState extends State<PaymentPage> {
                 const SizedBox(height: 4),
                 Text(
                   widget.deliveryAddress!,
-                  style: TextStyle(fontSize: 13, color: Colors.black54),
+                  style: const TextStyle(fontSize: 13, color: Colors.black54),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -315,10 +349,10 @@ class _PaymentPageState extends State<PaymentPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Card/UPI/Wallet', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                  const Text('Card/UPI/Wallet', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                   Text(
                     _isProcessing ? 'Processing...' : 'Secure payment',
-                    style: TextStyle(fontSize: 13, color: Colors.black54),
+                    style: const TextStyle(fontSize: 13, color: Colors.black54),
                   ),
                 ],
               ),
@@ -357,27 +391,18 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   Widget _compactPayButton() {
-    return Container(
+    return SizedBox(
+      width: double.infinity,
       height: 50,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: kBandiwalaYellow.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
       child: ElevatedButton.icon(
         onPressed: _isProcessing ? null : _openCheckout,
         icon: _isProcessing
-            ? SizedBox(
+            ? const SizedBox(
           width: 16,
           height: 16,
           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
         )
-            : Icon(Icons.payment, size: 18, color: Colors.black),
+            : const Icon(Icons.payment, size: 18, color: Colors.black),
         label: Text(
           _isProcessing ? 'Processing...' : 'Pay ₹${totalPayable.toStringAsFixed(0)}',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
@@ -386,6 +411,7 @@ class _PaymentPageState extends State<PaymentPage> {
           backgroundColor: kBandiwalaYellow,
           foregroundColor: Colors.black,
           elevation: 0,
+          disabledBackgroundColor: kBandiwalaYellow.withOpacity(0.6),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
