@@ -5,18 +5,18 @@ import 'cart_store.dart';
 import 'location_picker_page.dart';
 import 'payment_page.dart';
 import 'coupons_page.dart';
-import 'login_page.dart'; // ✅ ADD THIS IMPORT
+import 'login_page.dart';
 
 const kBandiwalaYellow = Color(0xFFFFC107);
 
 class CartScreen extends StatefulWidget {
   final VoidCallback? onBackToHome;
-  final String? phoneNumber; // ✅ ADD THIS
+  final String? phoneNumber;
 
   const CartScreen({
     super.key,
     this.onBackToHome,
-    this.phoneNumber, // ✅ ADD THIS
+    this.phoneNumber,
   });
 
   @override
@@ -54,13 +54,11 @@ class _CartScreenState extends State<CartScreen> {
     setState(() {});
   }
 
-  // ✅ NEW: Check if user is guest
   bool _isGuestUser() {
     final phone = widget.phoneNumber ?? FirebaseAuth.instance.currentUser?.phoneNumber;
     return phone == 'GUEST' || phone == null || phone.isEmpty;
   }
 
-  // ✅ NEW: Show guest login prompt
   void _showGuestLoginPrompt() {
     showDialog(
       context: context,
@@ -119,15 +117,12 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  // ✅ FIXED: Convert phone number to Firebase document ID
   Future<String> _getDocIdFromPhone(String phoneOrDocId) async {
     try {
-      // If it looks like a document ID (long alphanumeric), return as is
       if (phoneOrDocId.length > 15) {
         return phoneOrDocId;
       }
 
-      // Query vendors by phone number
       final querySnapshot = await FirebaseFirestore.instance
           .collection('vendors')
           .where('phone', isEqualTo: phoneOrDocId.trim())
@@ -200,8 +195,7 @@ class _CartScreenState extends State<CartScreen> {
 
         if (vendorTotal < minAmount) {
           isStillValid = false;
-          removalReason =
-          'Total from required vendors fell below ₹${minAmount.toInt()}';
+          removalReason = 'Total from required vendors fell below ₹${minAmount.toInt()}';
           print('   ❌ Amount too low');
         } else {
           print('   ✅ Still valid');
@@ -232,7 +226,7 @@ class _CartScreenState extends State<CartScreen> {
     final couponType = _appliedCoupon!['couponType'] ?? 'discount';
     if (couponType == 'discount') {
       return (_appliedCoupon!['discountAmount'] ?? 0).toDouble();
-    } else if (couponType == 'free_delivery') {
+    } else if (couponType == 'freeDelivery') {
       return 30.0;
     }
     return 0;
@@ -299,7 +293,6 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _handlePlaceOrder() {
-    // ✅ CHECK IF GUEST FIRST
     if (_isGuestUser()) {
       _showGuestLoginPrompt();
       return;
@@ -323,7 +316,7 @@ class _CartScreenState extends State<CartScreen> {
 
   double _calculateFinalTotal() {
     final delivery = _appliedCoupon != null &&
-        _appliedCoupon!['couponType'] == 'free_delivery'
+        _appliedCoupon!['couponType'] == 'freeDelivery'
         ? 0.0
         : 30.0;
     final taxes = (cartStore.grandTotal + delivery) * 0.05;
@@ -332,7 +325,6 @@ class _CartScreenState extends State<CartScreen> {
     return total > 0 ? total : 0;
   }
 
-  // ✅ FIXED: Convert phone numbers to document IDs before showing coupons
   void _showAllCoupons() async {
     print('\n🔄 === CONVERTING PHONE NUMBERS TO DOCUMENT IDs ===');
 
@@ -341,7 +333,6 @@ class _CartScreenState extends State<CartScreen> {
     final Map<String, String> vendorNames = {};
     final List<String> cartVendorDocIds = [];
 
-    // Convert each phone number to document ID
     for (var phoneOrId in cartVendorPhones) {
       final docId = await _getDocIdFromPhone(phoneOrId);
       cartVendorDocIds.add(docId);
@@ -368,7 +359,7 @@ class _CartScreenState extends State<CartScreen> {
       MaterialPageRoute(
         builder: (_) => CouponsPage(
           cartAmount: cartStore.grandTotal,
-          cartVendorIds: cartVendorDocIds, // ← Now using document IDs!
+          cartVendorIds: cartVendorDocIds,
           vendorAmounts: vendorAmounts,
           vendorNames: vendorNames,
         ),
@@ -378,6 +369,142 @@ class _CartScreenState extends State<CartScreen> {
     if (selectedCoupon != null && mounted) {
       _applyCoupon(selectedCoupon);
     }
+  }
+
+  // ✅ NEW: Show coupon success dialog instead of snackbar
+  void _showCouponSuccessDialog(Map<String, dynamic> coupon) {
+    final couponCode = coupon['couponCode'] ?? '';
+    final couponType = coupon['couponType'] ?? 'discount';
+
+    String savingsText = '';
+    if (couponType == 'discount') {
+      savingsText = 'You saved ₹${_couponDiscount.toInt()} with this coupon';
+    } else if (couponType == 'freeDelivery') {
+      savingsText = 'You saved ₹30 with this coupon';
+    } else if (couponType == 'freebie') {
+      final freebieName = coupon['freebieName'] ?? 'free item';
+      savingsText = 'You got $freebieName free with this coupon';
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Coupon icon with percentage
+            Padding(
+              padding: const EdgeInsets.only(top: 32, bottom: 16),
+              child: Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.orange.shade300,
+                      Colors.orange.shade500,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      Icons.local_offer,
+                      size: 50,
+                      color: Colors.white.withOpacity(0.3),
+                    ),
+                    Text(
+                      couponType == 'discount'
+                          ? '${(_couponDiscount).toInt()}%'
+                          : '✓',
+                      style: const TextStyle(
+                        fontSize: 36,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Coupon code
+            Text(
+              '$couponCode applied',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Colors.black87,
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Savings text
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                savingsText,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87,
+                  height: 1.3,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            // Subtext
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                'That feels amazing, right?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                  height: 1.4,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
+            // Close button
+            Padding(
+              padding: const EdgeInsets.only(bottom: 24),
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: kBandiwalaYellow,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _applyCoupon(Map<String, dynamic> coupon) {
@@ -392,35 +519,8 @@ class _CartScreenState extends State<CartScreen> {
       });
     }
 
-    final couponType = coupon['couponType'] ?? 'discount';
-    String message = 'Coupon applied!';
-
-    if (couponType == 'discount') {
-      message = '🎉 Yay! You saved ₹${_couponDiscount.toInt()}';
-    } else if (couponType == 'free_delivery') {
-      message = '🎉 Yay! Free delivery applied';
-    } else if (couponType == 'freebie') {
-      final freebieName = coupon['freebieName'] ?? 'free item';
-      message = '🎉 Yay! You got $freebieName free';
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.celebration, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    // ✅ Show dialog instead of snackbar
+    _showCouponSuccessDialog(coupon);
   }
 
   void _removeCoupon() {
@@ -600,7 +700,7 @@ class _CartScreenState extends State<CartScreen> {
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: _handlePlaceOrder, // ✅ UPDATED - Now checks for guest
+                          onPressed: _handlePlaceOrder,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: kBandiwalaYellow,
                             foregroundColor: Colors.black,
@@ -661,6 +761,11 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 }
+
+// Keep all other classes (YouMayLikeSection, SuggestionCard, AddressSection,
+// CouponSectionWidget, PriceBreakdownWidget, VendorCartSection, CartLineItem)
+// exactly as they are in the original code - no changes needed
+
 
 class YouMayLikeSection extends StatelessWidget {
   final List<String> vendorIds;

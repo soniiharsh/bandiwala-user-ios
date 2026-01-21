@@ -38,7 +38,7 @@ class CouponsPage extends StatelessWidget {
     print('═══════════════════════════════════════\n');
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -47,10 +47,10 @@ class CouponsPage extends StatelessWidget {
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
         ),
         title: const Text(
-          'Restaurant coupons',
+          'Apply coupon',
           style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
             color: Colors.black87,
           ),
         ),
@@ -170,7 +170,6 @@ class CouponsPage extends StatelessWidget {
                   print('         [$i] "${couponVendorIds[i]}"');
                 }
 
-                // FIXED: Better matching logic
                 applicableVendorIds = _findMatchingVendors(
                   cartVendorIds: cartVendorIds,
                   couponVendorIds: couponVendorIds,
@@ -183,7 +182,6 @@ class CouponsPage extends StatelessWidget {
                   print('      ❌ NO MATCHING VENDORS - HIDING COUPON');
                   shouldShowCoupon = false;
                 } else {
-                  // Show matched vendors
                   print('      ✅ Matched vendors:');
                   for (var id in applicableVendorIds) {
                     final name = vendorNames[id] ?? 'Unknown';
@@ -191,7 +189,6 @@ class CouponsPage extends StatelessWidget {
                     print('         - $name: ₹$amount');
                   }
 
-                  // Calculate total from matching vendors
                   relevantAmount = applicableVendorIds.fold(
                     0.0,
                         (sum, id) => sum + (vendorAmounts[id] ?? 0),
@@ -211,19 +208,16 @@ class CouponsPage extends StatelessWidget {
               }
             }
 
-            // Skip if should not show
             if (!shouldShowCoupon) {
               print('   🚫 HIDDEN FROM LIST\n');
               continue;
             }
 
-            // Store calculated data
             couponData['applicableVendorIds'] = applicableVendorIds;
             couponData['remainingAmount'] = remainingAmount;
             couponData['isApplicable'] = isApplicable;
             couponData['relevantAmount'] = relevantAmount;
 
-            // Sort into lists
             if (isApplicable) {
               print('   ✅ APPLICABLE\n');
               applicableCoupons.add(couponData);
@@ -247,36 +241,106 @@ class CouponsPage extends StatelessWidget {
             return _buildEmptyState();
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: allCoupons.length,
-            itemBuilder: (context, index) {
-              final coupon = allCoupons[index];
-              return _CouponCard(
-                coupon: coupon,
-                remainingAmount: coupon['remainingAmount'] as double,
-                isApplicable: coupon['isApplicable'] as bool,
-                vendorNames: vendorNames,
-                applicableVendorIds: coupon['applicableVendorIds'] as List<String>,
-                isWholeApp: coupon['isWholeApp'] ?? true,
-                vendorAmounts: vendorAmounts,
-                onApply: () {
-                  if (coupon['isApplicable'] as bool) {
-                    Clipboard.setData(
-                      ClipboardData(text: coupon['couponCode'] as String),
+          return Column(
+            children: [
+              // Manual coupon entry section
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.local_offer, color: kBandiwalaYellow, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Enter a valid coupon code',
+                          hintStyle: TextStyle(
+                            color: Colors.grey.shade400,
+                            fontSize: 14,
+                          ),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {},
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(50, 30),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Apply',
+                        style: TextStyle(
+                          color: kBandiwalaYellow,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Available coupons header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Available Coupons',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Coupons list
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  itemCount: allCoupons.length,
+                  itemBuilder: (context, index) {
+                    final coupon = allCoupons[index];
+                    return _CouponCard(
+                      coupon: coupon,
+                      remainingAmount: coupon['remainingAmount'] as double,
+                      isApplicable: coupon['isApplicable'] as bool,
+                      vendorNames: vendorNames,
+                      applicableVendorIds: coupon['applicableVendorIds'] as List<String>,
+                      isWholeApp: coupon['isWholeApp'] ?? true,
+                      vendorAmounts: vendorAmounts,
+                      onApply: () {
+                        if (coupon['isApplicable'] as bool) {
+                          Clipboard.setData(
+                            ClipboardData(text: coupon['couponCode'] as String),
+                          );
+                          Navigator.pop(context, coupon);
+                        }
+                      },
                     );
-                    Navigator.pop(context, coupon);
-                  }
-                },
-              );
-            },
+                  },
+                ),
+              ),
+            ],
           );
         },
       ),
     );
   }
 
-  // FIXED: Improved vendor matching logic
   List<String> _findMatchingVendors({
     required List<String> cartVendorIds,
     required List<String> couponVendorIds,
@@ -285,15 +349,13 @@ class CouponsPage extends StatelessWidget {
     final matchedIds = <String>[];
 
     for (var cartId in cartVendorIds) {
-      // Normalize: trim whitespace
       final normalizedCartId = cartId.trim();
 
       for (var couponId in couponVendorIds) {
         final normalizedCouponId = couponId.trim();
 
-        // Direct ID match (case-sensitive for Firebase doc IDs)
         if (normalizedCartId == normalizedCouponId) {
-          matchedIds.add(cartId); // Keep original format
+          matchedIds.add(cartId);
           print('         ✅ MATCH: "$cartId" == "$couponId"');
           break;
         }
@@ -370,10 +432,9 @@ class _CouponCard extends StatelessWidget {
     final minAmount = (coupon['minAmount'] ?? 0).toDouble();
 
     if (isWholeApp) {
-      return 'Add ₹${remainingAmount.toStringAsFixed(0)} more to unlock';
+      return 'Shop for ₹${remainingAmount.toStringAsFixed(0)} more to apply offer';
     }
 
-    // Vendor-specific
     final totalFromVendors = applicableVendorIds.fold(
       0.0,
           (sum, id) => sum + (vendorAmounts[id] ?? 0),
@@ -396,414 +457,195 @@ class _CouponCard extends StatelessWidget {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  String _getMainDescription() {
     final couponType = coupon['couponType'] ?? 'discount';
-    return couponType == 'freebie'
-        ? _buildFreebieCard(context)
-        : _buildStandardCard(context);
+
+    if (couponType == 'freebie') {
+      return coupon['freebieName'] ?? 'FREE ITEM';
+    } else if (couponType == 'freeDelivery') {
+      return 'You save ₹${(coupon['deliverySavings'] ?? 1).toInt()}';
+    } else {
+      final discountAmount = (coupon['discountAmount'] ?? 0).toDouble();
+      return '${discountAmount.toInt()}% OFF on first order';
+    }
   }
 
-  Widget _buildStandardCard(BuildContext context) {
-    final couponType = coupon['couponType'] ?? 'discount';
-    final couponCode = coupon['couponCode'] ?? '';
+  String _getDetailedDescription() {
     final description = coupon['description'] ?? '';
+    final minAmount = (coupon['minAmount'] ?? 0).toDouble();
 
-    String titleText;
-    IconData iconData;
-    Color iconColor;
-
-    if (couponType == 'discount') {
-      final discountAmount = (coupon['discountAmount'] ?? 0).toDouble();
-      titleText = 'FLAT ₹${discountAmount.toInt()} OFF';
-      iconData = Icons.local_offer;
-      iconColor = Colors.green;
-    } else {
-      titleText = 'FREE DELIVERY';
-      iconData = Icons.delivery_dining;
-      iconColor = Colors.blue;
+    if (description.isNotEmpty) {
+      return description;
     }
 
+    final couponType = coupon['couponType'] ?? 'discount';
+    final couponCode = coupon['couponCode'] ?? '';
+
+    if (couponType == 'freeDelivery') {
+      return 'Free shipping on orders above ₹${minAmount.toInt()}';
+    } else {
+      return 'Get flat ${(coupon['discountAmount'] ?? 0).toInt()}% off using the code $couponCode on your first order above ₹${minAmount.toInt()}';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final couponCode = coupon['couponCode'] ?? '';
+    final mainDesc = _getMainDescription();
+    final detailedDesc = _getDetailedDescription();
     final addMoreMessage = _buildAddMoreMessage();
 
     return GestureDetector(
       onTap: isApplicable ? onApply : null,
-      child: Opacity(
-        opacity: isApplicable ? 1.0 : 0.7,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isApplicable ? Colors.green.shade300 : Colors.grey.shade300,
-              width: 1.5,
-            ),
-            boxShadow: isApplicable
-                ? [
-              BoxShadow(
-                color: Colors.green.withOpacity(0.1),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              )
-            ]
-                : null,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: isApplicable
-                      ? iconColor.withOpacity(0.1)
-                      : Colors.grey.shade100,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  iconData,
-                  color: isApplicable ? iconColor : Colors.grey.shade400,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isApplicable
-                            ? Colors.green.shade50
-                            : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: isApplicable
-                              ? Colors.green.shade300
-                              : Colors.grey.shade300,
-                          width: 1,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Column(
+          children: [
+            // Main content area
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Coupon icon
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: kBandiwalaYellow.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.local_offer,
+                      color: kBandiwalaYellow,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Coupon details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Coupon code
+                        Text(
+                          couponCode,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black87,
+                            letterSpacing: 0.5,
+                          ),
                         ),
-                      ),
-                      child: Text(
-                        couponCode,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: isApplicable
-                              ? Colors.green.shade700
-                              : Colors.grey.shade700,
-                          letterSpacing: 1.2,
+                        const SizedBox(height: 4),
+
+                        // Main description
+                        Text(
+                          mainDesc,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade700,
+                          ),
                         ),
+                      ],
+                    ),
+                  ),
+
+                  // Apply button
+                  TextButton(
+                    onPressed: isApplicable ? onApply : null,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      backgroundColor: isApplicable ? null : Colors.grey.shade100,
+                    ),
+                    child: Text(
+                      'Apply',
+                      style: TextStyle(
+                        color: isApplicable ? kBandiwalaYellow : Colors.grey.shade500,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Dotted separator
+            CustomPaint(
+              size: const Size(double.infinity, 1),
+              painter: DottedLinePainter(),
+            ),
+
+            // Detailed description section
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    detailedDesc,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                      height: 1.4,
+                    ),
+                  ),
+
+                  // Add more message
+                  if (addMoreMessage.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
-                      titleText,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: isApplicable ? Colors.black87 : Colors.grey.shade600,
+                      addMoreMessage,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: kBandiwalaYellow,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    if (description.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        description,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade700,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    if (!isWholeApp && applicableVendorIds.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.purple.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: Colors.purple.withOpacity(0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.store, size: 14, color: Colors.purple.shade700),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                'Valid for: ${applicableVendorIds.map((id) => vendorNames[id] ?? 'Restaurant').join(", ")}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.purple.shade700,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    if (!isApplicable && addMoreMessage.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.orange.shade200),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.info_outline, size: 16, color: Colors.orange.shade800),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                addMoreMessage,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.orange.shade800,
-                                  fontWeight: FontWeight.w500,
-                                  height: 1.3,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                   ],
-                ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Container(
-                width: 24,
-                height: 24,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isApplicable ? Colors.green.shade600 : Colors.grey.shade400,
-                    width: 2,
-                  ),
-                ),
-                child: isApplicable
-                    ? Center(
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade600,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                )
-                    : null,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFreebieCard(BuildContext context) {
-    final freebieName = coupon['freebieName'] ?? 'FREE ITEM';
-    final freebieImageUrl = coupon['freebieImageUrl'];
-    final couponCode = coupon['couponCode'] ?? '';
-    final description = coupon['description'] ?? '';
-    final addMoreMessage = _buildAddMoreMessage();
-
-    return GestureDetector(
-      onTap: isApplicable ? onApply : null,
-      child: Opacity(
-        opacity: isApplicable ? 1.0 : 0.7,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isApplicable ? Colors.orange.shade300 : Colors.grey.shade300,
-              width: 1.5,
             ),
-            boxShadow: isApplicable
-                ? [
-              BoxShadow(
-                color: Colors.orange.withOpacity(0.1),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              )
-            ]
-                : null,
-          ),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
-                child: freebieImageUrl != null && freebieImageUrl.toString().isNotEmpty
-                    ? Image.network(
-                  freebieImageUrl,
-                  width: 100,
-                  height: 140,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 100,
-                    height: 140,
-                    color: Colors.orange.shade100,
-                    child: const Icon(Icons.redeem, color: Colors.orange, size: 40),
-                  ),
-                )
-                    : Container(
-                  width: 100,
-                  height: 140,
-                  color: Colors.orange.shade100,
-                  child: const Icon(Icons.redeem, color: Colors.orange, size: 40),
-                ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isApplicable ? Colors.orange.shade50 : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(5),
-                          border: Border.all(
-                            color: isApplicable ? Colors.orange.shade300 : Colors.grey.shade300,
-                          ),
-                        ),
-                        child: Text(
-                          couponCode,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: isApplicable ? Colors.orange.shade800 : Colors.grey.shade700,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        freebieName,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black87,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (description.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          description,
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                      if (!isWholeApp && applicableVendorIds.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.purple.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: Colors.purple.withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.store, size: 12, color: Colors.purple.shade700),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  'Valid: ${applicableVendorIds.map((id) => vendorNames[id]).join(", ")}',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.purple.shade700,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      if (!isApplicable && addMoreMessage.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(5),
-                            border: Border.all(color: Colors.orange.shade200),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.info_outline, size: 14, color: Colors.orange.shade800),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  addMoreMessage,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.orange.shade800,
-                                    fontWeight: FontWeight.w500,
-                                    height: 1.2,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isApplicable ? Colors.orange.shade600 : Colors.grey.shade400,
-                      width: 2,
-                    ),
-                  ),
-                  child: isApplicable
-                      ? Center(
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade600,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  )
-                      : null,
-                ),
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );
   }
+}
+
+// Dotted line painter
+class DottedLinePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.grey.shade300
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+
+    const dashWidth = 5.0;
+    const dashSpace = 3.0;
+    double startX = 0;
+
+    while (startX < size.width) {
+      canvas.drawLine(
+        Offset(startX, 0),
+        Offset(startX + dashWidth, 0),
+        paint,
+      );
+      startX += dashWidth + dashSpace;
+    }
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }

@@ -128,28 +128,6 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                     ),
                     const SizedBox(height: 24),
 
-                    // Success checkmark
-                    FadeTransition(
-                      opacity: Tween<double>(begin: 0.0, end: 1.0).animate(
-                        CurvedAnimation(
-                          parent: _animationController,
-                          curve: const Interval(0.4, 0.8),
-                        ),
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: kBandiwalaYellow.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.check_circle,
-                          color: kBandiwalaYellow,
-                          size: 64,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
 
                     // Success text
                     FadeTransition(
