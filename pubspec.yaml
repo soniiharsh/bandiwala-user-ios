@@ -1,4 +1,4 @@
-name: bandiwala_user
+name: Bandiwala
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -48,6 +48,7 @@ dependencies:
   firebase_storage: ^13.0.5
   cached_network_image: ^3.4.1
   sms_autofill: ^2.4.1
+  google_fonts: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -59,6 +60,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
   change_app_package_name: ^1.5.0
 
 # For information on the generic Dart part of this file, see the
@@ -74,21 +76,6 @@ flutter:
   assets:
     - assets/images/splash.png
 
-    - assets/images/1.png # ✅ Add your images here
-    - assets/images/2.png
-    - assets/images/3.png
-    - assets/images/Biriyani.png
-    - assets/images/starters.png
-    - assets/images/Chinese.png
-    - assets/images/Soups.png
-    - assets/images/Sweets.png
-    - assets/images/Curries.png
-    - assets/images/Nonveg Pakoda.png
-    - assets/images/Mixture.png
-    - assets/images/Pulaos.png
-    - assets/images/Panipuri.png
-    - assets/images/Chat.png
-    - assets/images/Pav Bhaji.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -120,3 +107,9 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/splash.png"
+  adaptive_icon_background: "#FFFFFF"  # Your Bandiwala yellow
+  adaptive_icon_foreground: "assets/images/splash.png"

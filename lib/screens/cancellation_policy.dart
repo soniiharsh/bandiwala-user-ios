@@ -1,21 +1,16 @@
 import 'package:flutter/material.dart';
 
-const kBandiwalaYellow = Color(0xFFFFC107);
-
 class CancellationPolicyPage extends StatelessWidget {
   const CancellationPolicyPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           'Cancellation Policy',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
         ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
@@ -23,280 +18,146 @@ class CancellationPolicyPage extends StatelessWidget {
         centerTitle: false,
       ),
       body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Banner
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.cancel_outlined,
-                    size: 64,
-                    color: kBandiwalaYellow,
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Order Cancellation Policy',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Last Updated: January 5, 2026',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
+            // Title
+            const Text(
+              'Order Cancellation Policy',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.black87,
               ),
             ),
-
             const SizedBox(height: 8),
+            Text(
+              'Last Updated: January 5, 2026',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 24),
 
-            // Content Sections
-            _buildSection(
-              title: 'Cancellation by User',
-              icon: Icons.person_off_outlined,
-              children: [
-                _buildSubSection(
-                  title: '1. Before Merchant Confirms',
-                  content: [
-                    '• You can cancel for free',
-                    '• Full refund issued within 24 hours',
-                    '• No cancellation charges applied',
-                  ],
-                ),
-                _buildSubSection(
-                  title: '2. After Merchant Confirms (Before Dispatch)',
-                  content: [
-                    '• Cancellation fee: 10% of order value',
-                    '• Minimum cancellation fee: ₹20',
-                    '• Remaining amount refunded within 24 hours',
-                    '• Some merchants may offer refund without deduction',
-                  ],
-                ),
-                _buildSubSection(
-                  title: '3. After Dispatch (Delivery in Progress)',
-                  content: [
-                    '• Order is non-cancellable',
-                    '• If delivery is impossible, contact support',
-                    '• Refund may be issued if delivery is refused by recipient',
-                  ],
-                ),
-                _buildSubSection(
-                  title: '4. After Delivery',
-                  content: [
-                    '• Order cannot be cancelled',
-                    '• For issues with order quality, proceed to refund request',
-                    '• Report issues within 2 hours of delivery',
-                  ],
-                ),
-                _buildSubSection(
-                  title: '5. Promo Code Orders',
-                  content: [
-                    '• Cancelled before merchant confirms: Full refund + promo code remains valid',
-                    '• Cancelled after merchant confirms: Deduction applied only to paid amount, not promo value',
-                  ],
-                ),
-              ],
+            // Content
+            _buildParagraph(
+              'This Cancellation Policy outlines the terms and conditions under which orders placed on the BandiWala platform may be cancelled by users, merchants, or BandiWala itself. Please read this policy carefully to understand your rights and obligations.',
             ),
 
-            _buildSection(
-              title: 'Merchant-Initiated Cancellations',
-              icon: Icons.store_outlined,
-              children: [
-                _buildInfoCard(
-                  'Merchants may cancel orders if:',
-                  [
-                    '✓ Items are unexpectedly unavailable',
-                    '✓ Order volume exceeds capacity',
-                    '✓ Delivery location is outside service area',
-                    '✓ Customer uses address outside serviceable zone',
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildHighlightBox(
-                  'Refund Policy',
-                  'Full refund issued immediately and processed automatically',
-                ),
-              ],
+            _buildHeading('Cancellation by User'),
+
+            _buildParagraph(
+              'Users may cancel their orders at various stages of the order process. The cancellation charges and refund terms depend on the stage at which the order is cancelled.',
             ),
 
-            _buildSection(
-              title: 'BandiWala-Initiated Cancellations',
-              icon: Icons.admin_panel_settings_outlined,
-              children: [
-                _buildInfoCard(
-                  'BandiWala may cancel orders due to:',
-                  [
-                    '• Fraud detection',
-                    '• Payment failure',
-                    '• Merchant account suspended',
-                    '• Delivery partner unavailability',
-                    '• Force majeure (earthquakes, floods, etc.)',
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildHighlightBox(
-                  'Refund Policy',
-                  'Full refund issued immediately to original payment method',
-                ),
-              ],
+            _buildSubHeading('Before Merchant Confirms'),
+            _buildParagraph(
+              'If you cancel your order before the merchant confirms it, you can cancel the order for free. A full refund will be issued to your original payment method within 24 hours. No cancellation charges will be applied at this stage.',
             ),
 
-            _buildSection(
-              title: 'How to Cancel Your Order',
-              icon: Icons.help_outline,
-              children: [
-                _buildStepCard(1, 'Open Your Order', 'Go to "Order History" in the app'),
-                _buildStepCard(2, 'Select Order', 'Tap on the order you want to cancel'),
-                _buildStepCard(3, 'Cancel Order', 'Click "Cancel Order" button'),
-                _buildStepCard(4, 'Confirm', 'Select reason and confirm cancellation'),
-                const SizedBox(height: 12),
-                _buildWarningBox(
-                  'Important',
-                  'Cancellation charges may apply based on order status',
-                ),
-              ],
+            _buildSubHeading('After Merchant Confirms (Before Dispatch)'),
+            _buildParagraph(
+              'Once the merchant has confirmed your order but before it has been dispatched, a cancellation fee of 10% of the order value will be applied. The minimum cancellation fee is ₹20. The remaining amount will be refunded to your original payment method within 24 hours. Please note that some merchants may offer a full refund without any deduction, depending on their individual policies.',
             ),
 
-            _buildSection(
-              title: 'Cancellation Timeline',
-              icon: Icons.access_time,
-              children: [
-                _buildTimelineItem(
-                  'Order Placed',
-                  'Free cancellation available',
-                  true,
-                ),
-                _buildTimelineItem(
-                  'Merchant Confirms',
-                  '10% cancellation fee applies (Min ₹20)',
-                  true,
-                ),
-                _buildTimelineItem(
-                  'Order Dispatched',
-                  'Non-cancellable',
-                  true,
-                ),
-                _buildTimelineItem(
-                  'Order Delivered',
-                  'Cannot cancel - Request refund instead',
-                  false,
-                ),
-              ],
+            _buildSubHeading('After Dispatch (Delivery in Progress)'),
+            _buildParagraph(
+              'Once your order has been dispatched and is out for delivery, it becomes non-cancellable. However, if the delivery is impossible due to unforeseen circumstances, you may contact our support team. In cases where delivery is refused by the recipient, a refund may be issued after review.',
             ),
 
-            _buildSection(
-              title: 'Important Notes',
-              icon: Icons.info_outline,
-              children: [
-                _buildNoteCard(
-                  Icons.timer_outlined,
-                  'Processing Time',
-                  'Refunds are processed within 24 hours of cancellation approval',
-                ),
-                _buildNoteCard(
-                  Icons.account_balance_wallet_outlined,
-                  'Refund Method',
-                  'Refund will be credited to your original payment method',
-                ),
-                _buildNoteCard(
-                  Icons.warning_amber_outlined,
-                  'Abuse Prevention',
-                  'Excessive cancellations may result in account review',
-                ),
-              ],
+            _buildSubHeading('After Delivery'),
+            _buildParagraph(
+              'Orders cannot be cancelled after they have been delivered. If you have any issues with the quality or condition of your order, you should proceed to submit a refund request instead. Please note that all issues must be reported within 2 hours of delivery for timely resolution.',
             ),
 
-            // Contact Support Section
-            Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: kBandiwalaYellow.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.support_agent,
-                      color: kBandiwalaYellow,
-                      size: 32,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Need Help?',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Contact our support team for assistance',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.email_outlined, size: 16, color: Colors.grey.shade700),
-                      const SizedBox(width: 6),
-                      Text(
-                        'support@bandiwala.com',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade700,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.phone_outlined, size: 16, color: Colors.grey.shade700),
-                      const SizedBox(width: 6),
-                      Text(
-                        '+91 7382107075',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade700,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+            _buildSubHeading('Orders with Promo Codes'),
+            _buildParagraph(
+              'For orders placed using promotional codes or discount coupons, special terms apply. If you cancel the order before the merchant confirms it, you will receive a full refund and your promotional code will remain valid for future use. If you cancel after the merchant confirms the order, the cancellation fee will be applied only to the paid amount, not to the promotional discount value.',
+            ),
+
+            const SizedBox(height: 16),
+            _buildHeading('Merchant-Initiated Cancellations'),
+
+            _buildParagraph(
+              'Merchants reserve the right to cancel orders under certain circumstances. These circumstances include but are not limited to: items being unexpectedly unavailable due to stock issues, order volume exceeding the merchant\'s capacity to fulfill orders in a timely manner, delivery location being outside the merchant\'s service area, or the customer using a delivery address that falls outside the serviceable zone.',
+            ),
+
+            _buildParagraph(
+              'In the event of a merchant-initiated cancellation, a full refund will be issued immediately to your original payment method. The refund will be processed automatically without any intervention required from your side.',
+            ),
+
+            const SizedBox(height: 16),
+            _buildHeading('BandiWala-Initiated Cancellations'),
+
+            _buildParagraph(
+              'BandiWala may cancel orders in exceptional circumstances to protect the integrity of the platform and ensure a safe transaction environment. Orders may be cancelled due to fraud detection, payment failure or discrepancies, merchant account suspension or termination, unavailability of delivery partners in the area, or force majeure events such as natural disasters, earthquakes, floods, or other events beyond our control.',
+            ),
+
+            _buildParagraph(
+              'When BandiWala cancels an order, a full refund will be issued immediately to your original payment method. You will be notified via email or in-app notification about the cancellation and the reason for it.',
+            ),
+
+            const SizedBox(height: 16),
+            _buildHeading('How to Cancel Your Order'),
+
+            _buildParagraph(
+              'To cancel your order, follow these steps: First, open the BandiWala app and navigate to "Order History" from the menu. Next, select the specific order you wish to cancel by tapping on it. Once the order details are displayed, you will see a "Cancel Order" button. Click on this button and select the reason for cancellation from the provided options. Finally, confirm your cancellation request.',
+            ),
+
+            _buildParagraph(
+              'Please note that cancellation charges may apply based on the current status of your order. Make sure to review the cancellation policy details before confirming your cancellation.',
+            ),
+
+            const SizedBox(height: 16),
+            _buildHeading('Cancellation Timeline and Charges'),
+
+            _buildParagraph(
+              'The following timeline explains the cancellation charges at each stage of your order:',
+            ),
+
+            _buildParagraph(
+              'Order Placed: At this stage, you can cancel your order for free without any charges. Once the merchant confirms your order, a cancellation fee of 10% of the order value (minimum ₹20) will be applicable. After the order is dispatched for delivery, it becomes non-cancellable. Once the order has been delivered, you cannot cancel it and must request a refund instead if there are any issues.',
+            ),
+
+            const SizedBox(height: 16),
+            _buildHeading('Important Notes'),
+
+            _buildParagraph(
+              'All refunds are processed within 24 hours of cancellation approval. The refund will be credited to your original payment method, which may include credit cards, debit cards, UPI, wallets, or net banking. Please note that while we process refunds within 24 hours, it may take 3-7 business days for the amount to reflect in your account, depending on your bank or payment provider.',
+            ),
+
+            _buildParagraph(
+              'BandiWala monitors cancellation patterns to prevent abuse of the cancellation policy. Excessive or repeated cancellations without valid reasons may result in account review and potential restrictions on future orders. We encourage users to cancel orders only when absolutely necessary.',
+            ),
+
+            _buildParagraph(
+              'In cases where you experience issues with order quality, missing items, or incorrect deliveries, we recommend using the refund request feature instead of cancellation after delivery. This helps us track issues more effectively and improve service quality.',
+            ),
+
+            const SizedBox(height: 24),
+            _buildHeading('Contact Support'),
+
+            _buildParagraph(
+              'If you need assistance with order cancellations, refunds, or have any questions regarding this policy, please feel free to contact our customer support team. We are here to help you.',
+            ),
+
+            _buildParagraph(
+              'Email: support@bandiwala.com\nPhone: +91 7382107075',
+            ),
+
+            _buildParagraph(
+              'Our support team is available to assist you with any concerns or queries you may have regarding order cancellations and refunds.',
+            ),
+
+            const SizedBox(height: 24),
+            Divider(color: Colors.grey.shade300),
+            const SizedBox(height: 12),
+
+            Center(
+              child: Text(
+                '© 2026 BandiWala. All rights reserved.',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
               ),
             ),
-
             const SizedBox(height: 24),
           ],
         ),
@@ -304,377 +165,48 @@ class CancellationPolicyPage extends StatelessWidget {
     );
   }
 
-  Widget _buildSection({
-    required String title,
-    required IconData icon,
-    required List<Widget> children,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: kBandiwalaYellow.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, color: kBandiwalaYellow, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: Colors.grey.shade300),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: children,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSubSection({
-    required String title,
-    required List<String> content,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ...content.map((text) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade800,
-                height: 1.5,
-              ),
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoCard(String title, List<String> points) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ...points.map((point) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(
-              point,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade800,
-                height: 1.4,
-              ),
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHighlightBox(String title, String content) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: kBandiwalaYellow.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kBandiwalaYellow.withOpacity(0.5), width: 1.5),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.check_circle, color: kBandiwalaYellow, size: 24),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  content,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade800,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStepCard(int step, String title, String description) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: kBandiwalaYellow,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                '$step',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWarningBox(String title, String content) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: kBandiwalaYellow.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kBandiwalaYellow),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.warning_amber_rounded, color: kBandiwalaYellow, size: 24),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  content,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade800,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimelineItem(String title, String description, bool showLine) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                color: kBandiwalaYellow,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.check, color: Colors.white, size: 12),
-            ),
-            if (showLine)
-              Container(
-                width: 2,
-                height: 40,
-                color: Colors.grey.shade300,
-                margin: const EdgeInsets.symmetric(vertical: 4),
-              ),
-          ],
+  Widget _buildHeading(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 8),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: Colors.black87,
+          height: 1.4,
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade700,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _buildNoteCard(IconData icon, String title, String description) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
+  Widget _buildSubHeading(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 6),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: Colors.black87,
+          height: 1.4,
+        ),
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: kBandiwalaYellow.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: kBandiwalaYellow, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade700,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+    );
+  }
+
+  Widget _buildParagraph(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 13,
+          color: Colors.grey.shade800,
+          height: 1.6,
+          letterSpacing: 0.2,
+        ),
+        textAlign: TextAlign.justify,
       ),
     );
   }

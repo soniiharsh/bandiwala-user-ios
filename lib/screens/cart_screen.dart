@@ -1,6 +1,9 @@
+// cart_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:math';
 import 'cart_store.dart';
 import 'location_picker_page.dart';
 import 'payment_page.dart';
@@ -9,14 +12,137 @@ import 'login_page.dart';
 
 const kBandiwalaYellow = Color(0xFFFFC107);
 
+// ─── Service Zone Model ───────────────────────────────────────────────────────
+
+class _ServiceZone {
+  final String name;
+  final double lat;
+  final double lng;
+  final double radiusMeters;
+  const _ServiceZone({
+    required this.name,
+    required this.lat,
+    required this.lng,
+    required this.radiusMeters,
+  });
+}
+
+const List<_ServiceZone> _kServiceZones = [
+  _ServiceZone(
+    name: 'KPHB - Kukatpally Housing Board Colony',
+    lat: 17.476388,
+    lng: 78.390350,
+    radiusMeters: 805.83,
+  ),
+  _ServiceZone(
+    name: 'KPHB - Kukatpally Housing Board Colony',
+    lat: 17.485210,
+    lng: 78.376959,
+    radiusMeters: 941.10,
+  ),
+  _ServiceZone(
+    name: 'KPHB - Kukatpally Housing Board Colony',
+    lat: 17.490998,
+    lng: 78.393568,
+    radiusMeters: 1020.00,
+  ),
+  _ServiceZone(
+    name: 'KPHB - Kukatpally Housing Board Colony',
+    lat: 17.493208,
+    lng: 78.383281,
+    radiusMeters: 750.00,
+  ),
+  _ServiceZone(
+    name: 'Madhapur',
+    lat: 17.446960,
+    lng: 78.391101,
+    radiusMeters: 1225.23,
+  ),
+  _ServiceZone(
+    name: 'Nizampet',
+    lat: 17.509248,
+    lng: 78.373744,
+    radiusMeters: 1471.04,
+  ),
+  _ServiceZone(
+    name: 'Pragathi Nagar',
+    lat: 17.522838,
+    lng: 78.396081,
+    radiusMeters: 1380.00,
+  ),
+  _ServiceZone(
+    name: 'Addagutta',
+    lat: 17.503804,
+    lng: 78.396080,
+    radiusMeters: 1029.53,
+  ),
+  _ServiceZone(
+    name: 'Gajularamaram',
+    lat: 17.536753,
+    lng: 78.396639,
+    radiusMeters: 491.73,
+  ),
+];
+
+String? _getMatchedZone(double lat, double lng) {
+  for (final zone in _kServiceZones) {
+    final dist = _haversine(lat, lng, zone.lat, zone.lng);
+    if (dist <= zone.radiusMeters) return zone.name;
+  }
+  return null;
+}
+
+double _haversine(double lat1, double lon1, double lat2, double lon2) {
+  const R = 6371000.0;
+  final dLat = _rad(lat2 - lat1);
+  final dLon = _rad(lon2 - lon1);
+  final a =
+      sin(dLat / 2) * sin(dLat / 2) +
+      cos(_rad(lat1)) * cos(_rad(lat2)) * sin(dLon / 2) * sin(dLon / 2);
+  return R * 2 * atan2(sqrt(a), sqrt(1 - a));
+}
+
+double _rad(double deg) => deg * pi / 180;
+
+bool _vendorServesZone(Map<String, dynamic> data, String zone) {
+  final zoneLower = zone.toLowerCase().trim();
+
+  final addressField = data['address'];
+  if (addressField is String && addressField.isNotEmpty) {
+    final parts = addressField.split(',').map((p) => p.trim().toLowerCase());
+    if (parts.any((p) => p.contains(zoneLower) || zoneLower.contains(p))) {
+      return true;
+    }
+  }
+
+  final locationsField = data['locations'];
+  if (locationsField is List) {
+    final locs = locationsField.map((e) => e.toString().trim().toLowerCase());
+    if (locs.any((l) => l.contains(zoneLower) || zoneLower.contains(l))) {
+      return true;
+    }
+  } else if (locationsField is String && locationsField.isNotEmpty) {
+    final parts = locationsField.split(',').map((p) => p.trim().toLowerCase());
+    if (parts.any((p) => p.contains(zoneLower) || zoneLower.contains(p))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+// ─── CartScreen ───────────────────────────────────────────────────────────────
+
 class CartScreen extends StatefulWidget {
   final VoidCallback? onBackToHome;
   final String? phoneNumber;
+  final SavedLocation? deliveryAddress;
 
   const CartScreen({
     super.key,
     this.onBackToHome,
     this.phoneNumber,
+    this.deliveryAddress,
   });
 
   @override
@@ -24,38 +150,97 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  bool _showPriceBreakdown = false;
-  final TextEditingController _addressController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _addressKey = GlobalKey();
 
   Map<String, dynamic>? _appliedCoupon;
   double _couponDiscount = 0;
 
+  SavedLocation? _selectedAddress;
+
+  Map<String, bool> _vendorDeliverable = {};
+  bool _checkingDelivery = false;
+
   @override
   void initState() {
     super.initState();
     cartStore.addListener(_onCartChanged);
+    _selectedAddress = widget.deliveryAddress;
+    if (_selectedAddress != null) {
+      _checkDeliveryForAllVendors(_selectedAddress!);
+    }
+  }
+
+  @override
+  void didUpdateWidget(CartScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.deliveryAddress != widget.deliveryAddress &&
+        widget.deliveryAddress != null) {
+      setState(() => _selectedAddress = widget.deliveryAddress);
+      _checkDeliveryForAllVendors(widget.deliveryAddress!);
+    }
   }
 
   @override
   void dispose() {
     cartStore.removeListener(_onCartChanged);
-    _addressController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
   void _onCartChanged() {
     if (!mounted) return;
-    if (_appliedCoupon != null) {
-      _validateAppliedCoupon();
+    if (_appliedCoupon != null) _validateAppliedCoupon();
+    if (_selectedAddress != null) {
+      _checkDeliveryForAllVendors(_selectedAddress!);
     }
     setState(() {});
   }
 
+  Future<void> _checkDeliveryForAllVendors(SavedLocation address) async {
+    if (!mounted) return;
+    setState(() => _checkingDelivery = true);
+
+    final addressZone = _getMatchedZone(address.latitude, address.longitude);
+    final Map<String, bool> result = {};
+
+    for (final vendorId in cartStore.cartByVendor.keys) {
+      try {
+        final docSnap = await FirebaseFirestore.instance
+            .collection('items')
+            .doc(vendorId)
+            .get();
+
+        if (!docSnap.exists) {
+          result[vendorId] = true;
+          continue;
+        }
+
+        final data = docSnap.data()!;
+        if (addressZone == null) {
+          result[vendorId] = false;
+        } else {
+          result[vendorId] = _vendorServesZone(data, addressZone);
+        }
+      } catch (e) {
+        debugPrint('Zone check error for $vendorId: $e');
+        result[vendorId] = true;
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _vendorDeliverable = result;
+        _checkingDelivery = false;
+      });
+    }
+  }
+
+  bool get _hasUndeliverableVendors => _vendorDeliverable.values.any((v) => !v);
+
   bool _isGuestUser() {
-    final phone = widget.phoneNumber ?? FirebaseAuth.instance.currentUser?.phoneNumber;
+    final phone =
+        widget.phoneNumber ?? FirebaseAuth.instance.currentUser?.phoneNumber;
     return phone == 'GUEST' || phone == null || phone.isEmpty;
   }
 
@@ -71,10 +256,7 @@ class _CartScreenState extends State<CartScreen> {
             SizedBox(width: 12),
             Text(
               'Login Required',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
             ),
           ],
         ),
@@ -96,7 +278,7 @@ class _CartScreenState extends State<CartScreen> {
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (_) => const LoginPage()),
-                    (route) => false,
+                (route) => false,
               );
             },
             style: ElevatedButton.styleFrom(
@@ -119,35 +301,25 @@ class _CartScreenState extends State<CartScreen> {
 
   Future<String> _getDocIdFromPhone(String phoneOrDocId) async {
     try {
-      if (phoneOrDocId.length > 15) {
-        return phoneOrDocId;
-      }
-
+      if (phoneOrDocId.length > 15) return phoneOrDocId;
       final querySnapshot = await FirebaseFirestore.instance
           .collection('vendors')
           .where('phone', isEqualTo: phoneOrDocId.trim())
           .limit(1)
           .get();
-
       if (querySnapshot.docs.isNotEmpty) {
-        final docId = querySnapshot.docs.first.id;
-        print('📱 → 🆔 Converted: $phoneOrDocId → $docId');
-        return docId;
+        return querySnapshot.docs.first.id;
       }
-
-      print('⚠️ No vendor found for: $phoneOrDocId');
       return phoneOrDocId;
     } catch (e) {
-      print('❌ Error converting phone to doc ID: $e');
       return phoneOrDocId;
     }
   }
 
+  // ─── Coupon ────────────────────────────────────────────────────────────────
+
   void _validateAppliedCoupon() {
     if (_appliedCoupon == null) return;
-
-    print('\n🔍 === VALIDATING APPLIED COUPON ===');
-    print('Coupon Code: ${_appliedCoupon!['couponCode']}');
 
     final minAmount = (_appliedCoupon!['minAmount'] ?? 0).toDouble();
     final isWholeApp = _appliedCoupon!['isWholeApp'] ?? true;
@@ -155,56 +327,36 @@ class _CartScreenState extends State<CartScreen> {
     String removalReason = '';
 
     if (isWholeApp) {
-      print('📱 Whole App Coupon');
-      print('   Cart Total: ₹${cartStore.grandTotal}');
-      print('   Required Minimum: ₹$minAmount');
-
       if (cartStore.grandTotal < minAmount) {
         isStillValid = false;
         removalReason = 'Cart total fell below ₹${minAmount.toInt()}';
       }
     } else {
-      print('🏪 Vendor-Specific Coupon');
-
-      final couponVendorIds = List<String>.from(_appliedCoupon!['vendorIds'] ?? []);
-      print('   Required Vendor IDs: $couponVendorIds');
-
+      final couponVendorIds = List<String>.from(
+        _appliedCoupon!['vendorIds'] ?? [],
+      );
       final cartVendorIds = cartStore.cartByVendor.keys.toList();
-      print('   Current Cart Vendor IDs: $cartVendorIds');
-
       final matchingVendors = cartVendorIds
           .where((id) => couponVendorIds.contains(id))
           .toList();
 
-      print('   Matching Vendors: $matchingVendors');
-
       if (matchingVendors.isEmpty) {
         isStillValid = false;
         removalReason = 'No items from required vendors in cart';
-        print('   ❌ No matching vendors found');
       } else {
         double vendorTotal = 0;
         for (var vendorId in matchingVendors) {
-          final amount = cartStore.vendorTotal(vendorId);
-          vendorTotal += amount;
-          print('   - $vendorId: ₹$amount');
+          vendorTotal += cartStore.vendorTotal(vendorId);
         }
-
-        print('   Total from matching vendors: ₹$vendorTotal');
-        print('   Required Minimum: ₹$minAmount');
-
         if (vendorTotal < minAmount) {
           isStillValid = false;
-          removalReason = 'Total from required vendors fell below ₹${minAmount.toInt()}';
-          print('   ❌ Amount too low');
-        } else {
-          print('   ✅ Still valid');
+          removalReason =
+              'Total from required vendors fell below ₹${minAmount.toInt()}';
         }
       }
     }
 
     if (!isStillValid) {
-      print('❌ Removing coupon: $removalReason');
       _removeCoupon();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -215,41 +367,34 @@ class _CartScreenState extends State<CartScreen> {
           ),
         );
       }
-    } else {
-      print('✅ Coupon still valid');
     }
   }
 
   double _calculateCouponDiscount() {
     if (_appliedCoupon == null) return 0;
-
     final couponType = _appliedCoupon!['couponType'] ?? 'discount';
     if (couponType == 'discount') {
       return (_appliedCoupon!['discountAmount'] ?? 0).toDouble();
-    } else if (couponType == 'freeDelivery') {
+    } else if (couponType == 'freeDelivery' || couponType == 'free_delivery') {
       return 30.0;
     }
     return 0;
   }
 
+  // ─── Address picker ────────────────────────────────────────────────────────
+
   Future<void> _pickDeliveryLocation() async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const LocationPickerPage(),
-      ),
+      MaterialPageRoute(builder: (_) => const LocationPickerPage()),
     );
-
     if (!mounted) return;
-
     if (result is SavedLocation) {
-      setState(() {
-        _addressController.text = result.address;
-      });
-
+      setState(() => _selectedAddress = result);
+      await _checkDeliveryForAllVendors(result);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('✓ Delivery address added'),
+          content: Text('✓ Delivery address updated'),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 2),
         ),
@@ -258,28 +403,24 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _scrollToAddress() {
-    final addressContext = _addressKey.currentContext;
-    if (addressContext != null) {
+    final ctx = _addressKey.currentContext;
+    if (ctx != null) {
       Scrollable.ensureVisible(
-        addressContext,
+        ctx,
         duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOut,
         alignment: 0.1,
       );
     }
-
     Future.delayed(const Duration(milliseconds: 600), () {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Row(
             children: [
               Icon(Icons.location_on, color: Colors.white, size: 20),
               SizedBox(width: 12),
-              Expanded(
-                child: Text('Please add delivery address to continue'),
-              ),
+              Expanded(child: Text('Please add delivery address to continue')),
             ],
           ),
           backgroundColor: Colors.orange.shade700,
@@ -292,14 +433,21 @@ class _CartScreenState extends State<CartScreen> {
     });
   }
 
+  // ─── UPDATED: Place order — passes full data to new PaymentPage ────────────
+
   void _handlePlaceOrder() {
     if (_isGuestUser()) {
       _showGuestLoginPrompt();
       return;
     }
 
-    if (_addressController.text.trim().isEmpty) {
+    if (_selectedAddress == null) {
       _scrollToAddress();
+      return;
+    }
+
+    if (_hasUndeliverableVendors) {
+      _showUndeliverableDialog();
       return;
     }
 
@@ -307,27 +455,102 @@ class _CartScreenState extends State<CartScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => PaymentPage(
-          amount: _calculateFinalTotal(),
-          deliveryAddress: _addressController.text,
+          itemsTotal: cartStore.grandTotal, // ← raw product total only
+          deliveryAddress: _selectedAddress!.address,
+          appliedCoupon: _appliedCoupon, // ← full coupon map
+          couponDiscount: _couponDiscount, // ← discount amount
         ),
       ),
     );
   }
 
-  double _calculateFinalTotal() {
-    final delivery = _appliedCoupon != null &&
-        _appliedCoupon!['couponType'] == 'freeDelivery'
-        ? 0.0
-        : 30.0;
-    final taxes = (cartStore.grandTotal + delivery) * 0.05;
-    final discount = _calculateCouponDiscount();
-    final total = cartStore.grandTotal + delivery + taxes - discount;
-    return total > 0 ? total : 0;
+  void _showUndeliverableDialog() {
+    final undeliverable = _vendorDeliverable.entries
+        .where((e) => !e.value)
+        .map((e) => cartStore.cartByVendor[e.key]?.vendorName ?? e.key)
+        .toList();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.delivery_dining, color: Colors.orange, size: 26),
+            SizedBox(width: 10),
+            Text(
+              'Delivery Unavailable',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Sorry, we can\'t deliver from the following vendors to your selected address:',
+              style: TextStyle(fontSize: 14, height: 1.4),
+            ),
+            const SizedBox(height: 10),
+            ...undeliverable.map(
+              (name) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.store, size: 14, color: Colors.grey),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Try changing your delivery address to one within our service zones.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _pickDeliveryLocation();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kBandiwalaYellow,
+              foregroundColor: Colors.black87,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Change Address'),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _showAllCoupons() async {
-    print('\n🔄 === CONVERTING PHONE NUMBERS TO DOCUMENT IDs ===');
+  // ─── Coupons ───────────────────────────────────────────────────────────────
 
+  void _showAllCoupons() async {
     final cartVendorPhones = cartStore.cartByVendor.keys.toList();
     final Map<String, double> vendorAmounts = {};
     final Map<String, String> vendorNames = {};
@@ -336,21 +559,9 @@ class _CartScreenState extends State<CartScreen> {
     for (var phoneOrId in cartVendorPhones) {
       final docId = await _getDocIdFromPhone(phoneOrId);
       cartVendorDocIds.add(docId);
-
       vendorAmounts[docId] = cartStore.vendorTotal(phoneOrId);
       vendorNames[docId] = cartStore.cartByVendor[phoneOrId]!.vendorName;
     }
-
-    print('\n🛒 === CART DATA FOR COUPONS (CONVERTED) ===');
-    print('Total Cart Amount: ₹${cartStore.grandTotal}');
-    print('Number of Vendors: ${cartVendorDocIds.length}');
-    print('\nVendor Breakdown:');
-    for (var vendorId in cartVendorDocIds) {
-      print('  📦 "${vendorNames[vendorId]}"');
-      print('     Document ID: "$vendorId"');
-      print('     Amount: ₹${vendorAmounts[vendorId]}');
-    }
-    print('================================\n');
 
     if (!mounted) return;
 
@@ -371,7 +582,6 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  // ✅ NEW: Show coupon success dialog instead of snackbar
   void _showCouponSuccessDialog(Map<String, dynamic> coupon) {
     final couponCode = coupon['couponCode'] ?? '';
     final couponType = coupon['couponType'] ?? 'discount';
@@ -379,24 +589,21 @@ class _CartScreenState extends State<CartScreen> {
     String savingsText = '';
     if (couponType == 'discount') {
       savingsText = 'You saved ₹${_couponDiscount.toInt()} with this coupon';
-    } else if (couponType == 'freeDelivery') {
-      savingsText = 'You saved ₹30 with this coupon';
+    } else if (couponType == 'freeDelivery' || couponType == 'free_delivery') {
+      savingsText = 'You saved ₹30 on delivery!';
     } else if (couponType == 'freebie') {
-      final freebieName = coupon['freebieName'] ?? 'free item';
-      savingsText = 'You got $freebieName free with this coupon';
+      savingsText =
+          'You got ${coupon['freebieName'] ?? 'free item'} free with this coupon';
     }
 
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Coupon icon with percentage
             Padding(
               padding: const EdgeInsets.only(top: 32, bottom: 16),
               child: Container(
@@ -404,10 +611,7 @@ class _CartScreenState extends State<CartScreen> {
                 height: 100,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      Colors.orange.shade300,
-                      Colors.orange.shade500,
-                    ],
+                    colors: [Colors.orange.shade300, Colors.orange.shade500],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -423,10 +627,10 @@ class _CartScreenState extends State<CartScreen> {
                     ),
                     Text(
                       couponType == 'discount'
-                          ? '${(_couponDiscount).toInt()}%'
+                          ? '₹${_couponDiscount.toInt()}'
                           : '✓',
                       style: const TextStyle(
-                        fontSize: 36,
+                        fontSize: 30,
                         fontWeight: FontWeight.w900,
                         color: Colors.white,
                       ),
@@ -435,20 +639,11 @@ class _CartScreenState extends State<CartScreen> {
                 ),
               ),
             ),
-
-            // Coupon code
             Text(
-              '$couponCode applied',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.black87,
-              ),
+              '$couponCode applied!',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
-
-            const SizedBox(height: 24),
-
-            // Savings text
+            const SizedBox(height: 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text(
@@ -457,15 +652,11 @@ class _CartScreenState extends State<CartScreen> {
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
-                  color: Colors.black87,
                   height: 1.3,
                 ),
               ),
             ),
-
             const SizedBox(height: 8),
-
-            // Subtext
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Text(
@@ -478,10 +669,7 @@ class _CartScreenState extends State<CartScreen> {
                 ),
               ),
             ),
-
             const SizedBox(height: 32),
-
-            // Close button
             Padding(
               padding: const EdgeInsets.only(bottom: 24),
               child: GestureDetector(
@@ -489,15 +677,11 @@ class _CartScreenState extends State<CartScreen> {
                 child: Container(
                   width: 56,
                   height: 56,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: kBandiwalaYellow,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.close,
-                    color: Colors.white,
-                    size: 28,
-                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 28),
                 ),
               ),
             ),
@@ -512,14 +696,11 @@ class _CartScreenState extends State<CartScreen> {
       _appliedCoupon = coupon;
       _couponDiscount = _calculateCouponDiscount();
     });
-
     if (coupon['id'] != null) {
-      FirebaseFirestore.instance.collection('coupons').doc(coupon['id']).update({
-        'currentUsage': FieldValue.increment(1),
-      });
+      FirebaseFirestore.instance.collection('coupons').doc(coupon['id']).update(
+        {'currentUsage': FieldValue.increment(1)},
+      );
     }
-
-    // ✅ Show dialog instead of snackbar
     _showCouponSuccessDialog(coupon);
   }
 
@@ -530,11 +711,9 @@ class _CartScreenState extends State<CartScreen> {
     });
   }
 
-  void _handleBack() {
-    if (widget.onBackToHome != null) {
-      widget.onBackToHome!();
-    }
-  }
+  void _handleBack() => widget.onBackToHome?.call();
+
+  // ─── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -544,15 +723,14 @@ class _CartScreenState extends State<CartScreen> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, dynamic result) {
-        if (!didPop) {
-          _handleBack();
-        }
+        if (!didPop) _handleBack();
       },
       child: Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(
           child: Column(
             children: [
+              // ── Header ──────────────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
                 child: Row(
@@ -591,140 +769,257 @@ class _CartScreenState extends State<CartScreen> {
                   ],
                 ),
               ),
+
               Expanded(
                 child: !hasItems
                     ? _buildEmptyState()
                     : ListView(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    ...cartStore.cartByVendor.entries.map(
-                          (entry) => VendorCartSection(
-                        vendorId: entry.key,
-                        vendorCart: entry.value,
-                        onQuantityChanged: (itemId, delta) {
-                          cartStore.updateQuantity(
-                            vendorId: entry.key,
-                            itemId: itemId,
-                            delta: delta,
-                          );
-                        },
-                        vendorTotal: cartStore.vendorTotal(entry.key),
+                        controller: _scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        children: [
+                          // ── Vendor sections ────────────────────────────
+                          ...cartStore.cartByVendor.entries.map((entry) {
+                            final canDeliver =
+                                _vendorDeliverable[entry.key] ?? true;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                VendorCartSection(
+                                  vendorId: entry.key,
+                                  vendorCart: entry.value,
+                                  onQuantityChanged: (itemId, delta) {
+                                    cartStore.updateQuantity(
+                                      vendorId: entry.key,
+                                      itemId: itemId,
+                                      delta: delta,
+                                    );
+                                  },
+                                  vendorTotal: cartStore.vendorTotal(entry.key),
+                                ),
+                                if (!canDeliver && _selectedAddress != null)
+                                  _DeliveryUnavailableBanner(
+                                    vendorName: entry.value.vendorName,
+                                    onChangeAddress: _pickDeliveryLocation,
+                                  ),
+                              ],
+                            );
+                          }),
+
+                          if (vendorIds.isNotEmpty) ...[
+                            const SizedBox(height: 20),
+                            YouMayLikeSection(vendorIds: vendorIds),
+                          ],
+
+                          const SizedBox(height: 20),
+
+                          // ── Address ────────────────────────────────────
+                          AddressSection(
+                            key: _addressKey,
+                            selectedAddress: _selectedAddress,
+                            onTapLocation: _pickDeliveryLocation,
+                            isChecking: _checkingDelivery,
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // ── Enhanced Coupon Section ────────────────────
+                          CouponSectionWidget(
+                            appliedCoupon: _appliedCoupon,
+                            couponDiscount: _couponDiscount,
+                            onViewAllCoupons: _showAllCoupons,
+                            onRemoveCoupon: _removeCoupon,
+                          ),
+
+                          const SizedBox(height: 120),
+                        ],
                       ),
-                    ),
-                    if (vendorIds.isNotEmpty) ...[
-                      const SizedBox(height: 20),
-                      YouMayLikeSection(vendorIds: vendorIds),
-                    ],
-                    const SizedBox(height: 20),
-                    AddressSection(
-                      key: _addressKey,
-                      addressController: _addressController,
-                      onTapLocation: _pickDeliveryLocation,
-                    ),
-                    const SizedBox(height: 16),
-                    CouponSectionWidget(
-                      appliedCoupon: _appliedCoupon,
-                      couponDiscount: _couponDiscount,
-                      onViewAllCoupons: _showAllCoupons,
-                      onRemoveCoupon: _removeCoupon,
-                    ),
-                    const SizedBox(height: 120),
-                  ],
-                ),
               ),
-              if (hasItems)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
-                        blurRadius: 10,
-                        offset: const Offset(0, -2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      InkWell(
-                        onTap: () {
-                          setState(() {
-                            _showPriceBreakdown = !_showPriceBreakdown;
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Row(
-                            children: [
-                              const Text(
-                                'Grand total',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Icon(
-                                _showPriceBreakdown
-                                    ? Icons.keyboard_arrow_up
-                                    : Icons.keyboard_arrow_down,
-                                size: 20,
-                                color: Colors.grey.shade600,
-                              ),
-                              const Spacer(),
-                              Text(
-                                '₹${_calculateFinalTotal().toStringAsFixed(0)}',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (_showPriceBreakdown) ...[
-                        const SizedBox(height: 8),
-                        PriceBreakdownWidget(
-                          grandTotal: cartStore.grandTotal,
-                          couponDiscount: _couponDiscount,
-                          appliedCoupon: _appliedCoupon,
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: _handlePlaceOrder,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: kBandiwalaYellow,
-                            foregroundColor: Colors.black,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            'Place Order',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+
+              // ── UPDATED Bottom Bar — only items total, no price breakdown ──
+              if (hasItems) _buildBottomBar(),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // ─── UPDATED Bottom Bar ───────────────────────────────────────────────────
+  // Shows only: items total (raw product value)
+  // No PriceBreakdownWidget, no tax/delivery confusion
+
+  Widget _buildBottomBar() {
+    final isFreeDelivery =
+        _appliedCoupon != null &&
+        (_appliedCoupon!['couponType'] == 'freeDelivery' ||
+            _appliedCoupon!['couponType'] == 'free_delivery');
+    final hasCouponSavings = _couponDiscount > 0 || isFreeDelivery;
+    final savingsAmount = _couponDiscount + (isFreeDelivery ? 30.0 : 0.0);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Savings strip — shown only when coupon applied
+          if (hasCouponSavings) ...[
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.green.shade400, Colors.green.shade600],
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.celebration, size: 15, color: Colors.white),
+                  const SizedBox(width: 6),
+                  Text(
+                    isFreeDelivery && _couponDiscount == 0
+                        ? 'Free delivery applied!'
+                        : 'Total savings: ₹${savingsAmount.toStringAsFixed(0)} applied',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Items total row
+          Row(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Items Total',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '₹${cartStore.grandTotal.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '+ taxes & delivery',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+              ),
+              const Spacer(),
+            ],
+          ),
+
+          // Delivery warning strip
+          if (_hasUndeliverableVendors && _selectedAddress != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.orange.shade700,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Some vendors can\'t deliver to your address',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: _pickDeliveryLocation,
+                      child: Text(
+                        'Change',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange.shade800,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 12),
+
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _checkingDelivery ? null : _handlePlaceOrder,
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    _hasUndeliverableVendors && _selectedAddress != null
+                    ? Colors.grey.shade300
+                    : kBandiwalaYellow,
+                foregroundColor: Colors.black,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: _checkingDelivery
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.black54,
+                      ),
+                    )
+                  : const Text(
+                      'Proceed to Checkout',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -751,9 +1046,66 @@ class _CartScreenState extends State<CartScreen> {
           const SizedBox(height: 8),
           Text(
             'Add items from nearby vendors',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Delivery Unavailable Banner ──────────────────────────────────────────────
+
+class _DeliveryUnavailableBanner extends StatelessWidget {
+  final String vendorName;
+  final VoidCallback onChangeAddress;
+
+  const _DeliveryUnavailableBanner({
+    required this.vendorName,
+    required this.onChangeAddress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.delivery_dining, color: Colors.red.shade400, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Sorry, we can\'t deliver from $vendorName to your address right now.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.red.shade700,
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                GestureDetector(
+                  onTap: onChangeAddress,
+                  child: Text(
+                    'Change delivery address →',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.red.shade600,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -762,14 +1114,174 @@ class _CartScreenState extends State<CartScreen> {
   }
 }
 
-// Keep all other classes (YouMayLikeSection, SuggestionCard, AddressSection,
-// CouponSectionWidget, PriceBreakdownWidget, VendorCartSection, CartLineItem)
-// exactly as they are in the original code - no changes needed
+// ─── AddressSection ───────────────────────────────────────────────────────────
 
+class AddressSection extends StatelessWidget {
+  final SavedLocation? selectedAddress;
+  final VoidCallback onTapLocation;
+  final bool isChecking;
+
+  const AddressSection({
+    super.key,
+    required this.selectedAddress,
+    required this.onTapLocation,
+    this.isChecking = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasAddress = selectedAddress != null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: hasAddress ? Colors.green.shade300 : Colors.grey.shade300,
+          width: 1.5,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTapLocation,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: hasAddress
+                        ? Colors.green.shade50
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: isChecking
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: kBandiwalaYellow,
+                          ),
+                        )
+                      : Icon(
+                          hasAddress
+                              ? Icons.location_on
+                              : Icons.add_location_alt,
+                          color: hasAddress
+                              ? Colors.green
+                              : Colors.grey.shade700,
+                          size: 22,
+                        ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            hasAddress ? 'Delivery Address' : 'Add Address',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (!hasAddress) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Required',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.red.shade700,
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (hasAddress && selectedAddress!.label != null) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: kBandiwalaYellow.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                selectedAddress!.label!.toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        hasAddress
+                            ? selectedAddress!.address
+                            : 'Tap to select location',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: hasAddress
+                              ? Colors.black87
+                              : Colors.grey.shade600,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (hasAddress &&
+                          selectedAddress!.houseNo != null &&
+                          selectedAddress!.houseNo!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            selectedAddress!.houseNo!,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: Colors.grey.shade600,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── YouMayLikeSection ────────────────────────────────────────────────────────
 
 class YouMayLikeSection extends StatelessWidget {
   final List<String> vendorIds;
-
   const YouMayLikeSection({super.key, required this.vendorIds});
 
   @override
@@ -795,17 +1307,13 @@ class YouMayLikeSection extends StatelessWidget {
             ),
           );
         }
-
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const SizedBox.shrink();
         }
-
         final allItems = snapshot.data!
             .where((item) => !cartItemIds.contains(item['id']))
             .toList();
-
         if (allItems.isEmpty) return const SizedBox.shrink();
-
         allItems.shuffle();
         final displayItems = allItems.take(10).toList();
 
@@ -831,10 +1339,7 @@ class YouMayLikeSection extends StatelessWidget {
                   const SizedBox(width: 8),
                   const Text(
                     'Complete your meal with',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
                 ],
               ),
@@ -847,11 +1352,11 @@ class YouMayLikeSection extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 itemCount: displayItems.length,
                 itemBuilder: (context, index) {
-                  final item = displayItems[index];
                   return Padding(
                     padding: EdgeInsets.only(
-                        right: index == displayItems.length - 1 ? 0 : 10),
-                    child: SuggestionCard(item: item),
+                      right: index == displayItems.length - 1 ? 0 : 10,
+                    ),
+                    child: SuggestionCard(item: displayItems[index]),
                   );
                 },
               ),
@@ -862,49 +1367,41 @@ class YouMayLikeSection extends StatelessWidget {
     );
   }
 
-  // ✅ FIXED: Convert phone to document ID when fetching items
   Future<List<Map<String, dynamic>>> _fetchVendorItemsWithDocIds(
-      List<String> vendorPhones) async {
+    List<String> vendorPhones,
+  ) async {
     final allItems = <Map<String, dynamic>>[];
-
     try {
       for (var phoneOrId in vendorPhones) {
-        // Try to fetch vendor by phone number to get document ID
         QuerySnapshot vendorQuery;
         String vendorDocId = phoneOrId;
         String phoneNumber = phoneOrId;
         String vendorName = 'Restaurant';
 
-        // Check if it's a phone number (10 digits) or document ID
         if (phoneOrId.length <= 15) {
-          // It's a phone number, find the document ID
           vendorQuery = await FirebaseFirestore.instance
               .collection('vendors')
               .where('phone', isEqualTo: phoneOrId.trim())
               .limit(1)
               .get();
-
           if (vendorQuery.docs.isNotEmpty) {
             vendorDocId = vendorQuery.docs.first.id;
-            final vendorData = vendorQuery.docs.first.data() as Map<String, dynamic>;
-            vendorName = vendorData['name'] ?? 'Restaurant';
+            final d = vendorQuery.docs.first.data() as Map<String, dynamic>;
+            vendorName = d['name'] ?? 'Restaurant';
             phoneNumber = phoneOrId;
           }
         } else {
-          // It's already a document ID
           final vendorDoc = await FirebaseFirestore.instance
               .collection('vendors')
               .doc(phoneOrId)
               .get();
-
           if (vendorDoc.exists) {
-            final vendorData = vendorDoc.data();
-            phoneNumber = vendorData?['phone'] ?? phoneOrId;
-            vendorName = vendorData?['name'] ?? 'Restaurant';
+            final d = vendorDoc.data();
+            phoneNumber = d?['phone'] ?? phoneOrId;
+            vendorName = d?['name'] ?? 'Restaurant';
           }
         }
 
-        // Fetch items using phone number path
         final itemsSnapshot = await FirebaseFirestore.instance
             .collection('items')
             .doc(phoneNumber)
@@ -914,26 +1411,25 @@ class YouMayLikeSection extends StatelessWidget {
             .get();
 
         for (var doc in itemsSnapshot.docs) {
-          final data = doc.data();
           allItems.add({
             'id': doc.id,
-            'vendorId': vendorDocId, // ← Use document ID, not phone!
+            'vendorId': vendorDocId,
             'vendorName': vendorName,
-            ...data,
+            ...doc.data(),
           });
         }
       }
     } catch (e) {
-      print('Error fetching vendor items: $e');
+      debugPrint('Error fetching vendor items: $e');
     }
-
     return allItems;
   }
 }
 
+// ─── SuggestionCard ───────────────────────────────────────────────────────────
+
 class SuggestionCard extends StatelessWidget {
   final Map<String, dynamic> item;
-
   const SuggestionCard({super.key, required this.item});
 
   @override
@@ -966,27 +1462,28 @@ class SuggestionCard extends StatelessWidget {
           Stack(
             children: [
               ClipRRect(
-                borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(10)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(10),
+                ),
                 child: imageUrl.isNotEmpty
                     ? Image.network(
-                  imageUrl,
-                  width: 140,
-                  height: 95,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 140,
-                    height: 95,
-                    color: Colors.grey.shade200,
-                    child: const Icon(Icons.restaurant, size: 28),
-                  ),
-                )
+                        imageUrl,
+                        width: 140,
+                        height: 95,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 140,
+                          height: 95,
+                          color: Colors.grey.shade200,
+                          child: const Icon(Icons.restaurant, size: 28),
+                        ),
+                      )
                     : Container(
-                  width: 140,
-                  height: 95,
-                  color: Colors.grey.shade200,
-                  child: const Icon(Icons.restaurant, size: 28),
-                ),
+                        width: 140,
+                        height: 95,
+                        color: Colors.grey.shade200,
+                        child: const Icon(Icons.restaurant, size: 28),
+                      ),
               ),
               Positioned(
                 top: 5,
@@ -1048,7 +1545,6 @@ class SuggestionCard extends StatelessWidget {
                           itemName: name,
                           price: price,
                         );
-
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('$name added to cart'),
@@ -1091,7 +1587,6 @@ class SuggestionCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: Colors.black87,
                   ),
                 ),
               ],
@@ -1103,119 +1598,7 @@ class SuggestionCard extends StatelessWidget {
   }
 }
 
-class AddressSection extends StatelessWidget {
-  final TextEditingController addressController;
-  final VoidCallback onTapLocation;
-
-  const AddressSection({
-    super.key,
-    required this.addressController,
-    required this.onTapLocation,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final hasAddress = addressController.text.trim().isNotEmpty;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: hasAddress ? Colors.green.shade300 : Colors.grey.shade300,
-          width: 1.5,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTapLocation,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: hasAddress
-                        ? Colors.green.shade50
-                        : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    hasAddress ? Icons.location_on : Icons.add_location_alt,
-                    color: hasAddress ? Colors.green : Colors.grey.shade700,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            hasAddress ? 'Delivery Address' : 'Add Address',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          if (!hasAddress) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.red.shade50,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'Required',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.red.shade700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        hasAddress
-                            ? addressController.text
-                            : 'Tap to select location',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: hasAddress
-                              ? Colors.black87
-                              : Colors.grey.shade600,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: Colors.grey.shade600,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+// ─── ENHANCED CouponSectionWidget ─────────────────────────────────────────────
 
 class CouponSectionWidget extends StatelessWidget {
   final Map<String, dynamic>? appliedCoupon;
@@ -1231,175 +1614,314 @@ class CouponSectionWidget extends StatelessWidget {
     required this.onRemoveCoupon,
   });
 
+  bool get _isFreeDelivery =>
+      appliedCoupon != null &&
+      (appliedCoupon!['couponType'] == 'freeDelivery' ||
+          appliedCoupon!['couponType'] == 'free_delivery');
+
+  bool get _isFreebie =>
+      appliedCoupon != null && appliedCoupon!['couponType'] == 'freebie';
+
   @override
   Widget build(BuildContext context) {
-    final hasAppliedCoupon = appliedCoupon != null;
+    final hasApplied = appliedCoupon != null;
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: hasAppliedCoupon
-              ? Colors.green.shade300
-              : Colors.grey.shade300,
-          width: 1.5,
+          color: hasApplied ? Colors.green.shade300 : Colors.grey.shade300,
+          width: hasApplied ? 1.5 : 1,
         ),
+        boxShadow: hasApplied
+            ? [
+                BoxShadow(
+                  color: Colors.green.withOpacity(0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : [],
       ),
       child: Column(
         children: [
+          // ── Tap row ───────────────────────────────────────────────────
           InkWell(
             onTap: onViewAllCoupons,
-            borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(12)),
+            borderRadius: BorderRadius.vertical(
+              top: const Radius.circular(14),
+              bottom: hasApplied ? Radius.zero : const Radius.circular(14),
+            ),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(9),
                     decoration: BoxDecoration(
-                      color: hasAppliedCoupon
-                          ? Colors.green.shade50
-                          : Colors.orange.shade50,
-                      borderRadius: BorderRadius.circular(8),
+                      gradient: LinearGradient(
+                        colors: hasApplied
+                            ? [Colors.green.shade400, Colors.green.shade600]
+                            : [Colors.orange.shade300, Colors.orange.shade500],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
-                      hasAppliedCoupon ? Icons.check_circle : Icons.local_offer,
-                      color: hasAppliedCoupon
-                          ? Colors.green.shade700
-                          : Colors.orange.shade700,
+                      hasApplied
+                          ? Icons.check_circle_outline_rounded
+                          : Icons.local_offer_rounded,
+                      color: Colors.white,
                       size: 20,
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    hasAppliedCoupon ? 'Coupon Applied' : 'Apply Coupon',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          hasApplied
+                              ? 'Offer Applied!'
+                              : 'Apply Offer / Coupon',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: hasApplied
+                                ? Colors.green.shade700
+                                : Colors.black87,
+                          ),
+                        ),
+                        if (!hasApplied) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Save more with exclusive offers',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  const Spacer(),
-                  if (!hasAppliedCoupon) ...[
-                    Text(
-                      'View all',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: kBandiwalaYellow,
+                  if (!hasApplied) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: kBandiwalaYellow.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            'View all',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.orange.shade700,
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          Icon(
+                            Icons.arrow_forward_ios,
+                            size: 11,
+                            color: Colors.orange.shade700,
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    const Icon(
-                      Icons.arrow_forward_ios,
-                      size: 14,
-                      color: kBandiwalaYellow,
+                  ] else ...[
+                    GestureDetector(
+                      onTap: onRemoveCoupon,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.close,
+                          size: 16,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
                     ),
                   ],
                 ],
               ),
             ),
           ),
-          if (hasAppliedCoupon) ...[
-            Divider(height: 1, color: Colors.grey.shade200),
+
+          // ── Applied coupon banner ─────────────────────────────────────
+          if (hasApplied) ...[
             Container(
-              padding: const EdgeInsets.all(16),
+              width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius:
-                const BorderRadius.vertical(bottom: Radius.circular(12)),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.green.shade50,
+                    Colors.green.shade100.withOpacity(0.5),
+                  ],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(14),
+                ),
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  if (appliedCoupon!['couponType'] == 'freebie' &&
-                      appliedCoupon!['freebieImageUrl'] != null)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        appliedCoupon!['freebieImageUrl'],
-                        width: 50,
-                        height: 50,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(
-                            Icons.redeem,
-                            color: Colors.white,
-                            size: 24,
+                  // Dashed divider
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: Row(
+                      children: List.generate(
+                        30,
+                        (i) => Expanded(
+                          child: Container(
+                            height: 1,
+                            color: i.isEven
+                                ? Colors.green.shade300
+                                : Colors.transparent,
                           ),
                         ),
-                      ),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        appliedCoupon!['couponType'] == 'free_delivery'
-                            ? Icons.delivery_dining
-                            : Icons.currency_rupee,
-                        color: Colors.white,
-                        size: 26,
                       ),
                     ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                    child: Row(
                       children: [
-                        const Row(
-                          children: [
-                            Icon(
-                              Icons.celebration,
-                              color: Colors.green,
-                              size: 16,
+                        // Coupon type icon
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.green.shade400,
+                                Colors.green.shade700,
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
-                            SizedBox(width: 6),
-                            Text(
-                              'Yay!',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.green,
-                              ),
-                            ),
-                          ],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child:
+                              _isFreebie &&
+                                  appliedCoupon!['freebieImageUrl'] != null
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    appliedCoupon!['freebieImageUrl'],
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.redeem,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                  ),
+                                )
+                              : Icon(
+                                  _isFreeDelivery
+                                      ? Icons.delivery_dining_rounded
+                                      : _isFreebie
+                                      ? Icons.redeem_rounded
+                                      : Icons.currency_rupee_rounded,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          appliedCoupon!['couponCode'] ?? '',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black87,
+
+                        const SizedBox(width: 12),
+
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Code pill
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade700,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  appliedCoupon!['couponCode'] ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                _getSavingsText(),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.green.shade800,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Applied successfully 🎉',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.green.shade600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _getSavingsText(),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade700,
+
+                        // Savings badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade600,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                _isFreeDelivery && couponDiscount == 0
+                                    ? 'FREE'
+                                    : '-₹${couponDiscount.toInt()}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              if (_isFreeDelivery)
+                                const Text(
+                                  'delivery',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: onRemoveCoupon,
-                    icon: const Icon(
-                      Icons.close,
-                      size: 20,
-                      color: Colors.green,
                     ),
                   ),
                 ],
@@ -1412,96 +1934,15 @@ class CouponSectionWidget extends StatelessWidget {
   }
 
   String _getSavingsText() {
-    if (appliedCoupon == null) return '';
-
-    final couponType = appliedCoupon!['couponType'] ?? 'discount';
-    if (couponType == 'discount') {
-      return 'You saved ₹${couponDiscount.toInt()}';
-    } else if (couponType == 'free_delivery') {
-      return 'Free delivery applied';
-    } else if (couponType == 'freebie') {
-      final freebieName = appliedCoupon!['freebieName'] ?? 'item';
-      return 'You got $freebieName free';
+    if (_isFreeDelivery) return 'Free delivery on this order';
+    if (_isFreebie) {
+      return 'Free: ${appliedCoupon!['freebieName'] ?? 'item'} added';
     }
-    return '';
+    return 'You save ₹${couponDiscount.toInt()} on this order';
   }
 }
 
-class PriceBreakdownWidget extends StatelessWidget {
-  final double grandTotal;
-  final double couponDiscount;
-  final Map<String, dynamic>? appliedCoupon;
-
-  const PriceBreakdownWidget({
-    super.key,
-    required this.grandTotal,
-    required this.couponDiscount,
-    this.appliedCoupon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isFreeDelivery =
-        appliedCoupon != null && appliedCoupon!['couponType'] == 'free_delivery';
-    final delivery = isFreeDelivery ? 0.0 : 30.0;
-    final taxes = (grandTotal + delivery) * 0.05;
-    final total = grandTotal + delivery + taxes - couponDiscount;
-
-    return Column(
-      children: [
-        _row('Items total', '₹${grandTotal.toStringAsFixed(0)}'),
-        _row(
-          'Delivery',
-          isFreeDelivery ? 'FREE' : '₹${delivery.toStringAsFixed(0)}',
-          strikethrough: isFreeDelivery,
-        ),
-        _row('Taxes & charges', '₹${taxes.toStringAsFixed(0)}'),
-        if (couponDiscount > 0 && appliedCoupon!['couponType'] == 'discount')
-          _row(
-            'Coupon discount',
-            '-₹${couponDiscount.toStringAsFixed(0)}',
-            isDiscount: true,
-          ),
-        Divider(height: 16, color: Colors.grey.shade300),
-        _row('To pay', '₹${total.toStringAsFixed(0)}', bold: true),
-      ],
-    );
-  }
-
-  Widget _row(
-      String label,
-      String value, {
-        bool bold = false,
-        bool isDiscount = false,
-        bool strikethrough = false,
-      }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: bold ? FontWeight.w600 : null,
-              decoration: strikethrough ? TextDecoration.lineThrough : null,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: bold ? FontWeight.w600 : null,
-              color: isDiscount ? Colors.green : null,
-              decoration: strikethrough ? TextDecoration.lineThrough : null,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// ─── VendorCartSection ────────────────────────────────────────────────────────
 
 class VendorCartSection extends StatelessWidget {
   final String vendorId;
@@ -1536,7 +1977,7 @@ class VendorCartSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           ...vendorCart.items.map(
-                (item) => Padding(
+            (item) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: CartLineItem(
                 item: item,
@@ -1556,6 +1997,8 @@ class VendorCartSection extends StatelessWidget {
     );
   }
 }
+
+// ─── CartLineItem ─────────────────────────────────────────────────────────────
 
 class CartLineItem extends StatelessWidget {
   final CartItem item;

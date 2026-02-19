@@ -1,21 +1,16 @@
 import 'package:flutter/material.dart';
 
-const kBandiwalaYellow = Color(0xFFFFC107);
-
 class RefundPolicyPage extends StatelessWidget {
   const RefundPolicyPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           'Refund Policy',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
         ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
@@ -23,416 +18,164 @@ class RefundPolicyPage extends StatelessWidget {
         centerTitle: false,
       ),
       body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Banner
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.account_balance_wallet_outlined,
-                    size: 64,
-                    color: kBandiwalaYellow,
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Refund Policy',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Last Updated: January 5, 2026',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
+            // Title
+            const Text(
+              'Refund Policy',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.black87,
               ),
             ),
-
             const SizedBox(height: 8),
+            Text(
+              'Last Updated: January 5, 2026',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 24),
 
-            // Refund Eligibility Section
-            _buildSection(
-              title: 'Refund Eligibility',
-              icon: Icons.verified_outlined,
-              children: [
-                _buildInfoCard(
-                  'You can request a refund for:',
-                  [
-                    '✓ Missing items from your order',
-                    '✓ Wrong items delivered',
-                    '✓ Food quality issues (spoilt, raw, burnt)',
-                    '✓ Significantly different from description',
-                  ],
-                ),
-              ],
+            // Content
+            _buildParagraph(
+              'This Refund Policy explains the terms and conditions under which customers may request refunds for orders placed through the BandiWala platform. We are committed to ensuring customer satisfaction while maintaining fair practices for all parties involved.',
             ),
 
-            // How to Request Refund Section
-            _buildSection(
-              title: 'How to Request a Refund',
-              icon: Icons.assignment_outlined,
-              children: [
-                _buildStepCard(1, 'Open Order History', 'Navigate to your past orders'),
-                _buildStepCard(2, 'Select Order', 'Tap on the order with issues'),
-                _buildStepCard(3, 'Report Issue', 'Click "Report Issue" or "Request Refund"'),
-                _buildStepCard(4, 'Select Reason', 'Choose the reason for refund'),
-                _buildStepCard(5, 'Upload Evidence', 'Provide photos (strongly recommended)'),
-                _buildStepCard(6, 'Submit Request', 'Submit and wait for review'),
-                const SizedBox(height: 12),
-                _buildWarningBox(
-                  'Important',
-                  'Photographic evidence significantly increases approval chances',
-                ),
-              ],
+            _buildHeading('Refund Eligibility'),
+
+            _buildParagraph(
+              'You are eligible to request a refund for your order under the following circumstances: missing items from your order that were paid for but not delivered, wrong items delivered that do not match what you ordered, food quality issues including spoilt food, undercooked or raw food, burnt or overcooked items, or items that are significantly different from their description on the platform.',
             ),
 
-            // Timeline Section
-            _buildSection(
-              title: 'Refund Timeline',
-              icon: Icons.schedule_outlined,
-              children: [
-                _buildTimelineBox('Request Window', 'Within 2 hours of delivery', Icons.timer),
-                _buildTimelineBox('Review Period', 'BandiWala reviews within 48 hours', Icons.search),
-                _buildTimelineBox('Decision', 'Communicated within 72 hours', Icons.notification_important),
-                _buildTimelineBox('Processing', 'Refund processed within 5-7 business days', Icons.account_balance),
-              ],
+            _buildParagraph(
+              'All refund requests must be made within 2 hours of delivery to be considered eligible. Requests made after this time window may not be processed. We strongly recommend providing photographic evidence of the issue to support your claim and expedite the approval process.',
             ),
 
-            // Refund Decisions Section
-            _buildSection(
-              title: 'Refund Decisions',
-              icon: Icons.gavel_outlined,
-              children: [
-                _buildSubSection(
-                  title: 'Approved Refunds',
-                  icon: Icons.check_circle,
-                  points: [
-                    '• Full order refund for major issues',
-                    '• Partial refund for specific items',
-                    '• Option to reorder at no extra cost',
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _buildSubSection(
-                  title: 'Approval Conditions',
-                  icon: Icons.done_all,
-                  points: [
-                    '• Clear photographic evidence provided',
-                    '• Reasonable and valid claim',
-                    '• First-time issue with merchant',
-                    '• Order value ≥ ₹200 (for full refunds)',
-                  ],
-                ),
-              ],
+            const SizedBox(height: 16),
+            _buildHeading('How to Request a Refund'),
+
+            _buildParagraph(
+              'To request a refund, follow these steps: First, open the BandiWala app and navigate to "Order History" to view your past orders. Select the specific order for which you want to request a refund by tapping on it. Once the order details are displayed, click on the "Report Issue" or "Request Refund" button. Choose the appropriate reason for your refund request from the list of options provided. Upload clear photographic evidence of the issue if possible - this is strongly recommended as it significantly increases the chances of approval. Finally, submit your refund request and wait for our team to review it.',
             ),
 
-            // Rejected Refunds Section
-            _buildSection(
-              title: 'Refund Rejection Reasons',
-              icon: Icons.cancel_outlined,
-              children: [
-                _buildRejectionCard('Insufficient or no evidence', Icons.photo_camera_outlined),
-                _buildRejectionCard('Claim made beyond 24 hours', Icons.access_time),
-                _buildRejectionCard('Customer at fault (ordered wrong item)', Icons.person_outlined),
-                _buildRejectionCard('Multiple refund requests (abuse)', Icons.warning_amber),
-                _buildRejectionCard('Food allergies (if clearly mentioned)', Icons.info_outlined),
-                _buildRejectionCard('Reasonable consumption time passed', Icons.timer_off),
-              ],
+            _buildParagraph(
+              'Photographic evidence plays a crucial role in the refund approval process. Clear images showing the issue with your order help our team make faster and more accurate decisions. Without proper evidence, your refund request may be rejected.',
             ),
 
-            // Refund Methods Section
-            _buildSection(
-              title: 'Refund Methods & Processing Time',
-              icon: Icons.payment_outlined,
-              children: [
-                _buildRefundMethodTable(),
-              ],
+            const SizedBox(height: 16),
+            _buildHeading('Refund Timeline and Process'),
+
+            _buildParagraph(
+              'The refund process follows a specific timeline to ensure thorough review and fair resolution. The request window is limited to 2 hours from the time of delivery. After you submit your refund request, BandiWala reviews the claim within 48 hours. You will be communicated the decision regarding your refund within 72 hours of submission. If your refund is approved, the amount will be processed within 5 to 7 business days, depending on your original payment method.',
             ),
 
-            // Partial Refunds Section
-            _buildSection(
-              title: 'Partial Refunds',
-              icon: Icons.calculate_outlined,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.calculate, color: Colors.grey.shade700, size: 20),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Calculation Method',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'If only some items have issues:',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '• Refund calculated based on item price only',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade800,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: kBandiwalaYellow.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: kBandiwalaYellow.withOpacity(0.5)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Example:',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Order Total: ₹500\nIssue Item: ₹150\nRefund Amount: ₹150',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade800,
-                                height: 1.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            const SizedBox(height: 16),
+            _buildHeading('Refund Decisions and Approval'),
+
+            _buildParagraph(
+              'When a refund request is approved, you may receive either a full order refund for major issues affecting the entire order, a partial refund for specific items that had problems, or in some cases, an option to reorder the affected items at no extra cost.',
             ),
 
-            // Non-Refundable Section
-            _buildSection(
-              title: 'Non-Refundable Situations',
-              icon: Icons.block_outlined,
-              children: [
-                _buildNonRefundableCard('Delivery fees (if delivery completed)', Icons.delivery_dining),
-                _buildNonRefundableCard('Packing charges', Icons.inventory_2_outlined),
-                _buildNonRefundableCard('Items customer ate/consumed partially', Icons.restaurant),
-                _buildNonRefundableCard('Special instructions changed after confirmation', Icons.edit_note),
-                _buildNonRefundableCard('Self-pickup orders (customer responsibility)', Icons.storefront),
-                _buildNonRefundableCard('Offers/discounts already redeemed', Icons.local_offer),
-              ],
+            _buildParagraph(
+              'Refund approval is based on several conditions: clear photographic evidence must be provided to support your claim, the claim must be reasonable and valid, it should typically be a first-time issue with the particular merchant, and for full refunds, the order value should be at least ₹200. Orders below this threshold may only qualify for partial refunds or credits.',
             ),
 
-            // Abuse Prevention Section
-            _buildSection(
-              title: 'Refund Abuse Prevention',
-              icon: Icons.security_outlined,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: kBandiwalaYellow.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: kBandiwalaYellow, width: 1.5),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.warning_amber_rounded, color: kBandiwalaYellow, size: 24),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Account Actions',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildAbuseItem('3+ refunds per month', 'Account review'),
-                      _buildAbuseItem('Suspected fraudulent claims', 'Account suspension'),
-                      _buildAbuseItem('Pattern of false claims', 'Permanent ban'),
-                    ],
-                  ),
-                ),
-              ],
+            const SizedBox(height: 16),
+            _buildHeading('Reasons for Refund Rejection'),
+
+            _buildParagraph(
+              'Refund requests may be rejected for various reasons. Common rejection reasons include insufficient or no photographic evidence to support the claim, claims made beyond the 24-hour time limit after delivery, situations where the customer is at fault such as ordering the wrong item by mistake, multiple refund requests from the same customer indicating potential abuse of the refund system, food allergy issues when allergen information was clearly mentioned in the item description, and cases where a reasonable amount of time has passed suggesting the food was consumed.',
             ),
 
-            // Disputes & Appeals Section
-            _buildSection(
-              title: 'Disputes & Appeals',
-              icon: Icons.gavel,
-              children: [
-                _buildInfoCard(
-                  'If you disagree with a refund decision:',
-                  [
-                    '1. Contact support within 24 hours',
-                    '2. Provide additional evidence or clarification',
-                    '3. Final decision made within 48 hours',
-                    '4. Escalation to senior team available for major disputes',
-                  ],
-                ),
-              ],
+            const SizedBox(height: 16),
+            _buildHeading('Refund Methods and Processing Time'),
+
+            _buildParagraph(
+              'Refunds are processed back to your original payment method. The processing time varies depending on the payment method used:',
             ),
 
-            // Important Notes
-            _buildSection(
-              title: 'Important Notes',
-              icon: Icons.info_outline,
-              children: [
-                _buildNoteCard(
-                  Icons.camera_alt_outlined,
-                  'Photographic Evidence',
-                  'Always provide clear photos of issues for faster approval',
-                ),
-                _buildNoteCard(
-                  Icons.timer_outlined,
-                  'Time Limit',
-                  'Report issues within 2 hours of delivery for eligibility',
-                ),
-                _buildNoteCard(
-                  Icons.account_balance_wallet_outlined,
-                  'Refund Tracking',
-                  'Track refund status in Order History > Refund Status',
-                ),
-              ],
+            _buildParagraph(
+              'For Credit or Debit Card payments, the refund is credited back to your card within 5 to 10 business days. UPI payments are reversed to your UPI account within 1 to 2 hours. Wallet payments receive instant credit back to the wallet. Net Banking transactions are refunded to your bank account within 3 to 7 business days. Please note that these are estimated timeframes and actual processing times may vary depending on your bank or payment provider.',
             ),
 
-            // Contact Support Section
-            Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: kBandiwalaYellow.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.support_agent,
-                      color: kBandiwalaYellow,
-                      size: 32,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Need Help with Refunds?',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Our support team is here to assist you',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.email_outlined, size: 16, color: Colors.grey.shade700),
-                      const SizedBox(width: 6),
-                      Text(
-                        'support@bandiwala.com',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade700,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.phone_outlined, size: 16, color: Colors.grey.shade700),
-                      const SizedBox(width: 6),
-                      Text(
-                        '+91 7382107075',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade700,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.access_time, size: 16, color: Colors.grey.shade700),
-                      const SizedBox(width: 6),
-                      Text(
-                        '9 AM - 10 PM (Mon-Sat)',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade700,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+            const SizedBox(height: 16),
+            _buildHeading('Partial Refunds'),
+
+            _buildParagraph(
+              'When only some items in your order have issues, a partial refund may be issued. The refund amount is calculated based on the price of the affected items only, not the entire order total.',
+            ),
+
+            _buildParagraph(
+              'For example, if your total order was ₹500 and only one item worth ₹150 had an issue, you would receive a refund of ₹150. Delivery charges, packing charges, and other fees are not included in partial refunds unless the entire order is affected.',
+            ),
+
+            const SizedBox(height: 16),
+            _buildHeading('Non-Refundable Situations'),
+
+            _buildParagraph(
+              'Certain charges and situations are not eligible for refunds. These include delivery fees if the delivery was successfully completed, packing charges, items that the customer has partially eaten or consumed, special instructions that were changed after order confirmation, self-pickup orders where the customer is responsible for collection, and offers or discounts that have already been redeemed at the time of order.',
+            ),
+
+            const SizedBox(height: 16),
+            _buildHeading('Refund Abuse Prevention'),
+
+            _buildParagraph(
+              'To maintain fairness and prevent abuse of the refund system, BandiWala monitors refund patterns across all user accounts. If a customer makes 3 or more refund requests within a single month, their account will be flagged for review. Accounts with suspected fraudulent claims may face temporary suspension. Continued patterns of false or unjustified claims can result in permanent account ban.',
+            ),
+
+            _buildParagraph(
+              'We encourage customers to use the refund system responsibly and only for genuine issues. Abuse of the system affects all users and makes it harder for legitimate complaints to be processed quickly.',
+            ),
+
+            const SizedBox(height: 16),
+            _buildHeading('Disputes and Appeals'),
+
+            _buildParagraph(
+              'If you disagree with a refund decision made by our team, you have the right to appeal. To initiate an appeal, contact our support team within 24 hours of receiving the refund decision. Provide any additional evidence or clarification that may support your case. Our team will conduct a final review of your appeal and communicate the decision within 48 hours. For major disputes involving significant amounts, escalation to our senior review team is available.',
+            ),
+
+            const SizedBox(height: 16),
+            _buildHeading('Important Notes and Recommendations'),
+
+            _buildParagraph(
+              'Always provide clear photographic evidence when reporting issues. Photos should clearly show the problem with your order, such as missing items, wrong items, or quality issues. This documentation is crucial for faster approval of your refund request.',
+            ),
+
+            _buildParagraph(
+              'Remember the strict time limit of 2 hours from delivery to report issues. Claims made after this window will not be eligible for refunds. We recommend checking your order immediately upon delivery.',
+            ),
+
+            _buildParagraph(
+              'You can track the status of your refund request at any time by going to Order History in the app and checking the Refund Status section. This will show you the current stage of your refund processing.',
+            ),
+
+            const SizedBox(height: 24),
+            _buildHeading('Contact Support'),
+
+            _buildParagraph(
+              'If you need assistance with refund requests or have any questions regarding this policy, please contact our customer support team:',
+            ),
+
+            _buildParagraph(
+              'Email: support@bandiwala.com\nPhone: +91 7382107075\nSupport Hours: 9 AM - 10 PM (Monday to Saturday)',
+            ),
+
+            _buildParagraph(
+              'Our support team is dedicated to helping you resolve any issues with your orders and will guide you through the refund process if needed.',
+            ),
+
+            const SizedBox(height: 24),
+            Divider(color: Colors.grey.shade300),
+            const SizedBox(height: 12),
+
+            Center(
+              child: Text(
+                '© 2026 BandiWala. All rights reserved.',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
               ),
             ),
-
             const SizedBox(height: 24),
           ],
         ),
@@ -440,497 +183,33 @@ class RefundPolicyPage extends StatelessWidget {
     );
   }
 
-  Widget _buildSection({
-    required String title,
-    required IconData icon,
-    required List<Widget> children,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: kBandiwalaYellow.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, color: kBandiwalaYellow, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: Colors.grey.shade300),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: children,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoCard(String title, List<String> points) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ...points.map((point) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(
-              point,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade800,
-                height: 1.4,
-              ),
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStepCard(int step, String title, String description) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: kBandiwalaYellow,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                '$step',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWarningBox(String title, String content) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: kBandiwalaYellow.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kBandiwalaYellow),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.warning_amber_rounded, color: kBandiwalaYellow, size: 24),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  content,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade800,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimelineBox(String title, String description, IconData icon) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: kBandiwalaYellow.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: kBandiwalaYellow, size: 24),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade700,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSubSection({
-    required String title,
-    required IconData icon,
-    required List<String> points,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: Colors.grey.shade700, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ...points.map((point) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(
-              point,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade800,
-                height: 1.4,
-              ),
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRejectionCard(String reason, IconData icon) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.grey.shade700, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              reason,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade800,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRefundMethodTable() {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        children: [
-          _buildTableRow('Payment Method', 'Refund Method', 'Time', isHeader: true),
-          _buildTableRow('Credit/Debit Card', 'Card credit', '5-10 days'),
-          _buildTableRow('UPI', 'UPI reversal', '1-2 hours'),
-          _buildTableRow('Wallet', 'Wallet credit', 'Instant'),
-          _buildTableRow('Net Banking', 'Bank account', '3-7 days'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTableRow(String col1, String col2, String col3, {bool isHeader = false}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      decoration: BoxDecoration(
-        color: isHeader ? Colors.grey.shade100 : Colors.white,
-        border: Border(
-          bottom: BorderSide(color: Colors.grey.shade300, width: 0.5),
+  Widget _buildHeading(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 8),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: Colors.black87,
+          height: 1.4,
         ),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              col1,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isHeader ? FontWeight.w700 : FontWeight.w500,
-                color: isHeader ? Colors.black87 : Colors.grey.shade800,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              col2,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isHeader ? FontWeight.w700 : FontWeight.w500,
-                color: isHeader ? Colors.black87 : Colors.grey.shade800,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Text(
-              col3,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isHeader ? FontWeight.w700 : FontWeight.w500,
-                color: isHeader ? Colors.black87 : Colors.grey.shade800,
-              ),
-              textAlign: TextAlign.end,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
-  Widget _buildNonRefundableCard(String text, IconData icon) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.grey.shade700, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade800,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          Icon(Icons.block, color: Colors.grey.shade600, size: 18),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAbuseItem(String trigger, String action) {
+  Widget _buildParagraph(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: const BoxDecoration(
-              color: Colors.black87,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: RichText(
-              text: TextSpan(
-                style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
-                children: [
-                  TextSpan(
-                    text: trigger,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const TextSpan(text: ' → '),
-                  TextSpan(
-                    text: action,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNoteCard(IconData icon, String title, String description) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: kBandiwalaYellow.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: kBandiwalaYellow, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade700,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 13,
+          color: Colors.grey.shade800,
+          height: 1.6,
+          letterSpacing: 0.2,
+        ),
+        textAlign: TextAlign.justify,
       ),
     );
   }

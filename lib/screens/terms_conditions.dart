@@ -1,21 +1,16 @@
 import 'package:flutter/material.dart';
 
-const kBandiwalaYellow = Color(0xFFFFC107);
-
 class TermsConditionsPage extends StatelessWidget {
   const TermsConditionsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           'Terms & Conditions',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
         ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
@@ -23,428 +18,199 @@ class TermsConditionsPage extends StatelessWidget {
         centerTitle: false,
       ),
       body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Banner
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.description_outlined,
-                    size: 64,
-                    color: kBandiwalaYellow,
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Terms & Conditions',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Last Updated: January 5, 2026',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
+            // Title
+            const Text(
+              'Terms & Conditions',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.black87,
               ),
             ),
-
             const SizedBox(height: 8),
+            Text(
+              'Last Updated: January 5, 2026',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 24),
 
-            // Introduction Section
-            _buildSection(
-              title: 'Introduction & Acceptance',
-              icon: Icons.handshake_outlined,
-              children: [
-                _buildTextContent(
-                  'These Terms of Service govern your access and use of the BandiWala platform, including our website, mobile application, and related services (collectively, "Platform").',
-                ),
-                const SizedBox(height: 12),
-                _buildHighlightBox(
-                  'Agreement',
-                  'By downloading, installing, accessing, or using the Platform, you acknowledge that you have read, understood, and agree to be bound by these Terms.',
-                ),
-              ],
+            // Content
+            _buildHeading('Introduction and Acceptance'),
+
+            _buildParagraph(
+              'These Terms of Service govern your access and use of the BandiWala platform, including our website, mobile application, and all related services collectively referred to as the "Platform". By downloading, installing, accessing, or using the Platform in any manner, you acknowledge that you have read, understood, and agree to be bound by these Terms and Conditions.',
             ),
 
-            // Eligibility & Account Creation
-            _buildSection(
-              title: 'Eligibility & Account Creation',
-              icon: Icons.person_add_outlined,
-              children: [
-                _buildInfoCard(
-                  'Age Requirement',
-                  'You must be at least 18 years old or the age of majority in your jurisdiction to use the Platform.',
-                ),
-                const SizedBox(height: 12),
-                _buildInfoCard(
-                  'Account Responsibility',
-                  '• You are responsible for maintaining the confidentiality of your login credentials\n• All activities under your account are your responsibility\n• You must provide accurate, current, and complete information\n• You agree to update information promptly if changes occur',
-                ),
-                const SizedBox(height: 12),
-                _buildWarningBox(
-                  'Account Suspension/Termination',
-                  'BandiWala reserves the right to suspend or terminate your account for violations, fraudulent activity, or legal compliance.',
-                ),
-              ],
+            _buildParagraph(
+              'If you do not agree with any part of these Terms, you must immediately discontinue use of the Platform. Your continued use of our services constitutes acceptance of these Terms and any subsequent modifications we may make from time to time.',
             ),
 
-            // Prohibited Use
-            _buildSection(
-              title: 'Prohibited Use',
-              icon: Icons.block_outlined,
-              children: [
-                _buildProhibitedCard(
-                  '1. Content & Communication Violations',
-                  [
-                    '• Post obscene, defamatory, or harassing content',
-                    '• Make negative statements about BandiWala or merchants',
-                    '• Engage in harassment or discrimination',
-                    '• Share private information without consent',
-                  ],
-                ),
-                _buildProhibitedCard(
-                  '2. Fraudulent Activity',
-                  [
-                    '• Create fake accounts or impersonate others',
-                    '• Commit payment fraud',
-                    '• Place orders with no intention to pay',
-                    '• Manipulate ratings or reviews',
-                    '• Engage in refund fraud or abuse',
-                  ],
-                ),
-                _buildProhibitedCard(
-                  '3. Technical Violations',
-                  [
-                    '• Interfere with Platform infrastructure',
-                    '• Gain unauthorized access',
-                    '• Use bots, scrapers, or automated tools',
-                    '• Circumvent security measures',
-                    '• Reverse engineer the application',
-                  ],
-                ),
-              ],
+            const SizedBox(height: 16),
+            _buildHeading('Eligibility and Account Creation'),
+
+            _buildParagraph(
+              'To use the BandiWala Platform, you must be at least 18 years of age or have reached the age of majority in your jurisdiction. By creating an account, you represent and warrant that you meet this age requirement and have the legal capacity to enter into a binding agreement.',
             ),
 
-            // Ordering & Payment Terms
-            _buildSection(
-              title: 'Ordering & Payment Terms',
-              icon: Icons.shopping_cart_outlined,
-              children: [
-                _buildInfoCard(
-                  'Order Placement',
-                  '• Clicking "Place Order" authorizes BandiWala to place order on your behalf\n• Merchant may accept or decline at their discretion\n• BandiWala is not party to sale contract\n• Direct payments to merchants are prohibited',
-                ),
-                const SizedBox(height: 12),
-                _buildInfoCard(
-                  'Pricing & Availability',
-                  '• Prices subject to change without notice\n• All prices include applicable commissions\n• Technical errors may cause incorrect pricing\n• Merchants may cancel if items unavailable',
-                ),
-                const SizedBox(height: 12),
-                _buildPaymentMethodsCard(),
-              ],
+            _buildParagraph(
+              'You are responsible for maintaining the confidentiality of your login credentials, including your username and password. All activities that occur under your account are your sole responsibility. You must provide accurate, current, and complete information during the registration process and agree to update this information promptly if any changes occur. Failure to maintain accurate information may result in account suspension or termination.',
             ),
 
-            // Merchant Liability Disclaimer
-            _buildSection(
-              title: 'Merchant Liability Disclaimer',
-              icon: Icons.store_outlined,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: kBandiwalaYellow.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: kBandiwalaYellow.withOpacity(0.8), width: 2),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.error_outline, color: kBandiwalaYellow, size: 28),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Text(
-                              'Critical Disclaimer',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'BandiWala does NOT own, sell, or control merchants or their food products.',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black87,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Merchants are independent third parties responsible for:',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ...['Quality and freshness of food', 'Proper food safety and hygiene', 'Menu accuracy and ingredients', 'FSSAI compliance', 'All product warranties']
-                          .map((item) => Padding(
-                        padding: const EdgeInsets.only(left: 12, bottom: 6),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('• ', style: TextStyle(color: Colors.black87)),
-                            Expanded(
-                              child: Text(
-                                item,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade800,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _buildHighlightBox(
-                  'BandiWala\'s Role',
-                  'We act as an intermediary, facilitating transactions between you and merchants. We do not guarantee quality, taste, or safety of food items.',
-                ),
-              ],
+            _buildParagraph(
+              'BandiWala reserves the right to suspend or terminate your account at any time for violations of these Terms, fraudulent activity, abuse of the Platform, or for legal compliance purposes. We may also refuse service to anyone for any reason at our sole discretion.',
             ),
 
-            // Delivery Services
-            _buildSection(
-              title: 'Delivery Services',
-              icon: Icons.delivery_dining_outlined,
-              children: [
-                _buildInfoCard(
-                  'Delivery Partner Role',
-                  '• Delivery partners are independent contractors\n• NOT BandiWala employees\n• Delivery times are estimates\n• Delays may occur due to traffic, weather, etc.',
-                ),
-                const SizedBox(height: 12),
-                _buildInfoCard(
-                  'Delivery Conditions',
-                  '• BandiWala not liable for delays or food damage\n• Partners not authorized to modify orders\n• You must ensure safe delivery location\n• Orders must be accepted within specified time',
-                ),
-                const SizedBox(height: 12),
-                _buildWarningBox(
-                  'Delivery Disputes',
-                  'Report delivery issues within 1 hour with photographic evidence. BandiWala will investigate and may issue refunds at discretion.',
-                ),
-              ],
+            const SizedBox(height: 16),
+            _buildHeading('Prohibited Use'),
+
+            _buildSubHeading('Content and Communication Violations'),
+            _buildParagraph(
+              'You agree not to post, transmit, or share any content that is obscene, defamatory, harassing, threatening, or otherwise objectionable. You may not make false or negative statements about BandiWala, its merchants, or other users. Engaging in harassment, discrimination, or abuse of any kind is strictly prohibited. You may not share private or confidential information about other users without their explicit consent.',
             ),
 
-            // Ratings & Reviews
-            _buildSection(
-              title: 'Ratings, Reviews & Content',
-              icon: Icons.star_outline,
-              children: [
-                _buildInfoCard(
-                  'Review Conduct',
-                  '✓ Reviews must be honest and based on actual experience\n✓ Only review orders you personally received\n✗ No false claims or fabricated stories\n✗ No promotional content for other platforms\n✗ No personal attacks on merchant staff\n✗ No spam or contact information',
-                ),
-                const SizedBox(height: 12),
-                _buildHighlightBox(
-                  'Content Ownership',
-                  'By posting content, you grant BandiWala a non-exclusive, worldwide, perpetual license to use and display your content.',
-                ),
-              ],
+            _buildSubHeading('Fraudulent Activity'),
+            _buildParagraph(
+              'Creating fake accounts, impersonating other users or merchants, committing payment fraud, or placing orders with no intention to pay are all strictly forbidden. You may not manipulate ratings, reviews, or feedback in any way. Engaging in refund fraud or abusing the refund system through false claims or excessive requests will result in immediate account termination and potential legal action.',
             ),
 
-            // Governing Law
-            _buildSection(
-              title: 'Governing Law & Jurisdiction',
-              icon: Icons.account_balance_outlined,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.gavel, color: Colors.grey.shade700, size: 24),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Text(
-                              'Legal Jurisdiction',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        '• These Terms are governed by the laws of India',
-                        style: TextStyle(
-                          fontSize: 13,
-                          height: 1.5,
-                        ),
-                      ),
-                      Text(
-                        '• Subject to Consumer Protection Act 2019',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade800,
-                          height: 1.5,
-                        ),
-                      ),
-                      Text(
-                        '• Disputes subject to Hyderabad, Telangana jurisdiction',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade800,
-                          height: 1.5,
-                        ),
-                      ),
-                      Text(
-                        '• Arbitration for disputes ≥ ₹1 lakh',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade800,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            _buildSubHeading('Technical Violations'),
+            _buildParagraph(
+              'You are prohibited from interfering with the Platform infrastructure, servers, or networks. Attempting to gain unauthorized access to any part of the Platform, other user accounts, or computer systems is illegal and will be prosecuted. The use of bots, scrapers, automated tools, or any technology to access the Platform without permission is forbidden. You may not circumvent security measures, reverse engineer the application, or attempt to extract source code.',
             ),
 
-            // Contact Information
-            _buildSection(
-              title: 'Contact Information',
-              icon: Icons.contact_support_outlined,
-              children: [
-                _buildContactCard('General Inquiries', 'hello@bandiwala.com', Icons.email),
-                _buildContactCard('Support', 'support@bandiwala.com', Icons.support_agent),
-                _buildContactCard('Privacy Concerns', 'privacy@bandiwala.com', Icons.privacy_tip),
-                _buildContactCard('Compliance', 'compliance@bandiwala.com', Icons.verified_user),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.location_on, color: Colors.grey.shade700, size: 20),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Registered Office',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'P-405, PG Block, VJ Hub\nVNRVJIET, Bachupally\nHyderabad, Telangana - 500090\nIndia',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade700,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            const SizedBox(height: 16),
+            _buildHeading('Ordering and Payment Terms'),
+
+            _buildParagraph(
+              'When you click "Place Order" on the Platform, you authorize BandiWala to place the order with the selected merchant on your behalf. Please note that merchants may accept or decline your order at their sole discretion based on availability, capacity, or other factors. BandiWala is not a party to the sale contract between you and the merchant. We act solely as an intermediary facilitating the transaction.',
             ),
 
-            // Footer Note
-            Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.check_circle_outline,
-                    size: 48,
-                    color: kBandiwalaYellow,
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Thank you for reading our Terms & Conditions',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'By using BandiWala, you agree to these terms',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '© 2026 BandiWala. All Rights Reserved',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade500,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
+            _buildParagraph(
+              'Making direct payments to merchants outside the Platform is strictly prohibited and may result in account suspension. All transactions must be processed through the Platform using approved payment methods.',
+            ),
+
+            _buildParagraph(
+              'Prices displayed on the Platform are subject to change without prior notice. All prices include applicable platform commissions and fees. In the event of technical errors causing incorrect pricing, merchants or BandiWala reserve the right to cancel orders. Merchants may also cancel orders if items become unavailable after order placement.',
+            ),
+
+            _buildParagraph(
+              'BandiWala accepts the following payment methods: Credit and Debit Cards issued by recognized banks, UPI services including Google Pay, PhonePe, and Paytm, Digital Wallets, and Net Banking. All transactions are processed in Indian Rupees (INR). Payment information is processed securely through certified payment gateways.',
+            ),
+
+            const SizedBox(height: 16),
+            _buildHeading('Merchant Liability Disclaimer'),
+
+            _buildParagraph(
+              'This is a critical disclaimer that all users must understand: BandiWala does NOT own, sell, operate, or control any merchants or their food products. Merchants are independent third-party businesses who list their products on our Platform.',
+            ),
+
+            _buildParagraph(
+              'Merchants are solely responsible for the quality and freshness of food they prepare and deliver. They are responsible for maintaining proper food safety and hygiene standards in accordance with local health regulations. Merchants must ensure menu accuracy and provide correct information about ingredients, especially allergens. All merchants must maintain valid FSSAI (Food Safety and Standards Authority of India) licenses and comply with food safety regulations. Any product warranties, guarantees, or claims are the sole responsibility of the merchant.',
+            ),
+
+            _buildParagraph(
+              'BandiWala acts only as an intermediary platform facilitating transactions between customers and merchants. We do not guarantee the quality, taste, safety, or fitness for consumption of any food items ordered through the Platform. While we encourage merchants to maintain high standards, we cannot be held liable for any issues arising from food quality, preparation, or ingredients.',
+            ),
+
+            const SizedBox(height: 16),
+            _buildHeading('Delivery Services'),
+
+            _buildParagraph(
+              'Delivery partners who fulfill orders placed through BandiWala are independent contractors and NOT employees of BandiWala. They operate as third-party service providers. Delivery times displayed on the Platform are estimates only and may vary based on multiple factors including traffic conditions, weather, merchant preparation time, and delivery partner availability.',
+            ),
+
+            _buildParagraph(
+              'BandiWala is not liable for delays in delivery or damage to food during transit. Delivery partners are not authorized to modify orders, accept additional payments, or make changes to items. You must ensure that you provide a safe and accessible delivery location with clear instructions if necessary. Orders must be accepted within the specified time frame shown in the app.',
+            ),
+
+            _buildParagraph(
+              'If you experience delivery issues such as significantly delayed delivery, damaged packaging, or incorrect items delivered, you must report these issues within 1 hour of the scheduled delivery time. Provide clear photographic evidence of the issue. BandiWala will investigate all reports and may issue refunds at our sole discretion based on the severity and validity of the complaint.',
+            ),
+
+            const SizedBox(height: 16),
+            _buildHeading('Ratings, Reviews, and User Content'),
+
+            _buildParagraph(
+              'When you submit ratings and reviews on the Platform, you agree that all reviews must be honest and based on your actual personal experience with the order. You may only review orders that you personally received and consumed. False claims, fabricated stories, or reviews based on second-hand information are prohibited.',
+            ),
+
+            _buildParagraph(
+              'Your reviews must not contain promotional content for competing platforms or services. Personal attacks on merchant staff, delivery partners, or other users are strictly forbidden. Spam, repetitive content, or inclusion of personal contact information in reviews is not allowed.',
+            ),
+
+            _buildParagraph(
+              'By posting any content including reviews, photos, or comments on the Platform, you grant BandiWala a non-exclusive, worldwide, perpetual, royalty-free license to use, display, reproduce, modify, and distribute your content in any media format. This helps us improve our services and showcase user experiences. You retain ownership of your content but allow us to use it for operational and promotional purposes.',
+            ),
+
+            const SizedBox(height: 16),
+            _buildHeading('Governing Law and Jurisdiction'),
+
+            _buildParagraph(
+              'These Terms and Conditions are governed by and construed in accordance with the laws of India. All disputes arising from your use of the Platform or these Terms shall be subject to the Consumer Protection Act 2019 and other applicable Indian laws.',
+            ),
+
+            _buildParagraph(
+              'Any disputes, controversies, or claims arising out of or relating to these Terms shall be subject to the exclusive jurisdiction of the courts located in Hyderabad, Telangana, India. For disputes involving amounts equal to or exceeding ₹1 lakh (one lakh Indian Rupees), the parties agree to submit to arbitration in accordance with the Arbitration and Conciliation Act, 1996.',
+            ),
+
+            const SizedBox(height: 16),
+            _buildHeading('Limitation of Liability'),
+
+            _buildParagraph(
+              'To the maximum extent permitted by law, BandiWala shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of the Platform. This includes but is not limited to loss of profits, data, goodwill, or other intangible losses resulting from your use or inability to use the service.',
+            ),
+
+            _buildParagraph(
+              'Our total liability to you for all claims arising from your use of the Platform shall not exceed the amount you paid to BandiWala in the six months preceding the claim, or ₹1,000, whichever is less.',
+            ),
+
+            const SizedBox(height: 16),
+            _buildHeading('Modifications to Terms'),
+
+            _buildParagraph(
+              'BandiWala reserves the right to modify, update, or change these Terms and Conditions at any time without prior notice. When we make changes, we will update the "Last Updated" date at the top of this document. Continued use of the Platform after any such changes constitutes your acceptance of the new Terms.',
+            ),
+
+            _buildParagraph(
+              'We encourage you to review these Terms periodically to stay informed about any updates. For significant changes that materially affect your rights, we may provide additional notice through the app or via email.',
+            ),
+
+            const SizedBox(height: 24),
+            _buildHeading('Contact Information'),
+
+            _buildParagraph(
+              'For questions, concerns, or inquiries regarding these Terms and Conditions or any aspect of the BandiWala Platform, please contact us using the information below:',
+            ),
+
+            _buildParagraph(
+              'General Inquiries: hello@bandiwala.com\nCustomer Support: support@bandiwala.com\nPrivacy Concerns: privacy@bandiwala.com\nCompliance Issues: compliance@bandiwala.com',
+            ),
+
+            _buildParagraph(
+              'Registered Office Address:\nP-405, PG Block, VJ Hub\nVNRVJIET, Bachupally\nHyderabad, Telangana - 500090\nIndia',
+            ),
+
+            const SizedBox(height: 24),
+            _buildHeading('Acceptance of Terms'),
+
+            _buildParagraph(
+              'By using BandiWala, you acknowledge that you have read and understood these Terms and Conditions and agree to be bound by them. Thank you for choosing BandiWala for your food delivery needs.',
+            ),
+
+            const SizedBox(height: 24),
+            Divider(color: Colors.grey.shade300),
+            const SizedBox(height: 12),
+
+            Center(
+              child: Text(
+                '© 2026 BandiWala. All rights reserved.',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
               ),
             ),
-
             const SizedBox(height: 24),
           ],
         ),
@@ -452,325 +218,48 @@ class TermsConditionsPage extends StatelessWidget {
     );
   }
 
-  // Common Section Builder
-  Widget _buildSection({
-    required String title,
-    required IconData icon,
-    required List<Widget> children,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: kBandiwalaYellow.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, color: kBandiwalaYellow, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: Colors.grey.shade300),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: children,
-            ),
-          ),
-        ],
+  Widget _buildHeading(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20, bottom: 8),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: Colors.black87,
+          height: 1.4,
+        ),
       ),
     );
   }
 
-  Widget _buildTextContent(String text) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontSize: 13,
-        color: Colors.grey.shade800,
-        height: 1.5,
+  Widget _buildSubHeading(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 6),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: Colors.black87,
+          height: 1.4,
+        ),
       ),
     );
   }
 
-  Widget _buildHighlightBox(String title, String content) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: kBandiwalaYellow.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kBandiwalaYellow.withOpacity(0.5), width: 1.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            content,
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade800,
-              height: 1.4,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoCard(String title, String content) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            content,
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade800,
-              height: 1.4,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWarningBox(String title, String content) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: kBandiwalaYellow.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kBandiwalaYellow),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.warning_amber_rounded, color: kBandiwalaYellow, size: 24),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  content,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade800,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProhibitedCard(String title, List<String> items) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ...items.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(
-              item,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade800,
-                height: 1.4,
-              ),
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentMethodsCard() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.payment, color: kBandiwalaYellow, size: 20),
-              const SizedBox(width: 8),
-              const Text(
-                'Accepted Payment Methods',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            '✓ Credit/Debit Cards\n✓ UPI (Google Pay, PhonePe, Paytm)\n✓ Digital Wallets\n✓ Net Banking',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade800,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: kBandiwalaYellow.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: kBandiwalaYellow.withOpacity(0.5)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: kBandiwalaYellow, size: 16),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'All transactions in Indian Rupees (INR)',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade800,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContactCard(String label, String email, IconData icon) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: kBandiwalaYellow.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Icon(icon, color: kBandiwalaYellow, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  email,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+  Widget _buildParagraph(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 13,
+          color: Colors.grey.shade800,
+          height: 1.6,
+          letterSpacing: 0.2,
+        ),
+        textAlign: TextAlign.justify,
       ),
     );
   }
