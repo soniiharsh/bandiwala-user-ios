@@ -366,6 +366,72 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
     widget.onSearchCleared?.call();
   }
 
+  // ─── Log no-result search to Firestore ───────────────────────────────────
+  //
+  // Document shape written to  logs/{auto-id} :
+  // {
+  //   "type"        : "no_result_search",
+  //   "reason"      : "User searched for an item that returned no results",
+  //   "searchQuery" : "<what the user typed>",
+  //   "phoneNumber" : "<user's phone number or 'unknown'>",
+  //   "location"    : {
+  //                     "latitude"  : <double | null>,
+  //                     "longitude" : <double | null>,
+  //                     "address"   : "<saved address string or 'unknown'>"
+  //                   },
+  //   "timestamp"   : <Firestore server timestamp>
+  // }
+
+  Future<void> _logNoResultSearch(String query) async {
+    try {
+      // ── Collect location info ─────────────────────────────────────────
+      double? lat;
+      double? lng;
+      String locationAddress = 'unknown';
+
+      if (_activeAddress != null) {
+        // Prefer the saved delivery address (has a human-readable string)
+        locationAddress = _activeAddress!.address;
+        // SavedLocation may carry lat/lng — use them if available
+        if (_activeAddress!.latitude != null &&
+            _activeAddress!.longitude != null) {
+          lat = _activeAddress!.latitude;
+          lng = _activeAddress!.longitude;
+        } else if (_currentPosition != null) {
+          lat = _currentPosition!.latitude;
+          lng = _currentPosition!.longitude;
+        }
+      } else if (_currentPosition != null) {
+        lat = _currentPosition!.latitude;
+        lng = _currentPosition!.longitude;
+        locationAddress = _displayLocation;
+      }
+
+      // ── Write log document ────────────────────────────────────────────
+      await FirebaseFirestore.instance.collection('logs').add({
+        'type': 'no_result_search',
+        'reason': 'User searched for an item that returned no results',
+        'searchQuery': query,
+        'phoneNumber': widget.phoneNumber?.isNotEmpty == true
+            ? widget.phoneNumber
+            : 'unknown',
+        'location': {
+          'latitude': lat,
+          'longitude': lng,
+          'address': locationAddress,
+        },
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      debugPrint('[Log] No-result search logged: "$query"');
+    } catch (e) {
+      // Logging must never crash the app
+      debugPrint('[Log] Failed to write no-result log: $e');
+    }
+  }
+
+  // ─── Run search ───────────────────────────────────────────────────────────
+
   Future<void> _runSearch(String query) async {
     if (query.trim().isEmpty) return;
     setState(() {
@@ -447,6 +513,11 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
           _searchResults = map.values.toList();
           _isLoadingSearch = false;
         });
+
+        // ── Log to Firestore if no results found ──────────────────────
+        if (_searchResults.isEmpty) {
+          await _logNoResultSearch(query.trim());
+        }
       }
     } catch (e) {
       debugPrint('Search error: $e');

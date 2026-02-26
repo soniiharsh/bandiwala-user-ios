@@ -243,13 +243,6 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
             (doc) => (doc.data() as Map<String, dynamic>)['isVeg'] == false,
           )
           .toList();
-    } else if (_activeFilter == 'Best Seller') {
-      result = result
-          .where(
-            (doc) =>
-                (doc.data() as Map<String, dynamic>)['isBestSeller'] == true,
-          )
-          .toList();
     }
 
     _filteredDocs = result;
@@ -282,7 +275,7 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
           // ── Search bar ───────────────────────────────────────────────
           SliverToBoxAdapter(child: _buildSearchBar()),
 
-          // ── Filter chips ─────────────────────────────────────────────
+          // ── Filter chips (Veg + Non-veg only) ───────────────────────
           SliverToBoxAdapter(child: _buildFilterChips()),
 
           // ── Items grid ───────────────────────────────────────────────
@@ -299,13 +292,11 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
 
   // ── Hero image + vendor card (overlap via Stack, no negative margin) ──────
   Widget _buildHeroWithOverlappingCard() {
-    // Card approximate height for the Stack to reserve space
     const double cardOverlap = 28.0;
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // ── Hero image section ──────────────────────────────────────────
         Column(
           children: [
             SizedBox(
@@ -375,12 +366,11 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
                 ],
               ),
             ),
-            // Space reserved for the overlapping card
             const SizedBox(height: cardOverlap),
           ],
         ),
 
-        // ── Vendor info card — uses Transform.translate to overlap hero ─
+        // ── Vendor info card overlapping hero ─
         Positioned(
           bottom: 0,
           left: 12,
@@ -391,10 +381,9 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
     );
   }
 
-  // ── Vendor info card (NO negative margin) ────────────────────────────────
+  // ── Vendor info card — NO inline coupon ──────────────────────────────────
   Widget _buildVendorInfoCard() {
     return Container(
-      // ✅ FIXED: Only positive margins — no negative values
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -472,71 +461,9 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
               overflow: TextOverflow.ellipsis,
             ),
           ],
-          // First coupon inline
-          if (_coupons.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Divider(height: 1),
-            const SizedBox(height: 12),
-            _buildInlineCoupon(_coupons.first),
-          ],
+          // ── NO inline coupon here (removed) ──
         ],
       ),
-    );
-  }
-
-  Widget _buildInlineCoupon(Map<String, dynamic> coupon) {
-    final code = coupon['couponCode'] ?? 'CODE';
-    final type = coupon['couponType'] ?? 'discount';
-    final min = (coupon['minAmount'] ?? 0).toDouble();
-
-    String label;
-    if (type == 'discount') {
-      final pct = (coupon['discountAmount'] ?? 0).toInt();
-      label = 'Unlock $pct% OFF';
-    } else if (type == 'free_delivery') {
-      label = 'Unlock Free Delivery';
-    } else {
-      label = 'Unlock ${coupon['freebieName'] ?? 'Free Item'}';
-    }
-
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE8F5E9),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            Icons.local_offer_outlined,
-            size: 20,
-            color: Colors.teal.shade600,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.teal.shade700,
-                ),
-              ),
-              Text(
-                'Use code $code  |  above ₹${min.toInt()}',
-                style: GoogleFonts.poppins(
-                  fontSize: 11,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 
@@ -607,47 +534,27 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
     );
   }
 
-  // ── Filter chips ──────────────────────────────────────────────────────────
+  // ── Filter chips — Veg + Non-veg ONLY ────────────────────────────────────
   Widget _buildFilterChips() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            _FilterChip(
-              label: 'Filters',
-              icon: Icons.tune_rounded,
-              isActive: _activeFilter != 'All',
-              onTap: () {},
-              showDropArrow: true,
-            ),
-            const SizedBox(width: 8),
-            _VegChip(
-              label: 'Veg',
-              isVeg: true,
-              isActive: _activeFilter == 'Veg',
-              onTap: () => _setFilter(_activeFilter == 'Veg' ? 'All' : 'Veg'),
-            ),
-            const SizedBox(width: 8),
-            _VegChip(
-              label: 'Non-veg',
-              isVeg: false,
-              isActive: _activeFilter == 'Non-veg',
-              onTap: () =>
-                  _setFilter(_activeFilter == 'Non-veg' ? 'All' : 'Non-veg'),
-            ),
-            const SizedBox(width: 8),
-            _FilterChip(
-              label: 'Best Seller',
-              icon: Icons.verified_rounded,
-              isActive: _activeFilter == 'Best Seller',
-              onTap: () => _setFilter(
-                _activeFilter == 'Best Seller' ? 'All' : 'Best Seller',
-              ),
-            ),
-          ],
-        ),
+      child: Row(
+        children: [
+          _VegChip(
+            label: 'Veg',
+            isVeg: true,
+            isActive: _activeFilter == 'Veg',
+            onTap: () => _setFilter(_activeFilter == 'Veg' ? 'All' : 'Veg'),
+          ),
+          const SizedBox(width: 8),
+          _VegChip(
+            label: 'Non-veg',
+            isVeg: false,
+            isActive: _activeFilter == 'Non-veg',
+            onTap: () =>
+                _setFilter(_activeFilter == 'Non-veg' ? 'All' : 'Non-veg'),
+          ),
+        ],
       ),
     );
   }
@@ -789,68 +696,6 @@ class _CircleButton extends StatelessWidget {
           ],
         ),
         child: Icon(icon, size: 22, color: iconColor),
-      ),
-    );
-  }
-}
-
-// ─── Filter chip ─────────────────────────────────────────────────────────────
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isActive;
-  final VoidCallback onTap;
-  final bool showDropArrow;
-
-  const _FilterChip({
-    required this.label,
-    required this.icon,
-    required this.isActive,
-    required this.onTap,
-    this.showDropArrow = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? Colors.black87 : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isActive ? Colors.black87 : Colors.grey.shade300,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 15,
-              color: isActive ? Colors.white : Colors.black87,
-            ),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: isActive ? Colors.white : Colors.black87,
-              ),
-            ),
-            if (showDropArrow) ...[
-              const SizedBox(width: 3),
-              Icon(
-                Icons.keyboard_arrow_down_rounded,
-                size: 16,
-                color: isActive ? Colors.white : Colors.black87,
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }
@@ -1384,6 +1229,11 @@ class _MenuSheet extends StatelessWidget {
 }
 
 // ─── Product detail overlay ───────────────────────────────────────────────────
+// Fixed layout:
+//  • Image floats above the white card (stays on top, never overlaps text)
+//  • Text content starts well below the image
+//  • Add button + counter pinned to bottom
+//  • Sheet height = exactly content height (no extra space, no scroll needed)
 
 class ProductDetailOverlay extends StatefulWidget {
   final String vendorId;
@@ -1421,6 +1271,13 @@ class ProductDetailOverlay extends StatefulWidget {
 
 class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
   int quantity = 1;
+
+  // Image visible height above the white card
+  static const double _imageHeight = 180.0;
+  // How much of the image overlaps the white card from the top
+  static const double _imageOverlap = 80.0;
+  // Top padding inside white card so text clears the image
+  static const double _cardTopPad = _imageHeight - _imageOverlap + 16;
 
   @override
   void initState() {
@@ -1479,317 +1336,334 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     final badgeColor = widget.isVeg
         ? Colors.green.shade600
         : Colors.red.shade600;
+    final bottomPad = MediaQuery.of(context).padding.bottom;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.72,
-      minChildSize: 0.5,
-      maxChildSize: 0.85,
-      builder: (_, scrollCtrl) {
-        return Stack(
-          clipBehavior: Clip.none,
+    // The white card body content (no image, no bottom button)
+    final cardContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Veg badge + category
+        Row(
           children: [
-            // ── White card body starts 80px down ───────────────────
-            Positioned(
-              top: 80,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                child: SingleChildScrollView(
-                  controller: scrollCtrl,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 28, 20, 30),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Veg badge + category
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(2.5),
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: badgeColor,
-                                  width: 1.5,
-                                ),
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                              child: Icon(
-                                Icons.circle,
-                                size: 8,
-                                color: badgeColor,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              widget.category,
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Name
-                        Text(
-                          widget.name,
-                          style: GoogleFonts.poppins(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.black87,
-                            height: 1.2,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 8),
-
-                        // Description
-                        Text(
-                          widget.description.isNotEmpty
-                              ? widget.description
-                              : 'Delicious item from ${widget.vendorName}',
-                          style: GoogleFonts.poppins(
-                            fontSize: 13,
-                            color: Colors.grey.shade600,
-                            height: 1.5,
-                          ),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 14),
-
-                        // Rating + price
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            if (widget.ratingCount > 0)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.star_rounded,
-                                      size: 14,
-                                      color: Colors.green.shade700,
-                                    ),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      widget.rating.toStringAsFixed(1),
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 12,
-                                        color: Colors.green.shade800,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      '(${widget.ratingCount})',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 11,
-                                        color: Colors.grey.shade500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            else
-                              const SizedBox(),
-                            Text(
-                              '₹ ${widget.price.toStringAsFixed(0)}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: _kYellow,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-
-                        // Qty stepper + Add button
-                        Row(
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFF3CD),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                children: [
-                                  _StepBtn(
-                                    icon: Icons.remove,
-                                    onTap: _decrement,
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                    ),
-                                    child: Text(
-                                      '$quantity',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                  _StepBtn(icon: Icons.add, onTap: _increment),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: widget.isAvailable
-                                    ? () {
-                                        final vc = cartStore
-                                            .cartByVendor[widget.vendorId];
-                                        final already =
-                                            vc?.items
-                                                .firstWhere(
-                                                  (i) => i.id == widget.itemId,
-                                                  orElse: () => CartItem(
-                                                    id: '',
-                                                    name: '',
-                                                    price: 0,
-                                                    quantity: 0,
-                                                  ),
-                                                )
-                                                .quantity ??
-                                            0;
-                                        if (already == 0) {
-                                          cartStore.addItem(
-                                            vendorId: widget.vendorId,
-                                            vendorName: widget.vendorName,
-                                            itemId: widget.itemId,
-                                            itemName: widget.name,
-                                            price: widget.price,
-                                          );
-                                        }
-                                        Navigator.pop(context);
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              '$quantity × ${widget.name} added',
-                                            ),
-                                            backgroundColor: Colors.green,
-                                            duration: const Duration(
-                                              seconds: 2,
-                                            ),
-                                            behavior: SnackBarBehavior.floating,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                    : null,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _kYellow,
-                                  foregroundColor: Colors.black,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 15,
-                                  ),
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                                child: Text(
-                                  widget.isAvailable
-                                      ? 'Total  ₹${(widget.price * quantity).toStringAsFixed(0)}'
-                                      : 'UNAVAILABLE',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+            Container(
+              padding: const EdgeInsets.all(2.5),
+              decoration: BoxDecoration(
+                border: Border.all(color: badgeColor, width: 1.5),
+                borderRadius: BorderRadius.circular(3),
               ),
+              child: Icon(Icons.circle, size: 8, color: badgeColor),
             ),
-
-            // ── Floating item image — above the white card ──────────
-            Positioned(
-              top: 0,
-              left: 16,
-              right: 16,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: Container(
-                  height: 190,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: widget.imageUrl.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: widget.imageUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) =>
-                              Container(color: Colors.grey.shade200),
-                          errorWidget: (_, __, ___) => Container(
-                            color: Colors.grey.shade200,
-                            child: const Icon(Icons.restaurant, size: 48),
-                          ),
-                        )
-                      : Container(
-                          color: Colors.grey.shade200,
-                          child: const Icon(Icons.restaurant, size: 48),
-                        ),
-                ),
-              ),
-            ),
-
-            // ── Yellow close button — top-right ─────────────────────
-            Positioned(
-              top: 8,
-              right: 24,
-              child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: _kYellow,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.close, color: Colors.black, size: 18),
-                ),
+            const SizedBox(width: 6),
+            Text(
+              widget.category,
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
-        );
-      },
+        ),
+        const SizedBox(height: 8),
+
+        // Name
+        Text(
+          widget.name,
+          style: GoogleFonts.poppins(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: Colors.black87,
+            height: 1.2,
+          ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 8),
+
+        // Description
+        if (widget.description.isNotEmpty)
+          Text(
+            widget.description,
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              color: Colors.grey.shade600,
+              height: 1.5,
+            ),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+        if (widget.description.isNotEmpty) const SizedBox(height: 14),
+
+        // Rating + price row
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            if (widget.ratingCount > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.star_rounded,
+                      size: 14,
+                      color: Colors.green.shade700,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      widget.rating.toStringAsFixed(1),
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: Colors.green.shade800,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      '(${widget.ratingCount})',
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              const SizedBox(),
+            Text(
+              '₹ ${widget.price.toStringAsFixed(0)}',
+              style: GoogleFonts.poppins(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: _kYellow,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    // Bottom action bar (qty stepper + add button)
+    final bottomBar = Container(
+      padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + bottomPad),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Colors.grey.shade100, width: 1)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3CD),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                _StepBtn(icon: Icons.remove, onTap: _decrement),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Text(
+                    '$quantity',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                _StepBtn(icon: Icons.add, onTap: _increment),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: widget.isAvailable
+                  ? () {
+                      final vc = cartStore.cartByVendor[widget.vendorId];
+                      final already =
+                          vc?.items
+                              .firstWhere(
+                                (i) => i.id == widget.itemId,
+                                orElse: () => CartItem(
+                                  id: '',
+                                  name: '',
+                                  price: 0,
+                                  quantity: 0,
+                                ),
+                              )
+                              .quantity ??
+                          0;
+                      if (already == 0) {
+                        cartStore.addItem(
+                          vendorId: widget.vendorId,
+                          vendorName: widget.vendorName,
+                          itemId: widget.itemId,
+                          itemName: widget.name,
+                          price: widget.price,
+                        );
+                      }
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('$quantity × ${widget.name} added'),
+                          backgroundColor: Colors.green,
+                          duration: const Duration(seconds: 2),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      );
+                    }
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _kYellow,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text(
+                widget.isAvailable
+                    ? 'Total  ₹${(widget.price * quantity).toStringAsFixed(0)}'
+                    : 'UNAVAILABLE',
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // Use an intrinsic-size bottom sheet so it wraps content exactly
+    return _IntrinsicBottomSheet(
+      imageHeight: _imageHeight,
+      imageOverlap: _imageOverlap,
+      cardTopPad: _cardTopPad,
+      imageUrl: widget.imageUrl,
+      cardContent: cardContent,
+      bottomBar: bottomBar,
+      onClose: () => Navigator.pop(context),
+    );
+  }
+}
+
+/// Uses a Stack so the image is always painted ON TOP of the white card.
+/// Sheet height = visibleImageHeight + card content + bottom bar (no scroll, no empty space).
+class _IntrinsicBottomSheet extends StatelessWidget {
+  final double imageHeight;
+  final double imageOverlap;
+  final double cardTopPad;
+  final String imageUrl;
+  final Widget cardContent;
+  final Widget bottomBar;
+  final VoidCallback onClose;
+
+  const _IntrinsicBottomSheet({
+    required this.imageHeight,
+    required this.imageOverlap,
+    required this.cardTopPad,
+    required this.imageUrl,
+    required this.cardContent,
+    required this.bottomBar,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleImageHeight = imageHeight - imageOverlap;
+
+    // White card rendered first (lower paint order = behind image)
+    final whiteCard = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Transparent spacer — image floats above here
+        SizedBox(height: visibleImageHeight),
+        Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Top padding pushes text below the image overlap
+              Padding(
+                padding: EdgeInsets.fromLTRB(20, cardTopPad, 20, 20),
+                child: cardContent,
+              ),
+              bottomBar,
+            ],
+          ),
+        ),
+      ],
+    );
+
+    // Stack: whiteCard FIRST (behind), image + close LAST (on top)
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // ── Layer 1: white card (behind) ────────────────────────────
+        whiteCard,
+
+        // ── Layer 2: floating image (on top of white card) ──────────
+        Positioned(
+          top: 0,
+          left: 16,
+          right: 16,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: SizedBox(
+              height: imageHeight,
+              child: imageUrl.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) =>
+                          Container(color: Colors.grey.shade200),
+                      errorWidget: (_, __, ___) => Container(
+                        color: Colors.grey.shade200,
+                        child: const Icon(Icons.restaurant, size: 48),
+                      ),
+                    )
+                  : Container(
+                      color: Colors.grey.shade200,
+                      child: const Icon(Icons.restaurant, size: 48),
+                    ),
+            ),
+          ),
+        ),
+
+        // ── Layer 3: close button (topmost) ─────────────────────────
+        Positioned(
+          top: 8,
+          right: 24,
+          child: GestureDetector(
+            onTap: onClose,
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: const BoxDecoration(
+                color: _kYellow,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.close, color: Colors.black, size: 18),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
