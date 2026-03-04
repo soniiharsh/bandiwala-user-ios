@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
+import 'orders.dart';
 import 'bottom_navigation.dart';
 import 'cart_screen.dart';
 import 'help_screen.dart';
@@ -49,7 +50,7 @@ class _VendorItemsPageState extends State<VendorItemsPage> {
         onBackPressed: () => Navigator.of(context).pop(),
       ),
       CartScreen(onBackToHome: () => setState(() => _currentIndex = 0)),
-      const HelpScreen(),
+      const OrdersPage(),
     ];
 
     return PopScope(
@@ -1780,6 +1781,7 @@ class _ItemCounterState extends State<_ItemCounter> {
     }
 
     final q = _qty;
+
     if (q == 0) {
       return SizedBox(
         width: double.infinity,
@@ -1806,41 +1808,63 @@ class _ItemCounterState extends State<_ItemCounter> {
       );
     }
 
-    return Container(
+    // ✅ Fixed counter: buttons are fixed size, number is flexible center
+    return SizedBox(
       width: double.infinity,
       height: 34,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.black87, width: 1.2),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          GestureDetector(
-            onTap: () => _change(-1),
-            child: const SizedBox(
-              width: 32,
-              height: 34,
-              child: Icon(Icons.remove, size: 15, color: Colors.black87),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.black87, width: 1.2),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // ── Minus button ─────────────────────────────────────
+            GestureDetector(
+              onTap: () => _change(-1),
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: 34,
+                alignment: Alignment.center,
+                child: Icon(
+                  q == 1 ? Icons.delete_outline : Icons.remove,
+                  size: 16,
+                  color: q == 1 ? Colors.red.shade400 : Colors.black87,
+                ),
+              ),
             ),
-          ),
-          Text(
-            '$q',
-            style: GoogleFonts.poppins(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
+
+            // ── Quantity number — takes remaining space, never overflows ──
+            Expanded(
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    '$q',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
-          GestureDetector(
-            onTap: () => _change(1),
-            child: const SizedBox(
-              width: 32,
-              height: 34,
-              child: Icon(Icons.add, size: 15, color: Colors.black87),
+
+            // ── Plus button ──────────────────────────────────────
+            GestureDetector(
+              onTap: () => _change(1),
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                width: 34,
+                alignment: Alignment.center,
+                child: const Icon(Icons.add, size: 16, color: Colors.black87),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

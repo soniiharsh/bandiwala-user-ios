@@ -451,14 +451,15 @@ class _CartScreenState extends State<CartScreen> {
       return;
     }
 
+    // AFTER:
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PaymentPage(
-          itemsTotal: cartStore.grandTotal, // ← raw product total only
-          deliveryAddress: _selectedAddress!.address,
-          appliedCoupon: _appliedCoupon, // ← full coupon map
-          couponDiscount: _couponDiscount, // ← discount amount
+          itemsTotal: cartStore.grandTotal,
+          deliveryLocation: _selectedAddress, // ✅ pass full SavedLocation
+          appliedCoupon: _appliedCoupon,
+          couponDiscount: _couponDiscount,
         ),
       ),
     );
@@ -2035,20 +2036,26 @@ class CartLineItem extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: kBandiwalaYellow),
+                border: Border.all(color: kBandiwalaYellow, width: 1.5),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _btn(Icons.remove, () => onQuantityChanged(-1)),
+                  _btn(
+                    item.quantity == 1 ? Icons.delete_outline : Icons.remove,
+                    () => onQuantityChanged(-1),
+                    isRemove: item.quantity == 1,
+                  ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: Text(
                       '${item.quantity}',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   _btn(Icons.add, () => onQuantityChanged(1)),
@@ -2066,10 +2073,18 @@ class CartLineItem extends StatelessWidget {
     );
   }
 
-  Widget _btn(IconData icon, VoidCallback onTap) {
+  Widget _btn(IconData icon, VoidCallback onTap, {bool isRemove = false}) {
     return InkWell(
       onTap: onTap,
-      child: Icon(icon, size: 16, color: kBandiwalaYellow),
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Icon(
+          icon,
+          size: 22,
+          color: isRemove ? Colors.red.shade400 : kBandiwalaYellow,
+        ),
+      ),
     );
   }
 }

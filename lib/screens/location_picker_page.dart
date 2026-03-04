@@ -11,9 +11,9 @@ import 'dart:async';
 // ─── Shared model ─────────────────────────────────────────────────────────────
 
 class SavedLocation {
-  final String address;
-  final double latitude;
-  final double longitude;
+  final String address; // Human-readable area name (e.g. "KPHB, Hyderabad")
+  final double latitude; // Full precision e.g. 17.476388123
+  final double longitude; // Full precision e.g. 78.390350456
   final String? houseNo;
   final String? phone;
   final String? label;
@@ -27,6 +27,7 @@ class SavedLocation {
     this.label,
   });
 
+  // ✅ lat/lng stored as full-precision doubles — never truncated
   Map<String, dynamic> toJson() => {
     'address': address,
     'latitude': latitude,
@@ -57,6 +58,10 @@ class SavedLocation {
     if (address.isNotEmpty) parts.add(address);
     return parts.join(', ');
   }
+
+  // ✅ Shows area name + precise coordinates
+  String get coordinatesDisplay =>
+      '${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}';
 
   String get shortLabel => label ?? 'Other';
 }
@@ -90,55 +95,45 @@ class LocationPickerPage extends StatefulWidget {
 class _LocationPickerPageState extends State<LocationPickerPage> {
   static const Color bandiwalaYellow = Color(0xFFFFC107);
 
-  // ── Mode flags ───────────────────────────────────────────────────────────
   bool _showModeSelection = true;
   bool _isCurrentLocationMode = false;
   bool _isNewAddressMode = false;
   bool _isMapReady = false;
 
-  // ── Map ──────────────────────────────────────────────────────────────────
   final MapController _mapController = MapController();
   LatLng? _currentPosition;
   LatLng? _selectedPosition;
   bool _isOutsideHyderabad = false;
 
-  // ── Controllers ──────────────────────────────────────────────────────────
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   final TextEditingController _houseNoController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
 
-  // ── State ────────────────────────────────────────────────────────────────
   List<SavedLocation> _savedLocations = [];
   bool _isFetchingLocation = false;
   String _selectedLabel = 'Home';
   String _fetchedAddress = '';
 
-  // ── Autocomplete ─────────────────────────────────────────────────────────
   List<_PlaceSuggestion> _suggestions = [];
   bool _isSearching = false;
   bool _showSuggestions = false;
   Timer? _debounce;
 
-  // Single reusable HTTP client
   final http.Client _httpClient = http.Client();
 
-  // ── Hyderabad bounds ─────────────────────────────────────────────────────
   static const double _minLat = 17.25;
   static const double _maxLat = 17.55;
   static const double _minLng = 78.25;
   static const double _maxLng = 78.65;
 
-  // ─────────────────────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
     _loadSavedLocations();
     _searchController.addListener(_onSearchChanged);
-    // Hide suggestions only when focus is COMPLETELY lost
     _searchFocusNode.addListener(() {
       if (!_searchFocusNode.hasFocus && mounted) {
-        // Small delay so tap-on-suggestion registers before hiding
         Future.delayed(const Duration(milliseconds: 200), () {
           if (mounted && !_searchFocusNode.hasFocus) {
             setState(() => _showSuggestions = false);
@@ -160,13 +155,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     super.dispose();
   }
 
-  // ─── Search listener ──────────────────────────────────────────────────────
-
   void _onSearchChanged() {
     if (!_isNewAddressMode) return;
     final query = _searchController.text.trim();
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-
     if (query.length < 2) {
       if (mounted) {
         setState(() {
@@ -177,21 +169,15 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       }
       return;
     }
-
     if (mounted) setState(() => _isSearching = true);
-
     _debounce = Timer(const Duration(milliseconds: 400), () {
       _fetchSuggestions(query);
     });
   }
 
-  // ─── Primary: Photon (OSM-based, fast, no key) ────────────────────────────
-
   Future<void> _fetchSuggestions(String query) async {
     if (!mounted) return;
-
     try {
-      // Use Uri.https constructor — avoids cleartext Android issues
       final uri = Uri.https('photon.komoot.io', '/api/', {
         'q': query,
         'limit': '8',
@@ -199,29 +185,23 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         'lat': '17.3850',
         'lon': '78.4867',
       });
-
       final response = await _httpClient
           .get(uri, headers: {'User-Agent': 'BandiWalaApp/1.0'})
           .timeout(const Duration(seconds: 8));
 
       if (!mounted) return;
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final features = data['features'] as List? ?? [];
-
         final suggestions = features.map((f) {
           final props = f['properties'] as Map<String, dynamic>? ?? {};
           final coords = f['geometry']['coordinates'] as List;
-
           final name = props['name'] as String? ?? '';
           final street = props['street'] as String? ?? '';
           final city =
               props['city'] as String? ?? props['county'] as String? ?? '';
           final state = props['state'] as String? ?? '';
           final district = props['district'] as String? ?? '';
-
-          // Short name shown bold in dropdown
           final shortName = name.isNotEmpty
               ? name
               : street.isNotEmpty
@@ -229,8 +209,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               : city.isNotEmpty
               ? city
               : query;
-
-          // Full address line
           final parts = <String>[];
           if (name.isNotEmpty) parts.add(name);
           if (street.isNotEmpty && street != name) parts.add(street);
@@ -238,7 +216,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           if (city.isNotEmpty && city != name && city != district)
             parts.add(city);
           if (state.isNotEmpty) parts.add(state);
-
           return _PlaceSuggestion(
             displayName: parts.isNotEmpty ? parts.take(4).join(', ') : query,
             shortName: shortName,
@@ -251,32 +228,25 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           setState(() {
             _suggestions = suggestions;
             _isSearching = false;
-            // ✅ No focus gate — show results as soon as they arrive
             _showSuggestions = suggestions.isNotEmpty;
           });
         }
       } else {
-        debugPrint('Photon HTTP ${response.statusCode}');
         if (mounted) setState(() => _isSearching = false);
-        // Try fallback on non-200
         _fetchSuggestionsFallback(query);
       }
     } on TimeoutException {
-      debugPrint('Photon timeout — falling back to Nominatim');
       if (mounted) {
         setState(() => _isSearching = false);
         _fetchSuggestionsFallback(query);
       }
     } catch (e) {
-      debugPrint('Photon error: $e — falling back to Nominatim');
       if (mounted) {
         setState(() => _isSearching = false);
         _fetchSuggestionsFallback(query);
       }
     }
   }
-
-  // ─── Fallback: Nominatim (no geocoding package needed) ────────────────────
 
   Future<void> _fetchSuggestionsFallback(String query) async {
     if (!mounted || query.isEmpty) return;
@@ -289,7 +259,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         'countrycodes': 'in',
         'accept-language': 'en',
       });
-
       final response = await _httpClient
           .get(
             uri,
@@ -301,10 +270,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           .timeout(const Duration(seconds: 8));
 
       if (!mounted) return;
-
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-
         final suggestions = data.map((item) {
           final addr = item['address'] as Map<String, dynamic>? ?? {};
           final name = item['name'] as String? ?? '';
@@ -320,7 +287,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               addr['county'] as String? ??
               '';
           final state = addr['state'] as String? ?? '';
-
           final shortName = name.isNotEmpty
               ? name
               : road.isNotEmpty
@@ -328,14 +294,12 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               : city.isNotEmpty
               ? city
               : query;
-
           final parts = <String>[];
           if (name.isNotEmpty) parts.add(name);
           if (road.isNotEmpty && road != name) parts.add(road);
           if (suburb.isNotEmpty) parts.add(suburb);
           if (city.isNotEmpty) parts.add(city);
           if (state.isNotEmpty) parts.add(state);
-
           return _PlaceSuggestion(
             displayName: parts.isNotEmpty
                 ? parts.take(4).join(', ')
@@ -358,10 +322,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     }
   }
 
-  // ─── Select suggestion ────────────────────────────────────────────────────
-
   Future<void> _selectSuggestion(_PlaceSuggestion suggestion) async {
-    // Immediately hide dropdown and stop searching
     if (mounted) {
       setState(() {
         _showSuggestions = false;
@@ -370,24 +331,19 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       });
     }
     _searchFocusNode.unfocus();
-
     final pos = LatLng(suggestion.lat, suggestion.lon);
     _searchController.text = suggestion.displayName;
-
-    // Reverse geocode for clean address
     final address = await _reverseGeocode(pos);
     if (!mounted) return;
-
     setState(() {
       _selectedPosition = pos;
       _fetchedAddress = address.isNotEmpty ? address : suggestion.displayName;
       _isOutsideHyderabad = !_isInHyderabad(pos);
     });
-
     if (_isMapReady) _mapController.move(pos, 16.0);
   }
 
-  // ─── Reverse geocode — pure HTTP, no geocoding package ───────────────────
+  // ─── Reverse geocode — returns clean area name only ───────────────────────
 
   Future<String> _reverseGeocode(LatLng position) async {
     // 1️⃣ Photon reverse (fastest)
@@ -465,11 +421,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     } catch (e) {
       debugPrint('Nominatim reverse error: $e');
     }
-
     return '';
   }
-
-  // ─── Helpers ──────────────────────────────────────────────────────────────
 
   Future<void> _loadSavedLocations() async {
     try {
@@ -492,8 +445,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       pos.latitude <= _maxLat &&
       pos.longitude >= _minLng &&
       pos.longitude <= _maxLng;
-
-  // ─── Current Location Mode ────────────────────────────────────────────────
 
   Future<void> _enterCurrentLocationMode() async {
     setState(() {
@@ -533,11 +484,13 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         return;
       }
 
+      // ✅ bestForNavigation = maximum GPS precision
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
         timeLimit: const Duration(seconds: 15),
       );
 
+      // ✅ Raw full-precision coordinates — no rounding
       final pos = LatLng(position.latitude, position.longitude);
       final address = await _reverseGeocode(pos);
 
@@ -551,7 +504,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         _isFetchingLocation = false;
       });
 
-      if (_isMapReady) _mapController.move(pos, 16.0);
+      if (_isMapReady) _mapController.move(pos, 17.0);
     } catch (e) {
       debugPrint('Fetch current location error: $e');
       if (!mounted) return;
@@ -561,8 +514,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       );
     }
   }
-
-  // ─── New Address Mode ─────────────────────────────────────────────────────
 
   void _enterNewAddressMode() {
     setState(() {
@@ -579,7 +530,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       _phoneController.clear();
       _selectedLabel = 'Home';
     });
-    // Auto-focus search after map renders
     Future.delayed(const Duration(milliseconds: 450), () {
       if (mounted && _isNewAddressMode) _searchFocusNode.requestFocus();
     });
@@ -594,21 +544,16 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         _suggestions = [];
       });
     }
-
     final address = await _reverseGeocode(point);
     if (!mounted) return;
-
     setState(() {
       _selectedPosition = point;
       _fetchedAddress = address.isNotEmpty ? address : 'Selected Location';
       _searchController.text = _fetchedAddress;
       _isOutsideHyderabad = !_isInHyderabad(point);
     });
-
     _mapController.move(point, _mapController.camera.zoom);
   }
-
-  // ─── Save ─────────────────────────────────────────────────────────────────
 
   bool _isDuplicate(SavedLocation loc) =>
       _savedLocations.any((e) => e.isSameLocation(loc));
@@ -627,14 +572,16 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       return;
     }
 
+    // ✅ address = human-readable area name
+    // ✅ latitude/longitude = full precision raw doubles
     final location = SavedLocation(
       address: _fetchedAddress.isNotEmpty
           ? _fetchedAddress
           : _searchController.text.trim().isNotEmpty
           ? _searchController.text.trim()
           : 'Selected Location',
-      latitude: _selectedPosition!.latitude,
-      longitude: _selectedPosition!.longitude,
+      latitude: _selectedPosition!.latitude, // e.g. 17.476388123456
+      longitude: _selectedPosition!.longitude, // e.g. 78.390350456789
       houseNo: _houseNoController.text.trim(),
       phone: _phoneController.text.trim().isNotEmpty
           ? _phoneController.text.trim()
@@ -753,8 +700,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       body: _showModeSelection ? _buildModeSelection() : _buildMapView(),
     );
   }
-
-  // ─── Mode Selection Screen ────────────────────────────────────────────────
 
   Widget _buildModeSelection() {
     return SafeArea(
@@ -880,6 +825,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
+  // ✅ Shows area name + lat/lng coordinates in saved tile
   Widget _buildSavedLocationTile(SavedLocation loc) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -939,13 +885,24 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                       ],
                     ),
                     const SizedBox(height: 2),
+                    // ✅ Area name shown here
                     Text(
                       loc.address,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.shade600,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    // ✅ Precise coordinates shown below area name
+                    Text(
+                      loc.coordinatesDisplay,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey.shade500,
+                        fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                   ],
@@ -959,12 +916,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
-  // ─── Map View ─────────────────────────────────────────────────────────────
-
   Widget _buildMapView() {
     return Stack(
       children: [
-        // ── Flutter Map ────────────────────────────────────────────────────
         FlutterMap(
           mapController: _mapController,
           options: MapOptions(
@@ -972,7 +926,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             initialZoom: 14.0,
             onMapReady: () {
               if (mounted) setState(() => _isMapReady = true);
-              // Snap to already-known position
               final target = _selectedPosition ?? _currentPosition;
               if (target != null) _mapController.move(target, 16.0);
             },
@@ -1007,7 +960,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           ],
         ),
 
-        // ── Top Search Bar Overlay ─────────────────────────────────────────
         SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1017,7 +969,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                 padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
                 child: Row(
                   children: [
-                    // Back button
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -1049,10 +1000,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                         },
                       ),
                     ),
-
                     const SizedBox(width: 8),
-
-                    // Search field or "Current Location" label
                     Expanded(
                       child: _isNewAddressMode
                           ? Container(
@@ -1166,7 +1114,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                 ),
               ),
 
-              // ── Suggestions Dropdown ─────────────────────────────────────
               if (_showSuggestions && _suggestions.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(64, 4, 8, 0),
@@ -1241,7 +1188,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                   ),
                 ),
 
-              // ── Outside Hyderabad warning ────────────────────────────────
               if (_isOutsideHyderabad)
                 Container(
                   margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -1279,7 +1225,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           ),
         ),
 
-        // ── GPS FAB ───────────────────────────────────────────────────────
         Positioned(
           right: 16,
           bottom: 330,
@@ -1301,7 +1246,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           ),
         ),
 
-        // ── Bottom Sheet ──────────────────────────────────────────────────
         DraggableScrollableSheet(
           initialChildSize: 0.38,
           minChildSize: 0.30,
@@ -1324,7 +1268,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               controller: scrollCtrl,
               padding: EdgeInsets.zero,
               children: [
-                // Drag handle
                 Center(
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 10),
@@ -1336,7 +1279,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                     ),
                   ),
                 ),
-
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                   child: Column(
@@ -1354,7 +1296,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                       ),
                       const SizedBox(height: 8),
 
-                      // Address preview box
                       if (_isFetchingLocation)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -1380,6 +1321,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                           ),
                         )
                       else if (_fetchedAddress.isNotEmpty)
+                        // ✅ Address preview: area name + precise coordinates
                         Container(
                           margin: const EdgeInsets.only(top: 8, bottom: 4),
                           padding: const EdgeInsets.all(12),
@@ -1388,25 +1330,56 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: Colors.grey.shade200),
                           ),
-                          child: Row(
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(
-                                Icons.location_on,
-                                color: Colors.red,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _fetchedAddress,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade800,
-                                    height: 1.4,
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.location_on,
+                                    color: Colors.red,
+                                    size: 18,
                                   ),
-                                ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _fetchedAddress,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey.shade800,
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
+                              if (_selectedPosition != null) ...[
+                                const SizedBox(height: 6),
+                                // ✅ Show lat/lng with 6 decimal precision
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.my_location,
+                                      size: 13,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '${_selectedPosition!.latitude.toStringAsFixed(6)}, '
+                                      '${_selectedPosition!.longitude.toStringAsFixed(6)}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade500,
+                                        fontFeatures: const [
+                                          FontFeature.tabularFigures(),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ],
                           ),
                         )
@@ -1424,7 +1397,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
                       const SizedBox(height: 16),
 
-                      // Label chips
                       const Text(
                         'Label',
                         style: TextStyle(
@@ -1446,7 +1418,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
                       const SizedBox(height: 16),
 
-                      // Door No field
                       TextField(
                         controller: _houseNoController,
                         textInputAction: TextInputAction.next,
@@ -1480,7 +1451,6 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
                       const SizedBox(height: 12),
 
-                      // Phone field
                       TextField(
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,

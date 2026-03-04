@@ -5,7 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:math';
-
+import 'orders.dart';
 import 'bottom_navigation.dart';
 import 'top_bar.dart';
 import 'vendor_items_page.dart';
@@ -168,7 +168,7 @@ class _HomePageState extends State<HomePage> {
         deliveryAddress: _activeAddress,
         onBackToHome: () => setState(() => _currentIndex = 0),
       ),
-      const HelpScreen(),
+      const OrdersPage(),
     ];
 
     return PopScope(

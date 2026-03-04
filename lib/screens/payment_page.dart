@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'cart_store.dart';
 import 'payment_success_page.dart';
+import 'location_picker_page.dart'; // ✅ import SavedLocation
 
 const kBandiwalaYellow = Color(0xFFFFC107);
 const kWhite = Color(0xFFFFFFFF);
@@ -13,18 +14,17 @@ const kBorderGrey = Color(0xFFE5E7EB);
 const kTextGrey = Color(0xFF6B7280);
 const kBgGrey = Color(0xFFF9FAFB);
 
-// ─── PaymentPage ──────────────────────────────────────────────────────────────
-
 class PaymentPage extends StatefulWidget {
-  final double itemsTotal; // raw cart total (no tax/delivery)
-  final String? deliveryAddress;
+  final double itemsTotal;
+  final SavedLocation?
+  deliveryLocation; // ✅ full SavedLocation instead of String
   final Map<String, dynamic>? appliedCoupon;
   final double couponDiscount;
 
   const PaymentPage({
     super.key,
     required this.itemsTotal,
-    this.deliveryAddress,
+    this.deliveryLocation, // ✅ renamed from deliveryAddress
     this.appliedCoupon,
     this.couponDiscount = 0,
   });
@@ -33,16 +33,12 @@ class PaymentPage extends StatefulWidget {
   State<PaymentPage> createState() => _PaymentPageState();
 }
 
-// ─── Payment Method Enum ──────────────────────────────────────────────────────
-
 enum _PaymentMethod { online, cod }
 
 class _PaymentPageState extends State<PaymentPage> {
   late Razorpay _razorpay;
   bool _isProcessing = false;
   _PaymentMethod _selectedMethod = _PaymentMethod.online;
-
-  // ── Calculated values ──────────────────────────────────────────────────────
 
   bool get _isFreeDelivery =>
       widget.appliedCoupon != null &&
@@ -68,8 +64,6 @@ class _PaymentPageState extends State<PaymentPage> {
     _razorpay.clear();
     super.dispose();
   }
-
-  // ── Razorpay ───────────────────────────────────────────────────────────────
 
   void _openRazorpay() {
     if (_isProcessing) return;
@@ -102,8 +96,6 @@ class _PaymentPageState extends State<PaymentPage> {
       }
     }
   }
-
-  // ── COD Order ─────────────────────────────────────────────────────────────
 
   Future<void> _placeCodOrder() async {
     if (_isProcessing) return;
@@ -145,8 +137,6 @@ class _PaymentPageState extends State<PaymentPage> {
     }
   }
 
-  // ── Firestore order creation ───────────────────────────────────────────────
-
   Future<String> _createOrderInFirestore({
     required String paymentId,
     required String paymentMethod,
@@ -182,34 +172,59 @@ class _PaymentPageState extends State<PaymentPage> {
       };
     }
 
+    // ✅ Build delivery location map with full precision coordinates
+    final loc = widget.deliveryLocation;
+    final Map<String, dynamic> deliveryLocationMap = loc != null
+        ? {
+            'address': loc.address, // area name e.g. "KPHB, Hyderabad"
+            'latitude': loc.latitude, // e.g. 17.476388123456 (full precision)
+            'longitude': loc.longitude, // e.g. 78.390350456789 (full precision)
+            'houseNo': loc.houseNo ?? '',
+            'phone': loc.phone ?? '',
+            'label': loc.label ?? 'Other',
+            'geopoint': GeoPoint(
+              loc.latitude,
+              loc.longitude,
+            ), // ✅ Firestore GeoPoint for geo queries
+          }
+        : {};
+
     final orderData = {
       'orderId': orderId,
       'paymentId': paymentId,
-      'paymentMethod': paymentMethod, // 'cod' or 'online'
+      'paymentMethod': paymentMethod,
       'customerPhone': customerPhone,
-      'deliveryAddress': widget.deliveryAddress ?? 'Not provided',
+
+      // ✅ Full delivery location object with coordinates
+      'deliveryLocation': deliveryLocationMap,
+
+      // ✅ Also stored at top level for easy querying
+      'deliveryAddress': loc?.fullDisplay ?? 'Not provided',
+      'deliveryLatitude': loc?.latitude,
+      'deliveryLongitude': loc?.longitude,
+
       'status': status,
       'timestamp': FieldValue.serverTimestamp(),
 
-      // ── Pricing breakdown ──────────────────────────────────────────────────
       'itemsTotal': widget.itemsTotal,
       'deliveryCharge': _deliveryCharge,
       'taxAmount': _taxAmount,
       'couponDiscount': widget.couponDiscount,
       'grandTotal': _grandTotal,
 
-      // ── Coupon info ────────────────────────────────────────────────────────
       'couponApplied': widget.appliedCoupon != null,
       'couponCode': widget.appliedCoupon?['couponCode'] ?? '',
       'couponType': widget.appliedCoupon?['couponType'] ?? '',
       'freeDelivery': _isFreeDelivery,
 
-      // ── Items ──────────────────────────────────────────────────────────────
       'itemsByVendor': itemsByVendor,
     };
 
     await FirebaseFirestore.instance.collection('orders').add(orderData);
-    debugPrint('✅ Order created: $orderId | Method: $paymentMethod');
+    debugPrint(
+      '✅ Order created: $orderId | Method: $paymentMethod | '
+      'Lat: ${loc?.latitude} Lng: ${loc?.longitude}',
+    );
     return orderId;
   }
 
@@ -231,8 +246,6 @@ class _PaymentPageState extends State<PaymentPage> {
       }
     }
   }
-
-  // ── Razorpay callbacks ─────────────────────────────────────────────────────
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
     final paymentId = response.paymentId ?? '';
@@ -293,8 +306,6 @@ class _PaymentPageState extends State<PaymentPage> {
     debugPrint('Wallet: ${response.walletName}');
   }
 
-  // ── Handle primary button tap ──────────────────────────────────────────────
-
   void _handlePrimaryAction() {
     if (_selectedMethod == _PaymentMethod.cod) {
       _placeCodOrder();
@@ -302,8 +313,6 @@ class _PaymentPageState extends State<PaymentPage> {
       _openRazorpay();
     }
   }
-
-  // ─── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -333,47 +342,35 @@ class _PaymentPageState extends State<PaymentPage> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               children: [
-                // ── Order Summary ──────────────────────────────────────────
                 _sectionLabel('Order Summary'),
                 const SizedBox(height: 8),
                 _orderSummaryCard(),
-
                 const SizedBox(height: 16),
 
-                // ── Delivery Address ───────────────────────────────────────
-                if (widget.deliveryAddress != null &&
-                    widget.deliveryAddress!.isNotEmpty) ...[
+                if (widget.deliveryLocation != null) ...[
                   _sectionLabel('Delivery To'),
                   const SizedBox(height: 8),
                   _addressCard(),
                   const SizedBox(height: 16),
                 ],
 
-                // ── Price Details ──────────────────────────────────────────
                 _sectionLabel('Bill Details'),
                 const SizedBox(height: 8),
                 _billDetailsCard(),
-
                 const SizedBox(height: 16),
 
-                // ── Payment Method ─────────────────────────────────────────
                 _sectionLabel('Payment Method'),
                 const SizedBox(height: 8),
                 _paymentMethodCard(),
-
                 const SizedBox(height: 100),
               ],
             ),
           ),
-
-          // ── Sticky bottom bar ──────────────────────────────────────────
           _bottomBar(),
         ],
       ),
     );
   }
-
-  // ─── Section label ────────────────────────────────────────────────────────
 
   Widget _sectionLabel(String text) {
     return Text(
@@ -386,8 +383,6 @@ class _PaymentPageState extends State<PaymentPage> {
       ),
     );
   }
-
-  // ─── Order Summary Card ───────────────────────────────────────────────────
 
   Widget _orderSummaryCard() {
     final vendors = cartStore.cartByVendor.entries.toList();
@@ -411,11 +406,9 @@ class _PaymentPageState extends State<PaymentPage> {
             final idx = entry.key;
             final e = entry.value;
             final isLast = idx == vendors.length - 1;
-
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Vendor header
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
                   child: Row(
@@ -445,8 +438,6 @@ class _PaymentPageState extends State<PaymentPage> {
                     ],
                   ),
                 ),
-
-                // Items
                 ...e.value.items.map(
                   (item) => Padding(
                     padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
@@ -481,8 +472,6 @@ class _PaymentPageState extends State<PaymentPage> {
                     ),
                   ),
                 ),
-
-                // Vendor subtotal
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                   child: Align(
@@ -497,7 +486,6 @@ class _PaymentPageState extends State<PaymentPage> {
                     ),
                   ),
                 ),
-
                 if (!isLast) Divider(height: 1, color: Colors.grey.shade100),
               ],
             );
@@ -507,9 +495,9 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── Address Card ─────────────────────────────────────────────────────────
-
+  // ✅ Address card now shows area name + precise coordinates
   Widget _addressCard() {
+    final loc = widget.deliveryLocation!;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -553,13 +541,33 @@ class _PaymentPageState extends State<PaymentPage> {
                   ),
                 ),
                 const SizedBox(height: 3),
+                // ✅ House no + area name
                 Text(
-                  widget.deliveryAddress!,
+                  loc.fullDisplay,
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     height: 1.4,
                   ),
+                ),
+                const SizedBox(height: 4),
+                // ✅ Precise coordinates shown below
+                Row(
+                  children: [
+                    Icon(
+                      Icons.my_location,
+                      size: 11,
+                      color: Colors.grey.shade500,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${loc.latitude.toStringAsFixed(6)}, ${loc.longitude.toStringAsFixed(6)}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -568,8 +576,6 @@ class _PaymentPageState extends State<PaymentPage> {
       ),
     );
   }
-
-  // ─── Bill Details Card ────────────────────────────────────────────────────
 
   Widget _billDetailsCard() {
     final hasCouponDiscount =
@@ -596,8 +602,6 @@ class _PaymentPageState extends State<PaymentPage> {
         children: [
           _billRow('Items Total', '₹${widget.itemsTotal.toStringAsFixed(0)}'),
           const SizedBox(height: 10),
-
-          // Delivery row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -652,19 +656,17 @@ class _PaymentPageState extends State<PaymentPage> {
                         ),
                       ],
                     )
-                  : Text(
+                  : const Text(
                       '₹30',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
             ],
           ),
-
           const SizedBox(height: 10),
           _billRow('Taxes & Charges (5%)', '₹${_taxAmount.toStringAsFixed(0)}'),
-
           if (hasCouponDiscount) ...[
             const SizedBox(height: 10),
             Row(
@@ -698,12 +700,10 @@ class _PaymentPageState extends State<PaymentPage> {
               ],
             ),
           ],
-
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Divider(height: 1, color: Colors.grey.shade200),
           ),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -721,7 +721,6 @@ class _PaymentPageState extends State<PaymentPage> {
               ),
             ],
           ),
-
           if (widget.couponDiscount > 0 || _isFreeDelivery) ...[
             const SizedBox(height: 10),
             Container(
@@ -758,8 +757,6 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── Payment Method Card ──────────────────────────────────────────────────
-
   Widget _paymentMethodCard() {
     return Container(
       decoration: BoxDecoration(
@@ -776,7 +773,6 @@ class _PaymentPageState extends State<PaymentPage> {
       ),
       child: Column(
         children: [
-          // Online Payment option
           _methodTile(
             method: _PaymentMethod.online,
             icon: Icons.payment_rounded,
@@ -785,10 +781,7 @@ class _PaymentPageState extends State<PaymentPage> {
             title: 'Pay Online',
             subtitle: 'UPI, Cards, Net Banking, Wallets',
           ),
-
           Divider(height: 1, color: Colors.grey.shade100),
-
-          // COD option
           _methodTile(
             method: _PaymentMethod.cod,
             icon: Icons.money_rounded,
@@ -842,16 +835,16 @@ class _PaymentPageState extends State<PaymentPage> {
                 children: [
                   Text(
                     title,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: isSelected ? Colors.black87 : Colors.black87,
+                      color: Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: TextStyle(fontSize: 12, color: kTextGrey),
+                    style: const TextStyle(fontSize: 12, color: kTextGrey),
                   ),
                 ],
               ),
@@ -878,11 +871,8 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── Bottom Bar ───────────────────────────────────────────────────────────
-
   Widget _bottomBar() {
     final isCod = _selectedMethod == _PaymentMethod.cod;
-
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       decoration: BoxDecoration(
@@ -900,7 +890,6 @@ class _PaymentPageState extends State<PaymentPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Amount row
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Row(
@@ -942,13 +931,13 @@ class _PaymentPageState extends State<PaymentPage> {
                       ),
                       child: Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.security,
                             size: 12,
                             color: kBandiwalaYellow,
                           ),
                           const SizedBox(width: 4),
-                          Text(
+                          const Text(
                             'Secured by Razorpay',
                             style: TextStyle(
                               fontSize: 10,
@@ -992,8 +981,6 @@ class _PaymentPageState extends State<PaymentPage> {
                 ],
               ),
             ),
-
-            // Primary button
             SizedBox(
               width: double.infinity,
               height: 52,
@@ -1036,15 +1023,12 @@ class _PaymentPageState extends State<PaymentPage> {
                 ),
               ),
             ),
-
             const SizedBox(height: 4),
           ],
         ),
       ),
     );
   }
-
-  // ─── Helper row ───────────────────────────────────────────────────────────
 
   Widget _billRow(String label, String value) {
     return Row(
