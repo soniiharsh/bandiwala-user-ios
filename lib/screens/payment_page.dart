@@ -70,7 +70,7 @@ class _PaymentPageState extends State<PaymentPage> {
     setState(() => _isProcessing = true);
 
     final options = {
-      'key': 'rzp_test_Ry7KzKrnhBoqUK',
+      'key': 'rzp_live_SIEw0ZGDGbPgTd',
       'amount': (_grandTotal * 100).toInt(),
       'name': 'Bandiwala',
       'description': 'Street food delivery',
