@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'cart_store.dart';
 import 'payment_success_page.dart';
-import 'location_picker_page.dart'; // ✅ import SavedLocation
+import 'location_picker_page.dart';
 
 const kBandiwalaYellow = Color(0xFFFFC107);
 const kWhite = Color(0xFFFFFFFF);
@@ -14,17 +14,42 @@ const kBorderGrey = Color(0xFFE5E7EB);
 const kTextGrey = Color(0xFF6B7280);
 const kBgGrey = Color(0xFFF9FAFB);
 
+// ─── Pricing Config Model ─────────────────────────────────────────────────────
+
+class _PricingConfig {
+  final double deliveryCharge;
+  final double platformFee;
+  final double taxPercent;
+
+  const _PricingConfig({
+    required this.deliveryCharge,
+    required this.platformFee,
+    required this.taxPercent,
+  });
+
+  // Default fallback if Firestore fetch fails
+  factory _PricingConfig.defaults() =>
+      const _PricingConfig(deliveryCharge: 29, platformFee: 10, taxPercent: 5);
+
+  factory _PricingConfig.fromMap(Map<String, dynamic> map) => _PricingConfig(
+    deliveryCharge: (map['deliveryCharge'] ?? 29).toDouble(),
+    platformFee: (map['platformFee'] ?? 10).toDouble(),
+    taxPercent: (map['taxPercent'] ?? 5).toDouble(),
+  );
+}
+
+// ─── PaymentPage ──────────────────────────────────────────────────────────────
+
 class PaymentPage extends StatefulWidget {
   final double itemsTotal;
-  final SavedLocation?
-  deliveryLocation; // ✅ full SavedLocation instead of String
+  final SavedLocation? deliveryLocation;
   final Map<String, dynamic>? appliedCoupon;
   final double couponDiscount;
 
   const PaymentPage({
     super.key,
     required this.itemsTotal,
-    this.deliveryLocation, // ✅ renamed from deliveryAddress
+    this.deliveryLocation,
     this.appliedCoupon,
     this.couponDiscount = 0,
   });
@@ -38,17 +63,29 @@ enum _PaymentMethod { online, cod }
 class _PaymentPageState extends State<PaymentPage> {
   late Razorpay _razorpay;
   bool _isProcessing = false;
+  bool _isLoadingPricing = true;
   _PaymentMethod _selectedMethod = _PaymentMethod.online;
 
+  // ── Pricing config from Firestore ──────────────────────────────────────────
+  _PricingConfig _pricing = _PricingConfig.defaults();
+
+  // ── Computed values (depend on _pricing) ──────────────────────────────────
   bool get _isFreeDelivery =>
       widget.appliedCoupon != null &&
       (widget.appliedCoupon!['couponType'] == 'freeDelivery' ||
           widget.appliedCoupon!['couponType'] == 'free_delivery');
 
-  double get _deliveryCharge => _isFreeDelivery ? 0.0 : 30.0;
-  double get _taxAmount => (widget.itemsTotal + _deliveryCharge) * 0.05;
+  double get _deliveryCharge => _isFreeDelivery ? 0.0 : _pricing.deliveryCharge;
+  double get _platformFee => _pricing.platformFee;
+  double get _taxAmount =>
+      (widget.itemsTotal + _deliveryCharge + _platformFee) *
+      (_pricing.taxPercent / 100);
   double get _grandTotal =>
-      widget.itemsTotal + _deliveryCharge + _taxAmount - widget.couponDiscount;
+      widget.itemsTotal +
+      _deliveryCharge +
+      _platformFee +
+      _taxAmount -
+      widget.couponDiscount;
 
   @override
   void initState() {
@@ -57,6 +94,7 @@ class _PaymentPageState extends State<PaymentPage> {
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+    _fetchPricingConfig();
   }
 
   @override
@@ -64,6 +102,33 @@ class _PaymentPageState extends State<PaymentPage> {
     _razorpay.clear();
     super.dispose();
   }
+
+  // ── Fetch pricing from Firestore ───────────────────────────────────────────
+
+  Future<void> _fetchPricingConfig() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('pricing_config')
+          .doc('defaults')
+          .get();
+
+      if (doc.exists && doc.data() != null) {
+        if (mounted) {
+          setState(() {
+            _pricing = _PricingConfig.fromMap(doc.data()!);
+            _isLoadingPricing = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _isLoadingPricing = false);
+      }
+    } catch (e) {
+      debugPrint('Pricing config fetch error: $e — using defaults');
+      if (mounted) setState(() => _isLoadingPricing = false);
+    }
+  }
+
+  // ── Razorpay ───────────────────────────────────────────────────────────────
 
   void _openRazorpay() {
     if (_isProcessing) return;
@@ -97,6 +162,8 @@ class _PaymentPageState extends State<PaymentPage> {
     }
   }
 
+  // ── COD ────────────────────────────────────────────────────────────────────
+
   Future<void> _placeCodOrder() async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
@@ -108,7 +175,6 @@ class _PaymentPageState extends State<PaymentPage> {
         status: 'confirmed',
       );
       _clearCartSafely();
-
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           Navigator.pushReplacement(
@@ -136,6 +202,8 @@ class _PaymentPageState extends State<PaymentPage> {
       }
     }
   }
+
+  // ── Firestore order creation ───────────────────────────────────────────────
 
   Future<String> _createOrderInFirestore({
     required String paymentId,
@@ -172,20 +240,16 @@ class _PaymentPageState extends State<PaymentPage> {
       };
     }
 
-    // ✅ Build delivery location map with full precision coordinates
     final loc = widget.deliveryLocation;
     final Map<String, dynamic> deliveryLocationMap = loc != null
         ? {
-            'address': loc.address, // area name e.g. "KPHB, Hyderabad"
-            'latitude': loc.latitude, // e.g. 17.476388123456 (full precision)
-            'longitude': loc.longitude, // e.g. 78.390350456789 (full precision)
+            'address': loc.address,
+            'latitude': loc.latitude,
+            'longitude': loc.longitude,
             'houseNo': loc.houseNo ?? '',
             'phone': loc.phone ?? '',
             'label': loc.label ?? 'Other',
-            'geopoint': GeoPoint(
-              loc.latitude,
-              loc.longitude,
-            ), // ✅ Firestore GeoPoint for geo queries
+            'geopoint': GeoPoint(loc.latitude, loc.longitude),
           }
         : {};
 
@@ -195,10 +259,7 @@ class _PaymentPageState extends State<PaymentPage> {
       'paymentMethod': paymentMethod,
       'customerPhone': customerPhone,
 
-      // ✅ Full delivery location object with coordinates
       'deliveryLocation': deliveryLocationMap,
-
-      // ✅ Also stored at top level for easy querying
       'deliveryAddress': loc?.fullDisplay ?? 'Not provided',
       'deliveryLatitude': loc?.latitude,
       'deliveryLongitude': loc?.longitude,
@@ -206,8 +267,11 @@ class _PaymentPageState extends State<PaymentPage> {
       'status': status,
       'timestamp': FieldValue.serverTimestamp(),
 
+      // ── Full pricing breakdown stored in order ────────────────────────────
       'itemsTotal': widget.itemsTotal,
       'deliveryCharge': _deliveryCharge,
+      'platformFee': _platformFee,
+      'taxPercent': _pricing.taxPercent,
       'taxAmount': _taxAmount,
       'couponDiscount': widget.couponDiscount,
       'grandTotal': _grandTotal,
@@ -222,8 +286,8 @@ class _PaymentPageState extends State<PaymentPage> {
 
     await FirebaseFirestore.instance.collection('orders').add(orderData);
     debugPrint(
-      '✅ Order created: $orderId | Method: $paymentMethod | '
-      'Lat: ${loc?.latitude} Lng: ${loc?.longitude}',
+      '✅ Order: $orderId | $paymentMethod | '
+      'Total: $_grandTotal | Lat: ${loc?.latitude}',
     );
     return orderId;
   }
@@ -246,6 +310,8 @@ class _PaymentPageState extends State<PaymentPage> {
       }
     }
   }
+
+  // ── Razorpay callbacks ─────────────────────────────────────────────────────
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
     final paymentId = response.paymentId ?? '';
@@ -314,6 +380,8 @@ class _PaymentPageState extends State<PaymentPage> {
     }
   }
 
+  // ─── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -336,41 +404,47 @@ class _PaymentPageState extends State<PaymentPage> {
           child: Container(height: 1, color: kBorderGrey),
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      body: _isLoadingPricing
+          ? const Center(
+              child: CircularProgressIndicator(color: kBandiwalaYellow),
+            )
+          : Column(
               children: [
-                _sectionLabel('Order Summary'),
-                const SizedBox(height: 8),
-                _orderSummaryCard(),
-                const SizedBox(height: 16),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    children: [
+                      _sectionLabel('Order Summary'),
+                      const SizedBox(height: 8),
+                      _orderSummaryCard(),
+                      const SizedBox(height: 16),
 
-                if (widget.deliveryLocation != null) ...[
-                  _sectionLabel('Delivery To'),
-                  const SizedBox(height: 8),
-                  _addressCard(),
-                  const SizedBox(height: 16),
-                ],
+                      if (widget.deliveryLocation != null) ...[
+                        _sectionLabel('Delivery To'),
+                        const SizedBox(height: 8),
+                        _addressCard(),
+                        const SizedBox(height: 16),
+                      ],
 
-                _sectionLabel('Bill Details'),
-                const SizedBox(height: 8),
-                _billDetailsCard(),
-                const SizedBox(height: 16),
+                      _sectionLabel('Bill Details'),
+                      const SizedBox(height: 8),
+                      _billDetailsCard(),
+                      const SizedBox(height: 16),
 
-                _sectionLabel('Payment Method'),
-                const SizedBox(height: 8),
-                _paymentMethodCard(),
-                const SizedBox(height: 100),
+                      _sectionLabel('Payment Method'),
+                      const SizedBox(height: 8),
+                      _paymentMethodCard(),
+                      const SizedBox(height: 100),
+                    ],
+                  ),
+                ),
+                _bottomBar(),
               ],
             ),
-          ),
-          _bottomBar(),
-        ],
-      ),
     );
   }
+
+  // ─── Section label ────────────────────────────────────────────────────────
 
   Widget _sectionLabel(String text) {
     return Text(
@@ -383,6 +457,8 @@ class _PaymentPageState extends State<PaymentPage> {
       ),
     );
   }
+
+  // ─── Order Summary ────────────────────────────────────────────────────────
 
   Widget _orderSummaryCard() {
     final vendors = cartStore.cartByVendor.entries.toList();
@@ -495,7 +571,8 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ✅ Address card now shows area name + precise coordinates
+  // ─── Address Card ─────────────────────────────────────────────────────────
+
   Widget _addressCard() {
     final loc = widget.deliveryLocation!;
     return Container(
@@ -541,7 +618,6 @@ class _PaymentPageState extends State<PaymentPage> {
                   ),
                 ),
                 const SizedBox(height: 3),
-                // ✅ House no + area name
                 Text(
                   loc.fullDisplay,
                   style: const TextStyle(
@@ -551,7 +627,6 @@ class _PaymentPageState extends State<PaymentPage> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                // ✅ Precise coordinates shown below
                 Row(
                   children: [
                     Icon(
@@ -577,12 +652,17 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
+  // ─── Bill Details Card ────────────────────────────────────────────────────
+
   Widget _billDetailsCard() {
     final hasCouponDiscount =
         widget.couponDiscount > 0 &&
         widget.appliedCoupon != null &&
         widget.appliedCoupon!['couponType'] != 'freeDelivery' &&
         widget.appliedCoupon!['couponType'] != 'free_delivery';
+
+    final totalSavings =
+        widget.couponDiscount + (_isFreeDelivery ? _pricing.deliveryCharge : 0);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -600,8 +680,11 @@ class _PaymentPageState extends State<PaymentPage> {
       ),
       child: Column(
         children: [
+          // ── Items Total ─────────────────────────────────────────────────
           _billRow('Items Total', '₹${widget.itemsTotal.toStringAsFixed(0)}'),
           const SizedBox(height: 10),
+
+          // ── Delivery Charge ─────────────────────────────────────────────
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -638,7 +721,7 @@ class _PaymentPageState extends State<PaymentPage> {
                   ? Row(
                       children: [
                         Text(
-                          '₹30',
+                          '₹${_pricing.deliveryCharge.toStringAsFixed(0)}',
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey.shade400,
@@ -656,9 +739,9 @@ class _PaymentPageState extends State<PaymentPage> {
                         ),
                       ],
                     )
-                  : const Text(
-                      '₹30',
-                      style: TextStyle(
+                  : Text(
+                      '₹${_pricing.deliveryCharge.toStringAsFixed(0)}',
+                      style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -666,7 +749,23 @@ class _PaymentPageState extends State<PaymentPage> {
             ],
           ),
           const SizedBox(height: 10),
-          _billRow('Taxes & Charges (5%)', '₹${_taxAmount.toStringAsFixed(0)}'),
+
+          // ── Platform Fee ────────────────────────────────────────────────
+          _billRow(
+            'Platform Fee',
+            '₹${_platformFee.toStringAsFixed(0)}',
+            labelColor: Colors.grey.shade700,
+          ),
+          const SizedBox(height: 10),
+
+          // ── Taxes ───────────────────────────────────────────────────────
+          _billRow(
+            'Taxes (${_pricing.taxPercent.toStringAsFixed(0)}%)',
+            '₹${_taxAmount.toStringAsFixed(0)}',
+            labelColor: Colors.grey.shade700,
+          ),
+
+          // ── Coupon Discount ─────────────────────────────────────────────
           if (hasCouponDiscount) ...[
             const SizedBox(height: 10),
             Row(
@@ -700,10 +799,13 @@ class _PaymentPageState extends State<PaymentPage> {
               ],
             ),
           ],
+
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Divider(height: 1, color: Colors.grey.shade200),
           ),
+
+          // ── Grand Total ─────────────────────────────────────────────────
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -721,7 +823,9 @@ class _PaymentPageState extends State<PaymentPage> {
               ),
             ],
           ),
-          if (widget.couponDiscount > 0 || _isFreeDelivery) ...[
+
+          // ── Savings Strip ───────────────────────────────────────────────
+          if (totalSavings > 0) ...[
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
@@ -738,14 +842,16 @@ class _PaymentPageState extends State<PaymentPage> {
                     color: Colors.green.shade700,
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    _isFreeDelivery && widget.couponDiscount == 0
-                        ? 'You\'re saving ₹30 on delivery!'
-                        : 'Total savings: ₹${(widget.couponDiscount + (_isFreeDelivery ? 30 : 0)).toStringAsFixed(0)} on this order',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.green.shade800,
-                      fontWeight: FontWeight.w600,
+                  Expanded(
+                    child: Text(
+                      _isFreeDelivery && widget.couponDiscount == 0
+                          ? 'You\'re saving ₹${_pricing.deliveryCharge.toStringAsFixed(0)} on delivery!'
+                          : 'Total savings: ₹${totalSavings.toStringAsFixed(0)} on this order',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.green.shade800,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -756,6 +862,8 @@ class _PaymentPageState extends State<PaymentPage> {
       ),
     );
   }
+
+  // ─── Payment Method Card ──────────────────────────────────────────────────
 
   Widget _paymentMethodCard() {
     return Container(
@@ -871,6 +979,8 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
+  // ─── Bottom Bar ───────────────────────────────────────────────────────────
+
   Widget _bottomBar() {
     final isCod = _selectedMethod == _PaymentMethod.cod;
     return Container(
@@ -929,15 +1039,15 @@ class _PaymentPageState extends State<PaymentPage> {
                           color: kBandiwalaYellow.withOpacity(0.4),
                         ),
                       ),
-                      child: Row(
+                      child: const Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.security,
                             size: 12,
                             color: kBandiwalaYellow,
                           ),
-                          const SizedBox(width: 4),
-                          const Text(
+                          SizedBox(width: 4),
+                          Text(
                             'Secured by Razorpay',
                             style: TextStyle(
                               fontSize: 10,
@@ -1030,13 +1140,18 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  Widget _billRow(String label, String value) {
+  // ─── Bill Row Helper ──────────────────────────────────────────────────────
+
+  Widget _billRow(String label, String value, {Color? labelColor}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+          style: TextStyle(
+            fontSize: 13,
+            color: labelColor ?? Colors.grey.shade700,
+          ),
         ),
         Text(
           value,
