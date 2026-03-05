@@ -261,8 +261,8 @@ class _PaymentPageState extends State<PaymentPage> {
 
       'deliveryLocation': deliveryLocationMap,
       'deliveryAddress': loc?.fullDisplay ?? 'Not provided',
-      'deliveryLatitude': loc?.latitude,
-      'deliveryLongitude': loc?.longitude,
+      'latitude': loc?.latitude,
+      'longitude': loc?.longitude,
 
       'status': status,
       'timestamp': FieldValue.serverTimestamp(),
