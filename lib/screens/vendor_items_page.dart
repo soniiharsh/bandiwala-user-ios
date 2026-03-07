@@ -831,215 +831,221 @@ class _ItemCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: () => _showDetail(context),
-      child: Opacity(
-        opacity: isAvailable ? 1.0 : 0.55,
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+      child: IgnorePointer(
+        ignoring: !isAvailable,
+        child: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Image with overlays ───────────────────────────────
-              Stack(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
-                    ),
-                    child: SizedBox(
-                      height: 130,
-                      width: double.infinity,
-                      child: imageUrl.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: imageUrl,
-                              fit: BoxFit.cover,
-                              placeholder: (_, __) =>
-                                  Container(color: Colors.grey.shade200),
-                              errorWidget: (_, __, ___) => Container(
-                                color: Colors.grey.shade200,
-                                child: const Center(
-                                  child: Icon(Icons.restaurant),
-                                ),
-                              ),
-                            )
-                          : Container(
-                              color: Colors.grey.shade200,
-                              child: const Center(
-                                child: Icon(Icons.restaurant),
-                              ),
-                            ),
-                    ),
-                  ),
-                  // Rating badge on image
-                  Positioned(
-                    bottom: 6,
-                    left: 6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.65),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.star_rounded,
-                            size: 11,
-                            color: _kYellow,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            rating.toStringAsFixed(1),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Unavailable overlay
-                  if (!isAvailable)
-                    Positioned.fill(
-                      child: ClipRRect(
+                  // ── Image with overlays ───────────────────────────────
+                  Stack(
+                    children: [
+                      ClipRRect(
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(16),
                         ),
-                        child: Container(
-                          color: Colors.black.withOpacity(0.4),
-                          alignment: Alignment.center,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black54,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'Unavailable',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
+                        child: SizedBox(
+                          height: 130,
+                          width: double.infinity,
+                          child: imageUrl.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: imageUrl,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) =>
+                                      Container(color: Colors.grey.shade200),
+                                  errorWidget: (_, __, ___) => Container(
+                                    color: Colors.grey.shade200,
+                                    child: const Center(
+                                      child: Icon(Icons.restaurant),
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  color: Colors.grey.shade200,
+                                  child: const Center(
+                                    child: Icon(Icons.restaurant),
+                                  ),
+                                ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-
-              // ── Info section ──────────────────────────────────────
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Dot + category
-                      Row(
-                        children: [
-                          Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              border: Border.all(color: badgeColor, width: 1.2),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                            child: Center(
-                              child: Container(
-                                width: 6,
-                                height: 6,
-                                decoration: BoxDecoration(
-                                  color: badgeColor,
-                                  borderRadius: BorderRadius.circular(2),
+                      // Rating badge on image
+                      Positioned(
+                        bottom: 6,
+                        left: 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.65),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.star_rounded,
+                                size: 11,
+                                color: _kYellow,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                rating.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              category,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.poppins(
-                                fontSize: 10,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      // Name
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      if (description.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          description,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            color: Colors.grey.shade500,
+                            ],
                           ),
                         ),
-                      ],
-                      const SizedBox(height: 5),
-                      // Price
-                      Text(
-                        '₹ ${price.toStringAsFixed(0)}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const Spacer(),
-                      // ADD / counter
-                      _ItemCounter(
-                        vendorId: vendorId,
-                        vendorName: vendorName,
-                        itemId: itemId,
-                        itemName: name,
-                        price: price,
-                        isAvailable: isAvailable,
                       ),
                     ],
                   ),
+
+                  // ── Info section ──────────────────────────────────────
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Dot + category
+                          Row(
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: badgeColor,
+                                    width: 1.2,
+                                  ),
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                child: Center(
+                                  child: Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: badgeColor,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  category,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 10,
+                                    color: Colors.grey.shade600,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          // Name
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          if (description.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              description,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                color: Colors.grey.shade500,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 5),
+                          // Price
+                          Text(
+                            '₹ ${price.toStringAsFixed(0)}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const Spacer(),
+                          // ADD / counter
+                          _ItemCounter(
+                            vendorId: vendorId,
+                            vendorName: vendorName,
+                            itemId: itemId,
+                            itemName: name,
+                            price: price,
+                            isAvailable: isAvailable,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (!isAvailable)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.65),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade600,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        '😴 OFFLINE NOW',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );
@@ -1534,7 +1540,7 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
               child: Text(
                 widget.isAvailable
                     ? 'Total  ₹${(widget.price * quantity).toStringAsFixed(0)}'
-                    : 'UNAVAILABLE',
+                    : 'OFFLINE NOW',
                 style: GoogleFonts.poppins(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -1770,7 +1776,7 @@ class _ItemCounterState extends State<_ItemCounter> {
             ),
           ),
           child: Text(
-            'UNAVAILABLE',
+            'OFFLINE',
             style: GoogleFonts.poppins(
               fontSize: 10,
               fontWeight: FontWeight.w600,

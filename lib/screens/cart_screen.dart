@@ -159,7 +159,9 @@ class _CartScreenState extends State<CartScreen> {
   SavedLocation? _selectedAddress;
 
   Map<String, bool> _vendorDeliverable = {};
+  Map<String, bool> _itemAvailability = {}; // itemId -> isAvailable
   bool _checkingDelivery = false;
+  bool _checkingItems = false;
 
   @override
   void initState() {
@@ -169,6 +171,7 @@ class _CartScreenState extends State<CartScreen> {
     if (_selectedAddress != null) {
       _checkDeliveryForAllVendors(_selectedAddress!);
     }
+    _checkAllItemsAvailability();
   }
 
   @override
@@ -194,6 +197,7 @@ class _CartScreenState extends State<CartScreen> {
     if (_selectedAddress != null) {
       _checkDeliveryForAllVendors(_selectedAddress!);
     }
+    _checkAllItemsAvailability();
     setState(() {});
   }
 
@@ -234,6 +238,54 @@ class _CartScreenState extends State<CartScreen> {
         _checkingDelivery = false;
       });
     }
+  }
+
+  Future<void> _checkAllItemsAvailability() async {
+    if (!mounted || cartStore.cartByVendor.isEmpty) return;
+    setState(() => _checkingItems = true);
+
+    final Map<String, bool> availability = {};
+
+    for (final vendorEntry in cartStore.cartByVendor.entries) {
+      final vendorId = vendorEntry.key;
+      final items = vendorEntry.value.items;
+
+      for (final item in items) {
+        try {
+          final doc = await FirebaseFirestore.instance
+              .collection('items')
+              .doc(vendorId)
+              .collection('items')
+              .doc(item.id)
+              .get();
+
+          if (doc.exists) {
+            availability[item.id] = doc.data()?['isAvailable'] ?? true;
+          } else {
+            availability[item.id] = false; // Item deleted?
+          }
+        } catch (e) {
+          debugPrint('Item check error for ${item.id}: $e');
+          availability[item.id] = true; // Fallback to true on error
+        }
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _itemAvailability = availability;
+        _checkingItems = false;
+      });
+    }
+  }
+
+  bool get _hasUnavailableItems {
+    for (final vendor in cartStore.cartByVendor.values) {
+      for (final item in vendor.items) {
+        if (_itemAvailability[item.id] == false) return true;
+      }
+    }
+    return false;
   }
 
   bool get _hasUndeliverableVendors => _vendorDeliverable.values.any((v) => !v);
@@ -451,6 +503,11 @@ class _CartScreenState extends State<CartScreen> {
       return;
     }
 
+    if (_hasUnavailableItems) {
+      _showUnavailableItemsDialog();
+      return;
+    }
+
     // AFTER:
     Navigator.push(
       context,
@@ -543,6 +600,91 @@ class _CartScreenState extends State<CartScreen> {
               ),
             ),
             child: const Text('Change Address'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showUnavailableItemsDialog([List<String>? itemIds]) {
+    final List<String> offlineNames = [];
+    if (itemIds != null) {
+      // Find names by IDs
+      for (final vendor in cartStore.cartByVendor.values) {
+        for (final item in vendor.items) {
+          if (itemIds.contains(item.id)) {
+            offlineNames.add(item.name);
+          }
+        }
+      }
+    } else {
+      // Find all offline
+      for (final vendor in cartStore.cartByVendor.values) {
+        for (final item in vendor.items) {
+          if (_itemAvailability[item.id] == false) {
+            offlineNames.add(item.name);
+          }
+        }
+      }
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.blue, size: 26),
+            SizedBox(width: 10),
+            Text(
+              'Items Offline',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Some items in your cart are currently not available. Please remove them to continue:',
+              style: TextStyle(fontSize: 14, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            ...offlineNames.map(
+              (name) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    const Icon(Icons.circle, size: 6, color: Colors.blue),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blue,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kBandiwalaYellow,
+              foregroundColor: Colors.black87,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Got it'),
           ),
         ],
       ),
@@ -788,6 +930,8 @@ class _CartScreenState extends State<CartScreen> {
                                 VendorCartSection(
                                   vendorId: entry.key,
                                   vendorCart: entry.value,
+                                  itemAvailability:
+                                      _itemAvailability, // Pass item availability
                                   onQuantityChanged: (itemId, delta) {
                                     cartStore.updateQuantity(
                                       vendorId: entry.key,
@@ -837,7 +981,7 @@ class _CartScreenState extends State<CartScreen> {
               ),
 
               // ── UPDATED Bottom Bar — only items total, no price breakdown ──
-              if (hasItems) _buildBottomBar(),
+              if (hasItems) _buildBottomBar(_hasUnavailableItems),
             ],
           ),
         ),
@@ -849,13 +993,21 @@ class _CartScreenState extends State<CartScreen> {
   // Shows only: items total (raw product value)
   // No PriceBreakdownWidget, no tax/delivery confusion
 
-  Widget _buildBottomBar() {
+  Widget _buildBottomBar(bool hasUnavailableItems) {
+    // Accept hasUnavailableItems
     final isFreeDelivery =
         _appliedCoupon != null &&
         (_appliedCoupon!['couponType'] == 'freeDelivery' ||
             _appliedCoupon!['couponType'] == 'free_delivery');
     final hasCouponSavings = _couponDiscount > 0 || isFreeDelivery;
     final savingsAmount = _couponDiscount;
+
+    // New: Determine if checkout should be disabled
+    final bool disableCheckout =
+        _checkingDelivery ||
+        _selectedAddress == null ||
+        _hasUndeliverableVendors ||
+        hasUnavailableItems;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -983,25 +1135,79 @@ class _CartScreenState extends State<CartScreen> {
               ),
             ),
 
+          // New: Unavailable items warning strip
+          if (hasUnavailableItems)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: Colors.red.shade700,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Some items are currently unavailable',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => _showUnavailableItemsDialog(
+                        _itemAvailability.entries
+                            .where((entry) => !entry.value)
+                            .map((entry) => entry.key)
+                            .toList(),
+                      ),
+                      child: Text(
+                        'View',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.red.shade800,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           const SizedBox(height: 12),
 
           SizedBox(
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-              onPressed: _checkingDelivery ? null : _handlePlaceOrder,
+              onPressed: (disableCheckout || _checkingItems)
+                  ? null
+                  : _handlePlaceOrder, // Disable if any condition met including loading
               style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    _hasUndeliverableVendors && _selectedAddress != null
+                backgroundColor: (disableCheckout || _checkingItems)
                     ? Colors.grey.shade300
                     : kBandiwalaYellow,
                 foregroundColor: Colors.black,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: _checkingDelivery
+              child: _checkingItems
                   ? const SizedBox(
                       width: 20,
                       height: 20,
@@ -1010,9 +1216,15 @@ class _CartScreenState extends State<CartScreen> {
                         color: Colors.black54,
                       ),
                     )
-                  : const Text(
-                      'Proceed to Checkout',
-                      style: TextStyle(
+                  : Text(
+                      _selectedAddress == null
+                          ? 'Select Delivery Address'
+                          : _hasUndeliverableVendors
+                          ? 'Cannot Deliver to Address'
+                          : hasUnavailableItems
+                          ? 'Remove Unavailable Items'
+                          : 'Proceed to Checkout',
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.3,
@@ -1948,6 +2160,7 @@ class CouponSectionWidget extends StatelessWidget {
 class VendorCartSection extends StatelessWidget {
   final String vendorId;
   final VendorCart vendorCart;
+  final Map<String, bool> itemAvailability; // New: item availability map
   final void Function(String itemId, int delta) onQuantityChanged;
   final double vendorTotal;
 
@@ -1955,6 +2168,7 @@ class VendorCartSection extends StatelessWidget {
     super.key,
     required this.vendorId,
     required this.vendorCart,
+    required this.itemAvailability, // Required
     required this.onQuantityChanged,
     required this.vendorTotal,
   });
@@ -1982,6 +2196,8 @@ class VendorCartSection extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 12),
               child: CartLineItem(
                 item: item,
+                isAvailable:
+                    itemAvailability[item.id] ?? true, // Pass availability
                 onQuantityChanged: (delta) => onQuantityChanged(item.id, delta),
               ),
             ),
@@ -2003,11 +2219,13 @@ class VendorCartSection extends StatelessWidget {
 
 class CartLineItem extends StatelessWidget {
   final CartItem item;
+  final bool isAvailable; // New: isAvailable flag
   final void Function(int delta) onQuantityChanged;
 
   const CartLineItem({
     super.key,
     required this.item,
+    this.isAvailable = true, // Default to true
     required this.onQuantityChanged,
   });
 
@@ -2026,9 +2244,52 @@ class CartLineItem extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            item.name,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.name,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isAvailable ? Colors.black87 : Colors.grey.shade400,
+                  decoration: isAvailable ? null : TextDecoration.lineThrough,
+                ),
+              ),
+              if (!isAvailable) ...[
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 10,
+                        color: Colors.red.shade700,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'This item is currently offline',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.red.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
         const SizedBox(width: 8),

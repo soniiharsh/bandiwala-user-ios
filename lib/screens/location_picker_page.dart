@@ -70,14 +70,16 @@ class SavedLocation {
 class _PlaceSuggestion {
   final String displayName;
   final String shortName;
-  final double lat;
-  final double lon;
+  final double? lat;
+  final double? lon;
+  final String? placeId;
 
   _PlaceSuggestion({
     required this.displayName,
     required this.shortName,
-    required this.lat,
-    required this.lon,
+    this.lat,
+    this.lon,
+    this.placeId,
   });
 }
 
@@ -120,6 +122,13 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   Timer? _debounce;
 
   final http.Client _httpClient = http.Client();
+  static const String _googleMapsApiKey =
+      'AIzaSyDKVT8aUdGm6EcR8DdRdh0QxI2oj7HRo5E';
+  String? _sessionToken;
+
+  void _generateSessionToken() {
+    _sessionToken = DateTime.now().millisecondsSinceEpoch.toString();
+  }
 
   static const double _minLat = 17.25;
   static const double _maxLat = 17.55;
@@ -176,17 +185,90 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
   Future<void> _fetchSuggestions(String query) async {
     if (!mounted) return;
+    if (_sessionToken == null) _generateSessionToken();
+
     try {
+      final uri = Uri.https(
+        'maps.googleapis.com',
+        '/maps/api/place/autocomplete/json',
+        {
+          'input': query,
+          'key': _googleMapsApiKey,
+          'location': '17.3850,78.4867', // Hyderabad center
+          'radius': '50000',
+          'strictbounds': 'false',
+          'components': 'country:in',
+          'language': 'en',
+          'sessiontoken': _sessionToken,
+        },
+      );
+
+      final response = await _httpClient.get(uri);
+
+      if (!mounted) return;
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'OK') {
+          final predictions = data['predictions'] as List;
+          final suggestions = predictions.map((p) {
+            final description = p['description'] as String;
+            final structuredFormatting =
+                p['structured_formatting'] as Map<String, dynamic>;
+            final mainText = structuredFormatting['main_text'] as String;
+
+            return _PlaceSuggestion(
+              displayName: description,
+              shortName: mainText,
+              placeId: p['place_id'],
+            );
+          }).toList();
+
+          setState(() {
+            _suggestions = suggestions;
+            _isSearching = false;
+            _showSuggestions = suggestions.isNotEmpty;
+          });
+          return;
+        } else if (data['status'] == 'ZERO_RESULTS') {
+          setState(() {
+            _suggestions = [];
+            _isSearching = false;
+            _showSuggestions = false;
+          });
+          return;
+        } else {
+          debugPrint('Google Autocomplete Error Status: ${data['status']}');
+          if (data['error_message'] != null) {
+            debugPrint('Error Message: ${data['error_message']}');
+          }
+          // Fallback to nominatim if Google returns an error (denied, over limit, etc)
+          await _fetchSuggestionsFallback(query);
+          return;
+        }
+      } else {
+        debugPrint('Google API HTTP Error: ${response.statusCode}');
+        await _fetchSuggestionsFallback(query);
+      }
+    } catch (e) {
+      debugPrint('Google Autocomplete catch error: $e');
+      await _fetchSuggestionsFallback(query);
+    }
+  }
+
+  Future<void> _fetchSuggestionsFallback(String query) async {
+    if (!mounted || query.isEmpty) return;
+    try {
+      // Photon API is a fast, free alternative based on OpenStreetMap
       final uri = Uri.https('photon.komoot.io', '/api/', {
         'q': query,
-        'limit': '8',
+        'limit': '10',
         'lang': 'en',
         'lat': '17.3850',
         'lon': '78.4867',
       });
       final response = await _httpClient
           .get(uri, headers: {'User-Agent': 'BandiWalaApp/1.0'})
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 5));
 
       if (!mounted) return;
       if (response.statusCode == 200) {
@@ -196,130 +278,56 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           final props = f['properties'] as Map<String, dynamic>? ?? {};
           final coords = f['geometry']['coordinates'] as List;
           final name = props['name'] as String? ?? '';
-          final street = props['street'] as String? ?? '';
-          final city =
-              props['city'] as String? ?? props['county'] as String? ?? '';
+          final city = props['city'] as String? ?? '';
           final state = props['state'] as String? ?? '';
-          final district = props['district'] as String? ?? '';
-          final shortName = name.isNotEmpty
-              ? name
-              : street.isNotEmpty
-              ? street
-              : city.isNotEmpty
-              ? city
-              : query;
           final parts = <String>[];
           if (name.isNotEmpty) parts.add(name);
-          if (street.isNotEmpty && street != name) parts.add(street);
-          if (district.isNotEmpty && district != name) parts.add(district);
-          if (city.isNotEmpty && city != name && city != district) {
-            parts.add(city);
-          }
+          if (city.isNotEmpty) parts.add(city);
           if (state.isNotEmpty) parts.add(state);
+
           return _PlaceSuggestion(
-            displayName: parts.isNotEmpty ? parts.take(4).join(', ') : query,
-            shortName: shortName,
+            displayName: parts.join(', '),
+            shortName: name.isNotEmpty ? name : query,
             lat: (coords[1] as num).toDouble(),
             lon: (coords[0] as num).toDouble(),
           );
         }).toList();
 
-        if (mounted) {
-          setState(() {
-            _suggestions = suggestions;
-            _isSearching = false;
-            _showSuggestions = suggestions.isNotEmpty;
-          });
-        }
+        setState(() {
+          _suggestions = suggestions;
+          _isSearching = false;
+          _showSuggestions = suggestions.isNotEmpty;
+        });
       } else {
-        if (mounted) setState(() => _isSearching = false);
-        _fetchSuggestionsFallback(query);
-      }
-    } on TimeoutException {
-      if (mounted) {
         setState(() => _isSearching = false);
-        _fetchSuggestionsFallback(query);
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isSearching = false);
-        _fetchSuggestionsFallback(query);
-      }
+      debugPrint('Fallback search error: $e');
+      if (mounted) setState(() => _isSearching = false);
     }
   }
 
-  Future<void> _fetchSuggestionsFallback(String query) async {
-    if (!mounted || query.isEmpty) return;
+  Future<LatLng> _getPlaceDetails(String placeId) async {
     try {
-      final uri = Uri.https('nominatim.openstreetmap.org', '/search', {
-        'q': query,
-        'format': 'json',
-        'addressdetails': '1',
-        'limit': '6',
-        'countrycodes': 'in',
-        'accept-language': 'en',
-      });
-      final response = await _httpClient
-          .get(
-            uri,
-            headers: {
-              'User-Agent': 'BandiWalaApp/1.0 (bandiwala.app)',
-              'Accept-Language': 'en',
-            },
-          )
-          .timeout(const Duration(seconds: 8));
-
-      if (!mounted) return;
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        final suggestions = data.map((item) {
-          final addr = item['address'] as Map<String, dynamic>? ?? {};
-          final name = item['name'] as String? ?? '';
-          final road =
-              addr['road'] as String? ?? addr['pedestrian'] as String? ?? '';
-          final suburb =
-              addr['suburb'] as String? ??
-              addr['neighbourhood'] as String? ??
-              '';
-          final city =
-              addr['city'] as String? ??
-              addr['town'] as String? ??
-              addr['county'] as String? ??
-              '';
-          final state = addr['state'] as String? ?? '';
-          final shortName = name.isNotEmpty
-              ? name
-              : road.isNotEmpty
-              ? road
-              : city.isNotEmpty
-              ? city
-              : query;
-          final parts = <String>[];
-          if (name.isNotEmpty) parts.add(name);
-          if (road.isNotEmpty && road != name) parts.add(road);
-          if (suburb.isNotEmpty) parts.add(suburb);
-          if (city.isNotEmpty) parts.add(city);
-          if (state.isNotEmpty) parts.add(state);
-          return _PlaceSuggestion(
-            displayName: parts.isNotEmpty
-                ? parts.take(4).join(', ')
-                : item['display_name'] as String? ?? query,
-            shortName: shortName,
-            lat: double.parse(item['lat'].toString()),
-            lon: double.parse(item['lon'].toString()),
-          );
-        }).toList();
-
-        if (mounted) {
-          setState(() {
-            _suggestions = suggestions;
-            _showSuggestions = suggestions.isNotEmpty;
+      final uri =
+          Uri.https('maps.googleapis.com', '/maps/api/place/details/json', {
+            'place_id': placeId,
+            'fields': 'geometry',
+            'key': _googleMapsApiKey,
+            'sessiontoken': _sessionToken,
           });
+      final response = await _httpClient.get(uri);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'OK') {
+          final location = data['result']['geometry']['location'];
+          return LatLng(location['lat'], location['lng']);
         }
       }
     } catch (e) {
-      debugPrint('Nominatim fallback error: $e');
+      debugPrint('Google Place Details error: $e');
     }
+    return const LatLng(17.3850, 78.4867); // Default to Hyderabad center
   }
 
   Future<void> _selectSuggestion(_PlaceSuggestion suggestion) async {
@@ -331,57 +339,72 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       });
     }
     _searchFocusNode.unfocus();
-    final pos = LatLng(suggestion.lat, suggestion.lon);
+
+    LatLng pos;
+    if (suggestion.placeId != null && suggestion.lat == null) {
+      pos = await _getPlaceDetails(suggestion.placeId!);
+    } else {
+      pos = LatLng(suggestion.lat ?? 0.0, suggestion.lon ?? 0.0);
+    }
+
     _searchController.text = suggestion.displayName;
     final address = await _reverseGeocode(pos);
+    _sessionToken = null; // Reset session token after selection
+
     if (!mounted) return;
     setState(() {
       _selectedPosition = pos;
       _fetchedAddress = address.isNotEmpty ? address : suggestion.displayName;
       _isOutsideHyderabad = !_isInHyderabad(pos);
     });
-    if (_mapController != null)
+    if (_mapController != null) {
       _mapController!.animateCamera(CameraUpdate.newLatLng(pos));
+    }
   }
 
   // ─── Reverse geocode — returns clean area name only ───────────────────────
 
   Future<String> _reverseGeocode(LatLng position) async {
-    // 1️⃣ Photon reverse (fastest)
     try {
-      final uri = Uri.https('photon.komoot.io', '/reverse', {
-        'lat': position.latitude.toString(),
-        'lon': position.longitude.toString(),
-        'limit': '1',
+      final uri = Uri.https('maps.googleapis.com', '/maps/api/geocode/json', {
+        'latlng': '${position.latitude},${position.longitude}',
+        'key': _googleMapsApiKey,
+        'language': 'en',
       });
-      final response = await _httpClient
-          .get(uri, headers: {'User-Agent': 'BandiWalaApp/1.0'})
-          .timeout(const Duration(seconds: 5));
-
+      final response = await _httpClient.get(uri);
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final features = data['features'] as List? ?? [];
-        if (features.isNotEmpty) {
-          final props =
-              features.first['properties'] as Map<String, dynamic>? ?? {};
-          final name = props['name'] as String? ?? '';
-          final street = props['street'] as String? ?? '';
-          final city =
-              props['city'] as String? ?? props['county'] as String? ?? '';
-          final state = props['state'] as String? ?? '';
-          final parts = <String>[];
-          if (name.isNotEmpty) parts.add(name);
-          if (street.isNotEmpty && street != name) parts.add(street);
-          if (city.isNotEmpty) parts.add(city);
-          if (state.isNotEmpty) parts.add(state);
-          if (parts.isNotEmpty) return parts.take(3).join(', ');
+        final data = jsonDecode(response.body);
+        if (data['status'] == 'OK') {
+          final results = data['results'] as List;
+          if (results.isNotEmpty) {
+            // Use the first result (most precise)
+            final formattedAddress =
+                results.first['formatted_address'] as String;
+            // Often we want just the area name, but formatted_address is good.
+            // Let's try to extract a slightly shorter area name if possible.
+            final addressComponents =
+                results.first['address_components'] as List;
+            final sublocality = addressComponents.firstWhere(
+              (c) => (c['types'] as List).contains('sublocality'),
+              orElse: () => null,
+            )?['long_name'];
+            final locality = addressComponents.firstWhere(
+              (c) => (c['types'] as List).contains('locality'),
+              orElse: () => null,
+            )?['long_name'];
+
+            if (sublocality != null && locality != null) {
+              return '$sublocality, $locality';
+            }
+            return formattedAddress.split(',').take(3).join(',').trim();
+          }
         }
       }
     } catch (e) {
-      debugPrint('Photon reverse error: $e');
+      debugPrint('Google Reverse Geocode error: $e');
     }
 
-    // 2️⃣ Nominatim reverse fallback
+    // Fallback to nominatim reverse if google fails
     try {
       final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', {
         'lat': position.latitude.toString(),
@@ -397,30 +420,14 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               'Accept-Language': 'en',
             },
           )
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final addr = data['address'] as Map<String, dynamic>? ?? {};
-        final road =
-            addr['road'] as String? ?? addr['pedestrian'] as String? ?? '';
-        final suburb =
-            addr['suburb'] as String? ?? addr['neighbourhood'] as String? ?? '';
-        final city =
-            addr['city'] as String? ??
-            addr['town'] as String? ??
-            addr['county'] as String? ??
-            '';
-        final state = addr['state'] as String? ?? '';
-        final parts = <String>[];
-        if (road.isNotEmpty) parts.add(road);
-        if (suburb.isNotEmpty) parts.add(suburb);
-        if (city.isNotEmpty) parts.add(city);
-        if (state.isNotEmpty) parts.add(state);
-        if (parts.isNotEmpty) return parts.take(3).join(', ');
+        return data['display_name'] ?? '';
       }
     } catch (e) {
-      debugPrint('Nominatim reverse error: $e');
+      debugPrint('Reverse geocode fallback error: $e');
     }
     return '';
   }
@@ -472,17 +479,36 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
+
+      if (permission == LocationPermission.deniedForever) {
         _showPermissionDialog(
-          'Permission Needed',
-          'Allow location access so we can deliver to you.',
+          'Location Permission Denied',
+          'You have permanently denied location access. Please enable it in app settings so we can provide service at your location.',
+          isSettings: true,
         );
         if (mounted) setState(() => _isFetchingLocation = false);
         return;
+      }
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          _showPermissionDialog(
+            'Permission Needed',
+            'Allow location access so we can deliver to you.',
+          );
+          if (mounted) setState(() => _isFetchingLocation = false);
+          return;
+        }
+        if (permission == LocationPermission.deniedForever) {
+          _showPermissionDialog(
+            'Location Permission Denied',
+            'Please enable location access in app settings to continue.',
+            isSettings: true,
+          );
+          if (mounted) setState(() => _isFetchingLocation = false);
+          return;
+        }
       }
 
       // ✅ bestForNavigation = maximum GPS precision
@@ -650,7 +676,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     if (mounted) Navigator.pop(context, location);
   }
 
-  void _showPermissionDialog(String title, String message) {
+  void _showPermissionDialog(
+    String title,
+    String message, {
+    bool isSettings = false,
+  }) {
     if (!mounted) return;
     showDialog(
       context: context,
@@ -659,7 +689,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            Icon(Icons.location_off, color: Colors.orange.shade600, size: 24),
+            Icon(
+              isSettings ? Icons.settings : Icons.location_off,
+              color: isSettings ? Colors.blue.shade600 : Colors.orange.shade600,
+              size: 24,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -681,13 +715,17 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              _fetchCurrentLocation();
+              if (isSettings) {
+                Geolocator.openAppSettings();
+              } else {
+                _fetchCurrentLocation();
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: bandiwalaYellow,
               foregroundColor: Colors.black87,
             ),
-            child: const Text('Retry'),
+            child: Text(isSettings ? 'Open Settings' : 'Retry'),
           ),
         ],
       ),

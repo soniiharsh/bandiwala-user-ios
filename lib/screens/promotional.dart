@@ -556,279 +556,282 @@ class _VendorMiniCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: Opacity(
-        opacity: vendor.isAvailable ? 1.0 : 0.55,
-        child: Container(
-          width: 175,
-          margin: const EdgeInsets.only(right: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.07),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(14),
-                    ),
-                    child: vendor.imageUrl.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: vendor.imageUrl,
-                            width: 175,
-                            height: 115,
-                            fit: BoxFit.cover,
-                            memCacheWidth: 350,
-                            memCacheHeight: 230,
-                            maxWidthDiskCache: 350,
-                            maxHeightDiskCache: 230,
-                            placeholder: (_, __) => Container(
-                              width: 175,
-                              height: 115,
-                              color: Colors.grey.shade200,
-                              child: const Center(
-                                child: SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: kBandiwalaYellow,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            errorWidget: (_, __, ___) => Container(
-                              width: 175,
-                              height: 115,
-                              color: Colors.grey.shade200,
-                              child: const Icon(
-                                Icons.store,
-                                size: 32,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          )
-                        : Container(
-                            width: 175,
-                            height: 115,
-                            color: Colors.grey.shade200,
-                            child: const Icon(
-                              Icons.store,
-                              size: 32,
-                              color: Colors.grey,
-                            ),
-                          ),
+      child: IgnorePointer(
+        ignoring: !vendor.isAvailable,
+        child: Stack(
+          children: [
+            Container(
+              width: 175,
+              margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.07),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
-
-                  // Discount badge
-                  if (hasDiscount)
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      child: Container(
-                        padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF1BA672),
-                          borderRadius: BorderRadius.only(
-                            topRight: Radius.circular(8),
-                            bottomLeft: Radius.circular(14),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '${vendor.discount} OFF',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                            if (vendor.maxDiscount.isNotEmpty)
-                              Text(
-                                'up to ₹${vendor.maxDiscount}',
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  color: Colors.white70,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  // Favourite heart
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: GestureDetector(
-                      onTap: onFavouriteTap,
-                      child: Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.15),
-                              blurRadius: 4,
-                            ),
-                          ],
-                        ),
-                        child: Icon(
-                          isFavourite
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          size: 16,
-                          color: isFavourite
-                              ? Colors.red
-                              : Colors.grey.shade600,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Unavailable overlay
-                  if (!vendor.isAvailable)
-                    Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.45),
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(14),
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'Unavailable',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                 ],
               ),
-
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      vendor.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(14),
+                        ),
+                        child: vendor.imageUrl.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: vendor.imageUrl,
+                                width: 175,
+                                height: 115,
+                                fit: BoxFit.cover,
+                                memCacheWidth: 350,
+                                memCacheHeight: 230,
+                                maxWidthDiskCache: 350,
+                                maxHeightDiskCache: 230,
+                                placeholder: (_, __) => Container(
+                                  width: 175,
+                                  height: 115,
+                                  color: Colors.grey.shade200,
+                                  child: const Center(
+                                    child: SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: kBandiwalaYellow,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                errorWidget: (_, __, ___) => Container(
+                                  width: 175,
+                                  height: 115,
+                                  color: Colors.grey.shade200,
+                                  child: const Icon(
+                                    Icons.store,
+                                    size: 32,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              )
+                            : Container(
+                                width: 175,
+                                height: 115,
+                                color: Colors.grey.shade200,
+                                child: const Icon(
+                                  Icons.store,
+                                  size: 32,
+                                  color: Colors.grey,
+                                ),
+                              ),
                       ),
-                    ),
-                    if (vendor.category.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        vendor.category,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade500,
+
+                      // Discount badge
+                      if (hasDiscount)
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          child: Container(
+                            padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF1BA672),
+                              borderRadius: BorderRadius.only(
+                                topRight: Radius.circular(8),
+                                bottomLeft: Radius.circular(14),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${vendor.discount} OFF',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                                if (vendor.maxDiscount.isNotEmpty)
+                                  Text(
+                                    'up to ₹${vendor.maxDiscount}',
+                                    style: const TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.white70,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                      // Favourite heart
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: GestureDetector(
+                          onTap: onFavouriteTap,
+                          child: Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.15),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              isFavourite
+                                  ? Icons.favorite_rounded
+                                  : Icons.favorite_border_rounded,
+                              size: 16,
+                              color: isFavourite
+                                  ? Colors.red
+                                  : Colors.grey.shade600,
+                            ),
+                          ),
                         ),
                       ),
                     ],
-                    const SizedBox(height: 7),
-                    Row(
+                  ),
+
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade600,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.star,
-                                size: 11,
-                                color: Colors.white,
-                              ),
-                              const SizedBox(width: 2),
-                              Text(
-                                vendor.rating.toStringAsFixed(1),
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
+                        Text(
+                          vendor.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        Container(
-                          width: 3,
-                          height: 3,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade400,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Icon(
-                          Icons.access_time_rounded,
-                          size: 11,
-                          color: Colors.grey.shade500,
-                        ),
-                        const SizedBox(width: 3),
-                        Expanded(
-                          child: Text(
-                            vendor.deliveryTime,
+                        if (vendor.category.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            vendor.category,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
+                              color: Colors.grey.shade500,
                             ),
                           ),
+                        ],
+                        const SizedBox(height: 7),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade600,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.star,
+                                    size: 11,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    vendor.rating.toStringAsFixed(1),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              width: 3,
+                              height: 3,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade400,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Icon(
+                              Icons.access_time_rounded,
+                              size: 11,
+                              color: Colors.grey.shade500,
+                            ),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                vendor.deliveryTime,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
+                ],
+              ),
+            ),
+            if (!vendor.isAvailable)
+              Positioned.fill(
+                child: Container(
+                  margin: const EdgeInsets.only(right: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.65),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade600,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'OFFLINE',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );

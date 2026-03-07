@@ -542,12 +542,44 @@ class _HomePageState extends State<HomePage> {
   SavedLocation? _activeAddress;
 
   @override
+  void initState() {
+    super.initState();
+    _loadLastUsedLocation();
+  }
+
+  Future<void> _loadLastUsedLocation() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('last_used_location');
+      if (saved != null && mounted) {
+        setState(() {
+          _activeAddress = SavedLocation.fromJson(jsonDecode(saved));
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading last used location: $e');
+    }
+  }
+
+  Future<void> _saveLastUsedLocation(SavedLocation loc) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_used_location', jsonEncode(loc.toJson()));
+    } catch (e) {
+      debugPrint('Error saving last used location: $e');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
       _HomeTab(
         phoneNumber: widget.phoneNumber,
         activeAddress: _activeAddress,
-        onAddressChanged: (loc) => setState(() => _activeAddress = loc),
+        onAddressChanged: (loc) {
+          setState(() => _activeAddress = loc);
+          _saveLastUsedLocation(loc);
+        },
       ),
       CartScreen(
         deliveryAddress: _activeAddress,
@@ -1624,28 +1656,6 @@ class _VendorCardState extends State<_VendorCard> {
                                 ),
                               ),
                             ),
-                            if (!widget.isAvailable)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.shade50,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: Colors.red.shade200,
-                                  ),
-                                ),
-                                child: Text(
-                                  'Unavailable',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.red.shade600,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
                           ],
                         ),
                         if (widget.category.isNotEmpty) ...[
@@ -1708,8 +1718,35 @@ class _VendorCardState extends State<_VendorCard> {
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 4),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.55),
+                  color: Colors.white.withOpacity(0.65),
                   borderRadius: BorderRadius.circular(16),
+                ),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade600,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: const Text(
+                      '😴 VENDOR OFFLINE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
