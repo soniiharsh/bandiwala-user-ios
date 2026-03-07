@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
+import 'dart:math'; // ✅ for shuffle
 import 'vendor_items_page.dart';
-import 'home_page.dart'; // ← WishlistManager + WishlistVendor
+import 'home_page.dart';
 
 const kBandiwalaYellow = Color(0xFFFFC107);
 
@@ -126,7 +127,6 @@ class _PromotionalBannerState extends State<PromotionalBanner>
             ),
           ),
           const SizedBox(height: 10),
-          // Dot indicators
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(
@@ -149,12 +149,10 @@ class _PromotionalBannerState extends State<PromotionalBanner>
 
         const SizedBox(height: 24),
 
-        // ── Recommended / Favourites tabs + side-scroll vendor strip ─────
         RecommendedVendorsStrip(onCategorySelected: widget.onCategorySelected),
 
         const SizedBox(height: 28),
 
-        // ── What's on your mind ──────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: FoodCategoryCarousel(
@@ -227,7 +225,6 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
   bool _isLoading = true;
   bool _hasLoaded = false;
 
-  // A single app-wide RouteObserver — add this to MaterialApp.navigatorObservers
   static final routeObserver = RouteObserver<ModalRoute<void>>();
 
   @override
@@ -252,11 +249,8 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
     super.dispose();
   }
 
-  /// Called automatically when user pops back to this screen
   @override
   void didPopNext() => _refreshWishlist();
-
-  // ── Data loading ──────────────────────────────────────────────────────────
 
   Future<void> _loadVendors() async {
     if (_hasLoaded) return;
@@ -279,15 +273,15 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
       }
     } catch (e) {
       debugPrint('Error loading vendor strip: $e');
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isLoading = false;
           _hasLoaded = true;
         });
+      }
     }
   }
 
-  /// Light refresh — just reload wishlist IDs, no full vendor re-fetch
   Future<void> _refreshWishlist() async {
     final ids = await _fetchWishlistIds();
     if (mounted) setState(() => _wishlistIds = ids);
@@ -297,8 +291,6 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
     final list = await WishlistManager.getWishlist();
     return list.map((v) => v.vendorId).toSet();
   }
-
-  // ── Wishlist toggle ───────────────────────────────────────────────────────
 
   Future<void> _toggleWishlist(_VendorData vendor) async {
     final wv = WishlistVendor(
@@ -329,13 +321,22 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
     );
   }
 
-  // ── Display helpers ───────────────────────────────────────────────────────
-
+  // ✅ Available vendors first, unavailable last — within each group order preserved
   List<_VendorData> get _displayed {
+    List<_VendorData> list;
     if (_activeTab == 1) {
-      return _allVendors.where((v) => _wishlistIds.contains(v.id)).toList();
+      list = _allVendors.where((v) => _wishlistIds.contains(v.id)).toList();
+    } else {
+      list = List<_VendorData>.from(_allVendors);
     }
-    return _allVendors;
+
+    // Stable sort: available first, then unavailable
+    list.sort((a, b) {
+      if (a.isAvailable == b.isAvailable) return 0;
+      return a.isAvailable ? -1 : 1;
+    });
+
+    return list;
   }
 
   void _openVendor(BuildContext context, _VendorData vendor) {
@@ -348,8 +349,6 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
     );
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -357,7 +356,6 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── Tabs — centred ─────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
@@ -378,7 +376,6 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
 
         const SizedBox(height: 14),
 
-        // ── Horizontal vendor scroll ────────────────────────────────────
         SizedBox(
           height: 215,
           child: _isLoading
@@ -567,7 +564,6 @@ class _VendorMiniCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Image + overlays ──────────────────────────────────────
               Stack(
                 children: [
                   ClipRRect(
@@ -622,7 +618,7 @@ class _VendorMiniCard extends StatelessWidget {
                           ),
                   ),
 
-                  // Discount badge — bottom-left
+                  // Discount badge
                   if (hasDiscount)
                     Positioned(
                       bottom: 0,
@@ -663,7 +659,7 @@ class _VendorMiniCard extends StatelessWidget {
                       ),
                     ),
 
-                  // Favourite heart — top-left
+                  // Favourite heart
                   Positioned(
                     top: 8,
                     left: 8,
@@ -729,7 +725,6 @@ class _VendorMiniCard extends StatelessWidget {
                 ],
               ),
 
-              // ── Info section ────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
                 child: Column(
@@ -759,7 +754,6 @@ class _VendorMiniCard extends StatelessWidget {
                     const SizedBox(height: 7),
                     Row(
                       children: [
-                        // Rating chip
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 5,
@@ -884,6 +878,9 @@ class _FoodCategoryCarouselState extends State<FoodCategoryCarousel>
           .map((doc) => FoodCategory.fromFirestore(doc))
           .where((c) => c.isActive)
           .toList();
+
+      // ✅ Shuffle categories (excluding "All") on every fresh load
+      firebaseCategories.shuffle(Random());
 
       if (mounted) {
         setState(() {

@@ -20,23 +20,6 @@ class CouponsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print('\n🎫 ═══════════════════════════════════════');
-    print('     COUPONS PAGE - DETAILED DEBUG      ');
-    print('═══════════════════════════════════════');
-    print('Cart Total Amount: ₹$cartAmount');
-    print('Number of Vendors in Cart: ${cartVendorIds.length}');
-    print('\n📦 CART VENDORS:');
-    for (int i = 0; i < cartVendorIds.length; i++) {
-      final id = cartVendorIds[i];
-      final name = vendorNames[id] ?? 'Unknown';
-      final amount = vendorAmounts[id] ?? 0;
-      print('  [$i] ID: "$id"');
-      print('      Name: "$name"');
-      print('      Amount: ₹$amount');
-      print('      ID Length: ${id.length} chars');
-    }
-    print('═══════════════════════════════════════\n');
-
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
@@ -63,13 +46,15 @@ class CouponsPage extends StatelessWidget {
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            print('❌ ERROR: ${snapshot.error}');
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.error_outline,
-                      size: 64, color: Colors.red.shade300),
+                  Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.red.shade300,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'Something went wrong',
@@ -99,42 +84,25 @@ class CouponsPage extends StatelessWidget {
           }
 
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            print('⚠️ No coupons found in database');
             return _buildEmptyState();
           }
-
-          print('\n📋 Found ${snapshot.data!.docs.length} active coupons in database\n');
 
           final applicableCoupons = <Map<String, dynamic>>[];
           final notApplicableCoupons = <Map<String, dynamic>>[];
 
           for (var doc in snapshot.data!.docs) {
             final data = doc.data() as Map<String, dynamic>;
-            final couponData = {
-              'id': doc.id,
-              ...data,
-            };
-
-            final couponCode = couponData['couponCode'] ?? 'UNKNOWN';
-            print('╔═══════════════════════════════════════╗');
-            print('║  Processing: $couponCode');
-            print('╚═══════════════════════════════════════╝');
+            final couponData = {'id': doc.id, ...data};
 
             // Check usage limit
             final hasUsageLimit = couponData['hasUsageLimit'] ?? false;
             final maxUsage = couponData['maxUsage'];
             final currentUsage = couponData['currentUsage'] ?? 0;
-
-            if (hasUsageLimit && maxUsage != null && currentUsage >= maxUsage) {
-              print('❌ SKIPPED - Usage limit reached ($currentUsage/$maxUsage)\n');
+            if (hasUsageLimit && maxUsage != null && currentUsage >= maxUsage)
               continue;
-            }
 
             final isWholeApp = couponData['isWholeApp'] ?? true;
             final minAmount = (couponData['minAmount'] ?? 0).toDouble();
-
-            print('   Type: ${isWholeApp ? "WHOLE APP" : "VENDOR-SPECIFIC"}');
-            print('   Min Amount: ₹$minAmount');
 
             List<String> applicableVendorIds = [];
             double relevantAmount = 0;
@@ -143,75 +111,38 @@ class CouponsPage extends StatelessWidget {
             bool shouldShowCoupon = true;
 
             if (isWholeApp) {
-              // WHOLE APP COUPON
-              print('   📱 Whole App Coupon');
               applicableVendorIds = List.from(cartVendorIds);
               relevantAmount = cartAmount;
               remainingAmount = minAmount - cartAmount;
               isApplicable = cartAmount >= minAmount;
-
-              print('      Cart Total: ₹$cartAmount');
-              print('      Is Applicable: ${isApplicable ? "✅ YES" : "❌ NO"}');
-              if (!isApplicable) {
-                print('      Need: ₹${remainingAmount.toStringAsFixed(0)} more');
-              }
             } else {
-              // VENDOR-SPECIFIC COUPON
-              print('   🏪 Vendor-Specific Coupon');
-
-              final couponVendorIds = List<String>.from(couponData['vendorIds'] ?? []);
+              final couponVendorIds = List<String>.from(
+                couponData['vendorIds'] ?? [],
+              );
 
               if (couponVendorIds.isEmpty) {
-                print('      ❌ No vendor IDs in coupon - HIDING');
                 shouldShowCoupon = false;
               } else {
-                print('      Required vendors (${couponVendorIds.length}):');
-                for (int i = 0; i < couponVendorIds.length; i++) {
-                  print('         [$i] "${couponVendorIds[i]}"');
-                }
-
                 applicableVendorIds = _findMatchingVendors(
                   cartVendorIds: cartVendorIds,
                   couponVendorIds: couponVendorIds,
                   vendorNames: vendorNames,
                 );
 
-                print('      Matched: ${applicableVendorIds.length} vendor(s)');
-
                 if (applicableVendorIds.isEmpty) {
-                  print('      ❌ NO MATCHING VENDORS - HIDING COUPON');
                   shouldShowCoupon = false;
                 } else {
-                  print('      ✅ Matched vendors:');
-                  for (var id in applicableVendorIds) {
-                    final name = vendorNames[id] ?? 'Unknown';
-                    final amount = vendorAmounts[id] ?? 0;
-                    print('         - $name: ₹$amount');
-                  }
-
                   relevantAmount = applicableVendorIds.fold(
                     0.0,
-                        (sum, id) => sum + (vendorAmounts[id] ?? 0),
+                    (sum, id) => sum + (vendorAmounts[id] ?? 0),
                   );
-
-                  print('      Total from matched: ₹$relevantAmount');
-                  print('      Required minimum: ₹$minAmount');
-
                   remainingAmount = minAmount - relevantAmount;
                   isApplicable = relevantAmount >= minAmount;
-
-                  print('      Is Applicable: ${isApplicable ? "✅ YES" : "❌ NO"}');
-                  if (!isApplicable) {
-                    print('      Need: ₹${remainingAmount.toStringAsFixed(0)} more');
-                  }
                 }
               }
             }
 
-            if (!shouldShowCoupon) {
-              print('   🚫 HIDDEN FROM LIST\n');
-              continue;
-            }
+            if (!shouldShowCoupon) continue;
 
             couponData['applicableVendorIds'] = applicableVendorIds;
             couponData['remainingAmount'] = remainingAmount;
@@ -219,34 +150,25 @@ class CouponsPage extends StatelessWidget {
             couponData['relevantAmount'] = relevantAmount;
 
             if (isApplicable) {
-              print('   ✅ APPLICABLE\n');
               applicableCoupons.add(couponData);
             } else {
-              print('   📝 NOT APPLICABLE\n');
               notApplicableCoupons.add(couponData);
             }
           }
 
           final allCoupons = [...applicableCoupons, ...notApplicableCoupons];
 
-          print('╔═══════════════════════════════════════╗');
-          print('║         FINAL RESULTS                 ║');
-          print('╠═══════════════════════════════════════╣');
-          print('║  ✅ Applicable: ${applicableCoupons.length.toString().padLeft(2)}                    ║');
-          print('║  ⚠️  Not Applicable: ${notApplicableCoupons.length.toString().padLeft(2)}                ║');
-          print('║  📊 Total Shown: ${allCoupons.length.toString().padLeft(2)}                    ║');
-          print('╚═══════════════════════════════════════╝\n');
-
-          if (allCoupons.isEmpty) {
-            return _buildEmptyState();
-          }
+          if (allCoupons.isEmpty) return _buildEmptyState();
 
           return Column(
             children: [
-              // Manual coupon entry section
+              // Manual coupon entry
               Container(
                 margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
@@ -254,7 +176,11 @@ class CouponsPage extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.local_offer, color: kBandiwalaYellow, size: 20),
+                    const Icon(
+                      Icons.local_offer,
+                      color: kBandiwalaYellow,
+                      size: 20,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: TextField(
@@ -291,7 +217,7 @@ class CouponsPage extends StatelessWidget {
                 ),
               ),
 
-              // Available coupons header
+              // Header
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
                 child: Align(
@@ -307,7 +233,7 @@ class CouponsPage extends StatelessWidget {
                 ),
               ),
 
-              // Coupons list
+              // List
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -319,7 +245,8 @@ class CouponsPage extends StatelessWidget {
                       remainingAmount: coupon['remainingAmount'] as double,
                       isApplicable: coupon['isApplicable'] as bool,
                       vendorNames: vendorNames,
-                      applicableVendorIds: coupon['applicableVendorIds'] as List<String>,
+                      applicableVendorIds:
+                          coupon['applicableVendorIds'] as List<String>,
                       isWholeApp: coupon['isWholeApp'] ?? true,
                       vendorAmounts: vendorAmounts,
                       onApply: () {
@@ -347,21 +274,15 @@ class CouponsPage extends StatelessWidget {
     required Map<String, String> vendorNames,
   }) {
     final matchedIds = <String>[];
-
     for (var cartId in cartVendorIds) {
       final normalizedCartId = cartId.trim();
-
       for (var couponId in couponVendorIds) {
-        final normalizedCouponId = couponId.trim();
-
-        if (normalizedCartId == normalizedCouponId) {
+        if (normalizedCartId == couponId.trim()) {
           matchedIds.add(cartId);
-          print('         ✅ MATCH: "$cartId" == "$couponId"');
           break;
         }
       }
     }
-
     return matchedIds;
   }
 
@@ -394,10 +315,7 @@ class CouponsPage extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Check back later for exciting offers',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
           ),
         ],
       ),
@@ -437,14 +355,14 @@ class _CouponCard extends StatelessWidget {
 
     final totalFromVendors = applicableVendorIds.fold(
       0.0,
-          (sum, id) => sum + (vendorAmounts[id] ?? 0),
+      (sum, id) => sum + (vendorAmounts[id] ?? 0),
     );
     final shortage = minAmount - totalFromVendors;
-
     if (shortage <= 0) return '';
 
     if (applicableVendorIds.length == 1) {
-      final vendorName = vendorNames[applicableVendorIds[0]] ?? 'this restaurant';
+      final vendorName =
+          vendorNames[applicableVendorIds[0]] ?? 'this restaurant';
       return 'Add ₹${shortage.toStringAsFixed(0)} more from $vendorName';
     } else if (applicableVendorIds.length == 2) {
       final name1 = vendorNames[applicableVendorIds[0]] ?? 'Restaurant 1';
@@ -457,34 +375,54 @@ class _CouponCard extends StatelessWidget {
     }
   }
 
+  // ✅ FIXED: No longer shows % — shows ₹ flat discount amount
   String _getMainDescription() {
     final couponType = coupon['couponType'] ?? 'discount';
+    final discountAmount = (coupon['discountAmount'] ?? 0).toDouble();
+    final minAmount = (coupon['minAmount'] ?? 0).toDouble();
 
     if (couponType == 'freebie') {
-      return coupon['freebieName'] ?? 'FREE ITEM';
+      final freebieName = coupon['freebieName'] ?? 'FREE ITEM';
+      return 'Get $freebieName FREE';
     } else if (couponType == 'freeDelivery') {
-      return 'You save ₹${(coupon['deliverySavings'] ?? 1).toInt()}';
+      return 'Free Delivery on this order';
     } else {
-      final discountAmount = (coupon['discountAmount'] ?? 0).toDouble();
-      return '${discountAmount.toInt()}% OFF on first order';
+      // ✅ Fixed: flat ₹ amount, not percentage
+      if (minAmount > 0) {
+        return 'Save ₹${discountAmount.toInt()} on orders above ₹${minAmount.toInt()}';
+      }
+      return 'Save ₹${discountAmount.toInt()} on this order';
     }
   }
 
+  // ✅ FIXED: Detailed description also uses ₹ flat amount
   String _getDetailedDescription() {
     final description = coupon['description'] ?? '';
-    final minAmount = (coupon['minAmount'] ?? 0).toDouble();
-
-    if (description.isNotEmpty) {
-      return description;
-    }
+    if (description.isNotEmpty) return description;
 
     final couponType = coupon['couponType'] ?? 'discount';
     final couponCode = coupon['couponCode'] ?? '';
+    final discountAmount = (coupon['discountAmount'] ?? 0).toDouble();
+    final minAmount = (coupon['minAmount'] ?? 0).toDouble();
+    final maxDiscount = coupon['maxDiscount'];
 
     if (couponType == 'freeDelivery') {
-      return 'Free shipping on orders above ₹${minAmount.toInt()}';
+      return minAmount > 0
+          ? 'Free delivery on orders above ₹${minAmount.toInt()}. Use code $couponCode.'
+          : 'Free delivery on this order. Use code $couponCode.';
+    } else if (couponType == 'freebie') {
+      final freebieName = coupon['freebieName'] ?? 'free item';
+      return minAmount > 0
+          ? 'Get $freebieName free on orders above ₹${minAmount.toInt()}. Use code $couponCode.'
+          : 'Get $freebieName free with this order. Use code $couponCode.';
     } else {
-      return 'Get flat ${(coupon['discountAmount'] ?? 0).toInt()}% off using the code $couponCode on your first order above ₹${minAmount.toInt()}';
+      // ✅ Fixed: flat ₹ discount language
+      String desc =
+          'Get flat ₹${discountAmount.toInt()} off using code $couponCode';
+      if (minAmount > 0) desc += ' on orders above ₹${minAmount.toInt()}';
+      if (maxDiscount != null)
+        desc += '. Max discount ₹${(maxDiscount as num).toInt()}';
+      return '$desc.';
     }
   }
 
@@ -506,13 +444,12 @@ class _CouponCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // Main content area
+            // Main content
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Coupon icon
                   Container(
                     width: 48,
                     height: 48,
@@ -520,20 +457,17 @@ class _CouponCard extends StatelessWidget {
                       color: kBandiwalaYellow.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.local_offer,
                       color: kBandiwalaYellow,
                       size: 24,
                     ),
                   ),
                   const SizedBox(width: 12),
-
-                  // Coupon details
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Coupon code
                         Text(
                           couponCode,
                           style: const TextStyle(
@@ -544,8 +478,6 @@ class _CouponCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 4),
-
-                        // Main description
                         Text(
                           mainDesc,
                           style: TextStyle(
@@ -557,20 +489,25 @@ class _CouponCard extends StatelessWidget {
                       ],
                     ),
                   ),
-
-                  // Apply button
                   TextButton(
                     onPressed: isApplicable ? onApply : null,
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      backgroundColor: isApplicable ? null : Colors.grey.shade100,
+                      backgroundColor: isApplicable
+                          ? null
+                          : Colors.grey.shade100,
                     ),
                     child: Text(
                       'Apply',
                       style: TextStyle(
-                        color: isApplicable ? kBandiwalaYellow : Colors.grey.shade500,
+                        color: isApplicable
+                            ? kBandiwalaYellow
+                            : Colors.grey.shade500,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
@@ -586,7 +523,7 @@ class _CouponCard extends StatelessWidget {
               painter: DottedLinePainter(),
             ),
 
-            // Detailed description section
+            // Detailed description
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -600,8 +537,6 @@ class _CouponCard extends StatelessWidget {
                       height: 1.4,
                     ),
                   ),
-
-                  // Add more message
                   if (addMoreMessage.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
@@ -623,7 +558,6 @@ class _CouponCard extends StatelessWidget {
   }
 }
 
-// Dotted line painter
 class DottedLinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -637,11 +571,7 @@ class DottedLinePainter extends CustomPainter {
     double startX = 0;
 
     while (startX < size.width) {
-      canvas.drawLine(
-        Offset(startX, 0),
-        Offset(startX + dashWidth, 0),
-        paint,
-      );
+      canvas.drawLine(Offset(startX, 0), Offset(startX + dashWidth, 0), paint);
       startX += dashWidth + dashSpace;
     }
   }

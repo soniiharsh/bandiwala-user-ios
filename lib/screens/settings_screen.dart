@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'splash_screen.dart';
-import 'login_page.dart'; // ✅ Import LoginPage
+import 'login_page.dart';
 import 'orders.dart';
 import 'wishlist.dart';
 import 'saved_addresses.dart';
@@ -27,22 +27,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _displayNumber = '';
   bool _isGuest = false;
 
+  // ✅ NEW: Name fields
+  String _customerName = '';
+  final TextEditingController _nameController = TextEditingController();
+  bool _isSavingName = false;
+
   @override
   void initState() {
     super.initState();
     _checkGuestStatus();
   }
 
-  // ✅ NEW: Check if user is guest
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
   Future<void> _checkGuestStatus() async {
     _isGuest = widget.phoneNumber == 'GUEST';
 
     if (_isGuest) {
-      // Show guest login prompt after build completes
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _showGuestLoginPrompt();
-        }
+        if (mounted) _showGuestLoginPrompt();
       });
 
       if (mounted) {
@@ -56,7 +63,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  // ✅ NEW: Show dialog for guest users
   void _showGuestLoginPrompt() {
     showDialog(
       context: context,
@@ -69,10 +75,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SizedBox(width: 12),
             Text(
               'Login Required',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-              ),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
             ),
           ],
         ),
@@ -83,8 +86,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Go back to previous screen
+              Navigator.pop(context);
+              Navigator.pop(context);
             },
             child: const Text(
               'Go Back',
@@ -93,11 +96,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
+              Navigator.pop(context);
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (_) => const LoginPage()),
-                    (route) => false,
+                (route) => false,
               );
             },
             style: ElevatedButton.styleFrom(
@@ -119,23 +122,141 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _initializeData() async {
-    await _loadOrderCount();
+    await Future.wait([_loadOrderCount(), _loadCustomerName()]);
     _updateDisplayNumber();
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    if (mounted) setState(() => _isLoading = false);
   }
 
   void _updateDisplayNumber() {
-    final phone = widget.phoneNumber ?? FirebaseAuth.instance.currentUser?.phoneNumber;
+    final phone =
+        widget.phoneNumber ?? FirebaseAuth.instance.currentUser?.phoneNumber;
     _displayNumber = phone?.replaceAll('+91', '') ?? '';
+  }
+
+  // ✅ NEW: Load customer name from Firestore
+  Future<void> _loadCustomerName() async {
+    try {
+      final phone =
+          widget.phoneNumber ?? FirebaseAuth.instance.currentUser?.phoneNumber;
+      if (phone == null || phone == 'GUEST') return;
+
+      final doc = await FirebaseFirestore.instance
+          .collection('customers')
+          .doc(phone)
+          .get();
+
+      if (doc.exists) {
+        final name = doc.data()?['name'] as String? ?? '';
+        if (mounted) {
+          setState(() {
+            _customerName = name;
+            _nameController.text = name;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading customer name: $e');
+    }
+  }
+
+  // ✅ NEW: Show editable name dialog
+  void _showEditNameDialog() {
+    _nameController.text = _customerName;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Edit Name',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+        ),
+        content: TextField(
+          controller: _nameController,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: InputDecoration(
+            hintText: 'Enter your name',
+            prefixIcon: const Icon(Icons.person_outline),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kBandiwalaYellow, width: 2),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newName = _nameController.text.trim();
+              if (newName.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Name cannot be empty')),
+                );
+                return;
+              }
+              Navigator.pop(context);
+              await _saveCustomerName(newName);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kBandiwalaYellow,
+              foregroundColor: Colors.black87,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Save',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ NEW: Save customer name to Firestore
+  Future<void> _saveCustomerName(String name) async {
+    setState(() => _isSavingName = true);
+    try {
+      final phone =
+          widget.phoneNumber ?? FirebaseAuth.instance.currentUser?.phoneNumber;
+      if (phone == null) return;
+
+      await FirebaseFirestore.instance.collection('customers').doc(phone).set({
+        'name': name,
+        'phone': phone,
+      }, SetOptions(merge: true));
+
+      if (mounted) {
+        setState(() {
+          _customerName = name;
+          _isSavingName = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Name saved successfully!'),
+            backgroundColor: Colors.green.shade600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error saving name: $e');
+      if (mounted) setState(() => _isSavingName = false);
+    }
   }
 
   Future<void> _loadOrderCount() async {
     try {
-      final userPhone = widget.phoneNumber ?? FirebaseAuth.instance.currentUser?.phoneNumber;
+      final userPhone =
+          widget.phoneNumber ?? FirebaseAuth.instance.currentUser?.phoneNumber;
       if (userPhone == null || userPhone == 'GUEST') return;
 
       final ordersSnapshot = await FirebaseFirestore.instance
@@ -143,11 +264,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           .where('customerPhone', isEqualTo: userPhone)
           .get();
 
-      if (mounted) {
-        setState(() {
-          _totalOrders = ordersSnapshot.docs.length;
-        });
-      }
+      if (mounted) setState(() => _totalOrders = ordersSnapshot.docs.length);
     } catch (e) {
       debugPrint('Error loading order count: $e');
     }
@@ -158,7 +275,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Logout',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         content: const Text('Are you sure you want to logout?'),
         actions: [
           TextButton(
@@ -169,7 +289,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: const Text('Logout'),
           ),
@@ -184,7 +306,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (_) => const SplashScreen()),
-                (route) => false,
+            (route) => false,
           );
         }
       } catch (e) {
@@ -193,7 +315,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  // ✅ NEW: Show login prompt for guest users trying to access features
   void _showFeatureLockedForGuest() {
     showDialog(
       context: context,
@@ -203,7 +324,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Icon(Icons.lock_outline, color: kBandiwalaYellow, size: 24),
             SizedBox(width: 12),
-            Text('Login Required', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              'Login Required',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         content: const Text('Please login to access this feature.'),
@@ -218,15 +342,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (_) => const LoginPage()),
-                    (route) => false,
+                (route) => false,
               );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: kBandiwalaYellow,
               foregroundColor: Colors.black87,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            child: const Text('Login', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Login',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -240,7 +369,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const OrdersPage()),
+      MaterialPageRoute(builder: (_) => const OrdersPage()),
     );
   }
 
@@ -251,7 +380,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const SavedAddressesPage()),
+      MaterialPageRoute(builder: (_) => const SavedAddressesPage()),
     );
   }
 
@@ -262,37 +391,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const WishlistPage()),
+      MaterialPageRoute(builder: (_) => const WishlistPage()),
     );
   }
 
-  void _navigateToTermsConditions() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const TermsConditionsPage()),
-    );
-  }
+  void _navigateToTermsConditions() => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const TermsConditionsPage()),
+  );
 
-  void _navigateToCancellationPolicy() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const CancellationPolicyPage()),
-    );
-  }
+  void _navigateToCancellationPolicy() => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const CancellationPolicyPage()),
+  );
 
-  void _navigateToRefundPolicy() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const RefundPolicyPage()),
-    );
-  }
+  void _navigateToRefundPolicy() => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const RefundPolicyPage()),
+  );
 
-  void _navigateToHelpSupport() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const HelpSupportPage()),
-    );
-  }
+  void _navigateToHelpSupport() => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const HelpSupportPage()),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -314,89 +435,180 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       body: _isLoading
           ? const Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(kBandiwalaYellow),
-        ),
-      )
-          : RefreshIndicator(
-        onRefresh: _initializeData,
-        color: kBandiwalaYellow,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _buildGreetingSection(),
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(kBandiwalaYellow),
               ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
+            )
+          : RefreshIndicator(
+              onRefresh: _initializeData,
+              color: kBandiwalaYellow,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: _buildStatCard(
-                        'Total Orders',
-                        _totalOrders.toString(),
-                        Icons.shopping_bag_outlined,
-                        onTap: _navigateToOrders,
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _buildGreetingSection(),
+                    ),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _buildStatCard(
+                              'Total Orders',
+                              _totalOrders.toString(),
+                              Icons.shopping_bag_outlined,
+                              onTap: _navigateToOrders,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildStatCard(
+                              'Wallet',
+                              '₹0',
+                              Icons.account_balance_wallet_outlined,
+                              onTap: null,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildStatCard(
-                        'Wallet',
-                        '₹0',
-                        Icons.account_balance_wallet_outlined,
-                        onTap: null,
-                      ),
-                    ),
+                    const SizedBox(height: 22),
+                    _buildMenuSection(),
+                    const SizedBox(height: 16),
+                    _buildLogoutButton(),
+                    const SizedBox(height: 22),
                   ],
                 ),
               ),
-              const SizedBox(height: 22),
-              _buildMenuSection(),
-              const SizedBox(height: 16),
-              _buildLogoutButton(),
-              const SizedBox(height: 22),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 
+  // ✅ UPDATED: Greeting shows name + edit button
   Widget _buildGreetingSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          _isGuest ? 'Hello Guest' : 'Hello',
-          style: const TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            color: kBandiwalaYellow,
-            letterSpacing: 0.5,
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: RichText(
+                text: TextSpan(
+                  children: [
+                    const TextSpan(
+                      text: 'Hello',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: kBandiwalaYellow,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    if (!_isGuest && _customerName.isNotEmpty) ...[
+                      const TextSpan(
+                        text: ', ',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: kBandiwalaYellow,
+                        ),
+                      ),
+                      TextSpan(
+                        text: _customerName,
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ] else if (_isGuest) ...[
+                      const TextSpan(
+                        text: ' Guest',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: kBandiwalaYellow,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            if (!_isGuest)
+              _isSavingName
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: kBandiwalaYellow,
+                      ),
+                    )
+                  : IconButton(
+                      icon: Icon(
+                        _customerName.isEmpty
+                            ? Icons.add_circle_outline
+                            : Icons.edit_outlined,
+                        color: kBandiwalaYellow,
+                        size: 26,
+                      ),
+                      tooltip: _customerName.isEmpty ? 'Add Name' : 'Edit Name',
+                      onPressed: _showEditNameDialog,
+                    ),
+          ],
         ),
         if (!_isGuest) ...[
           const SizedBox(height: 4),
-          Text(
-            _displayNumber.isNotEmpty ? _displayNumber : 'Guest',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Colors.black87,
+          // ✅ Show "Add your name" nudge if name is blank
+          if (_customerName.isEmpty)
+            GestureDetector(
+              onTap: _showEditNameDialog,
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 14,
+                    color: Colors.amber.shade700,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Tap to add your name',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.amber.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Text(
+              _displayNumber.isNotEmpty ? _displayNumber : '',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
             ),
-          ),
         ],
       ],
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, {VoidCallback? onTap}) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon, {
+    VoidCallback? onTap,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -527,7 +739,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(0),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
@@ -559,7 +770,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            const Icon(Icons.headset_mic_outlined, size: 22, color: Colors.black87),
+            const Icon(
+              Icons.headset_mic_outlined,
+              size: 22,
+              color: Colors.black87,
+            ),
             const SizedBox(width: 16),
             const Expanded(
               child: Column(
@@ -576,10 +791,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   SizedBox(height: 2),
                   Text(
                     'Get assistance anytime',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.black54,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.black54),
                   ),
                 ],
               ),
@@ -609,14 +821,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         height: 54,
         child: OutlinedButton.icon(
           onPressed: _isGuest
-              ? () {
-            // For guest, redirect to login
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (_) => const LoginPage()),
+              ? () => Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginPage()),
                   (route) => false,
-            );
-          }
+                )
               : _logout,
           icon: Icon(
             _isGuest ? Icons.login : Icons.logout,

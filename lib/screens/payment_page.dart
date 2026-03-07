@@ -14,27 +14,41 @@ const kBorderGrey = Color(0xFFE5E7EB);
 const kTextGrey = Color(0xFF6B7280);
 const kBgGrey = Color(0xFFF9FAFB);
 
+// ─── Tax Constants ────────────────────────────────────────────────────────────
+
+const double kFoodTaxPercent = 5.0;
+const double kDeliveryTaxPercent = 18.0;
+const double kPlatformFeeTaxPercent = 18.0;
+
 // ─── Pricing Config Model ─────────────────────────────────────────────────────
 
 class _PricingConfig {
   final double deliveryCharge;
   final double platformFee;
-  final double taxPercent;
+  // taxPercent kept for Firestore compat but individual rates are constants above
+  final double foodTaxPercent;
+  final double deliveryTaxPercent;
+  final double platformFeeTaxPercent;
 
   const _PricingConfig({
     required this.deliveryCharge,
     required this.platformFee,
-    required this.taxPercent,
+    this.foodTaxPercent = kFoodTaxPercent,
+    this.deliveryTaxPercent = kDeliveryTaxPercent,
+    this.platformFeeTaxPercent = kPlatformFeeTaxPercent,
   });
 
-  // Default fallback if Firestore fetch fails
   factory _PricingConfig.defaults() =>
-      const _PricingConfig(deliveryCharge: 29, platformFee: 10, taxPercent: 5);
+      const _PricingConfig(deliveryCharge: 29, platformFee: 10);
 
   factory _PricingConfig.fromMap(Map<String, dynamic> map) => _PricingConfig(
     deliveryCharge: (map['deliveryCharge'] ?? 29).toDouble(),
     platformFee: (map['platformFee'] ?? 10).toDouble(),
-    taxPercent: (map['taxPercent'] ?? 5).toDouble(),
+    foodTaxPercent: (map['foodTaxPercent'] ?? kFoodTaxPercent).toDouble(),
+    deliveryTaxPercent: (map['deliveryTaxPercent'] ?? kDeliveryTaxPercent)
+        .toDouble(),
+    platformFeeTaxPercent:
+        (map['platformFeeTaxPercent'] ?? kPlatformFeeTaxPercent).toDouble(),
   );
 }
 
@@ -64,28 +78,42 @@ class _PaymentPageState extends State<PaymentPage> {
   late Razorpay _razorpay;
   bool _isProcessing = false;
   bool _isLoadingPricing = true;
+  bool _taxBreakdownExpanded = false;
   _PaymentMethod _selectedMethod = _PaymentMethod.online;
 
-  // ── Pricing config from Firestore ──────────────────────────────────────────
   _PricingConfig _pricing = _PricingConfig.defaults();
 
-  // ── Computed values (depend on _pricing) ──────────────────────────────────
+  // ── Computed values ────────────────────────────────────────────────────────
+
   bool get _isFreeDelivery =>
       widget.appliedCoupon != null &&
       (widget.appliedCoupon!['couponType'] == 'freeDelivery' ||
           widget.appliedCoupon!['couponType'] == 'free_delivery');
 
   double get _deliveryCharge => _isFreeDelivery ? 0.0 : _pricing.deliveryCharge;
+
   double get _platformFee => _pricing.platformFee;
-  double get _taxAmount =>
-      (widget.itemsTotal + _deliveryCharge + _platformFee) *
-      (_pricing.taxPercent / 100);
-  double get _grandTotal =>
-      widget.itemsTotal +
-      _deliveryCharge +
-      _platformFee +
-      _taxAmount -
-      widget.couponDiscount;
+
+  // ── Split tax getters ──────────────────────────────────────────────────────
+  double get _foodTax => widget.itemsTotal * (_pricing.foodTaxPercent / 100);
+
+  double get _deliveryTax =>
+      _deliveryCharge * (_pricing.deliveryTaxPercent / 100);
+
+  double get _platformFeeTax =>
+      _platformFee * (_pricing.platformFeeTaxPercent / 100);
+
+  double get _totalTaxAmount => _foodTax + _deliveryTax + _platformFeeTax;
+
+  // ── Grand total ────────────────────────────────────────────────────────────
+  double get _grandTotal {
+    final discountToApply = _isFreeDelivery ? 0.0 : widget.couponDiscount;
+    return widget.itemsTotal +
+        _deliveryCharge +
+        _platformFee +
+        _totalTaxAmount -
+        discountToApply;
+  }
 
   @override
   void initState() {
@@ -103,7 +131,7 @@ class _PaymentPageState extends State<PaymentPage> {
     super.dispose();
   }
 
-  // ── Fetch pricing from Firestore ───────────────────────────────────────────
+  // ── Fetch pricing ──────────────────────────────────────────────────────────
 
   Future<void> _fetchPricingConfig() async {
     try {
@@ -111,7 +139,6 @@ class _PaymentPageState extends State<PaymentPage> {
           .collection('pricing_config')
           .doc('defaults')
           .get();
-
       if (doc.exists && doc.data() != null) {
         if (mounted) {
           setState(() {
@@ -160,6 +187,155 @@ class _PaymentPageState extends State<PaymentPage> {
         );
       }
     }
+  }
+
+  // ── COD Confirmation Dialog ────────────────────────────────────────────────
+
+  Future<void> _showCodConfirmationDialog() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.money_rounded,
+                color: Colors.green.shade600,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Confirm Cash on Delivery',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 12),
+            Text(
+              'You are placing an order with Cash on Delivery.',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: kBandiwalaYellow.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kBandiwalaYellow.withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Amount to pay on delivery',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  Text(
+                    '₹${_grandTotal.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: kBandiwalaYellow,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, size: 14, color: Colors.grey.shade500),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Please keep exact change ready. Our delivery partner will collect payment at your doorstep.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(color: Colors.grey.shade300),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Colors.black54,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kBandiwalaYellow,
+                    foregroundColor: Colors.black87,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    'Place Order',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) await _placeCodOrder();
   }
 
   // ── COD ────────────────────────────────────────────────────────────────────
@@ -258,36 +434,35 @@ class _PaymentPageState extends State<PaymentPage> {
       'paymentId': paymentId,
       'paymentMethod': paymentMethod,
       'customerPhone': customerPhone,
-
       'deliveryLocation': deliveryLocationMap,
       'deliveryAddress': loc?.fullDisplay ?? 'Not provided',
       'deliveryLatitude': loc?.latitude,
       'deliveryLongitude': loc?.longitude,
-
       'status': status,
       'timestamp': FieldValue.serverTimestamp(),
-
-      // ── Full pricing breakdown stored in order ────────────────────────────
       'itemsTotal': widget.itemsTotal,
       'deliveryCharge': _deliveryCharge,
       'platformFee': _platformFee,
-      'taxPercent': _pricing.taxPercent,
-      'taxAmount': _taxAmount,
-      'couponDiscount': widget.couponDiscount,
+      // Split tax stored in Firestore
+      'foodTaxPercent': _pricing.foodTaxPercent,
+      'deliveryTaxPercent': _pricing.deliveryTaxPercent,
+      'platformFeeTaxPercent': _pricing.platformFeeTaxPercent,
+      'foodTaxAmount': _foodTax,
+      'deliveryTaxAmount': _deliveryTax,
+      'platformFeeTaxAmount': _platformFeeTax,
+      'totalTaxAmount': _totalTaxAmount,
+      'couponDiscount': _isFreeDelivery ? 0.0 : widget.couponDiscount,
       'grandTotal': _grandTotal,
-
       'couponApplied': widget.appliedCoupon != null,
       'couponCode': widget.appliedCoupon?['couponCode'] ?? '',
       'couponType': widget.appliedCoupon?['couponType'] ?? '',
       'freeDelivery': _isFreeDelivery,
-
       'itemsByVendor': itemsByVendor,
     };
 
     await FirebaseFirestore.instance.collection('orders').add(orderData);
     debugPrint(
-      '✅ Order: $orderId | $paymentMethod | '
-      'Total: $_grandTotal | Lat: ${loc?.latitude}',
+      '✅ Order: $orderId | $paymentMethod | Total: $_grandTotal | Lat: ${loc?.latitude}',
     );
     return orderId;
   }
@@ -374,7 +549,7 @@ class _PaymentPageState extends State<PaymentPage> {
 
   void _handlePrimaryAction() {
     if (_selectedMethod == _PaymentMethod.cod) {
-      _placeCodOrder();
+      _showCodConfirmationDialog();
     } else {
       _openRazorpay();
     }
@@ -418,19 +593,16 @@ class _PaymentPageState extends State<PaymentPage> {
                       const SizedBox(height: 8),
                       _orderSummaryCard(),
                       const SizedBox(height: 16),
-
                       if (widget.deliveryLocation != null) ...[
                         _sectionLabel('Delivery To'),
                         const SizedBox(height: 8),
                         _addressCard(),
                         const SizedBox(height: 16),
                       ],
-
                       _sectionLabel('Bill Details'),
                       const SizedBox(height: 8),
                       _billDetailsCard(),
                       const SizedBox(height: 16),
-
                       _sectionLabel('Payment Method'),
                       const SizedBox(height: 8),
                       _paymentMethodCard(),
@@ -462,7 +634,6 @@ class _PaymentPageState extends State<PaymentPage> {
 
   Widget _orderSummaryCard() {
     final vendors = cartStore.cartByVendor.entries.toList();
-
     return Container(
       decoration: BoxDecoration(
         color: kWhite,
@@ -661,8 +832,9 @@ class _PaymentPageState extends State<PaymentPage> {
         widget.appliedCoupon!['couponType'] != 'freeDelivery' &&
         widget.appliedCoupon!['couponType'] != 'free_delivery';
 
-    final totalSavings =
-        widget.couponDiscount + (_isFreeDelivery ? _pricing.deliveryCharge : 0);
+    final totalSavings = _isFreeDelivery
+        ? _pricing.deliveryCharge
+        : widget.couponDiscount;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -679,12 +851,13 @@ class _PaymentPageState extends State<PaymentPage> {
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Items Total ─────────────────────────────────────────────────
+          // Items Total
           _billRow('Items Total', '₹${widget.itemsTotal.toStringAsFixed(0)}'),
           const SizedBox(height: 10),
 
-          // ── Delivery Charge ─────────────────────────────────────────────
+          // Delivery Charge
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -750,7 +923,7 @@ class _PaymentPageState extends State<PaymentPage> {
           ),
           const SizedBox(height: 10),
 
-          // ── Platform Fee ────────────────────────────────────────────────
+          // Platform Fee
           _billRow(
             'Platform Fee',
             '₹${_platformFee.toStringAsFixed(0)}',
@@ -758,14 +931,88 @@ class _PaymentPageState extends State<PaymentPage> {
           ),
           const SizedBox(height: 10),
 
-          // ── Taxes ───────────────────────────────────────────────────────
-          _billRow(
-            'Taxes (${_pricing.taxPercent.toStringAsFixed(0)}%)',
-            '₹${_taxAmount.toStringAsFixed(0)}',
-            labelColor: Colors.grey.shade700,
+          // ── Taxes Section (expandable breakdown) ──────────────────────────
+          GestureDetector(
+            onTap: () =>
+                setState(() => _taxBreakdownExpanded = !_taxBreakdownExpanded),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Taxes & Charges',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _taxBreakdownExpanded
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_down,
+                      size: 16,
+                      color: Colors.grey.shade500,
+                    ),
+                  ],
+                ),
+                Text(
+                  '₹${_totalTaxAmount.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
 
-          // ── Coupon Discount ─────────────────────────────────────────────
+          // ── Expandable tax breakdown ───────────────────────────────────
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 200),
+            crossFadeState: _taxBreakdownExpanded
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            firstChild: Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                children: [
+                  _taxBreakdownRow(
+                    label: 'GST on Food',
+                    percent: _pricing.foodTaxPercent,
+                    amount: _foodTax,
+                    base: widget.itemsTotal,
+                  ),
+                  if (!_isFreeDelivery) ...[
+                    const SizedBox(height: 6),
+                    _taxBreakdownRow(
+                      label: 'GST on Delivery',
+                      percent: _pricing.deliveryTaxPercent,
+                      amount: _deliveryTax,
+                      base: _deliveryCharge,
+                    ),
+                  ],
+                  const SizedBox(height: 6),
+                  _taxBreakdownRow(
+                    label: 'GST on Platform Fee',
+                    percent: _pricing.platformFeeTaxPercent,
+                    amount: _platformFeeTax,
+                    base: _platformFee,
+                  ),
+                ],
+              ),
+            ),
+            secondChild: const SizedBox.shrink(),
+          ),
+
+          // Coupon Discount
           if (hasCouponDiscount) ...[
             const SizedBox(height: 10),
             Row(
@@ -805,7 +1052,7 @@ class _PaymentPageState extends State<PaymentPage> {
             child: Divider(height: 1, color: Colors.grey.shade200),
           ),
 
-          // ── Grand Total ─────────────────────────────────────────────────
+          // Grand Total
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -824,7 +1071,7 @@ class _PaymentPageState extends State<PaymentPage> {
             ],
           ),
 
-          // ── Savings Strip ───────────────────────────────────────────────
+          // Savings Strip
           if (totalSavings > 0) ...[
             const SizedBox(height: 10),
             Container(
@@ -845,7 +1092,7 @@ class _PaymentPageState extends State<PaymentPage> {
                   Expanded(
                     child: Text(
                       _isFreeDelivery && widget.couponDiscount == 0
-                          ? 'You\'re saving ₹${_pricing.deliveryCharge.toStringAsFixed(0)} on delivery!'
+                          ? "You're saving ₹${_pricing.deliveryCharge.toStringAsFixed(0)} on delivery!"
                           : 'Total savings: ₹${totalSavings.toStringAsFixed(0)} on this order',
                       style: TextStyle(
                         fontSize: 12,
@@ -860,6 +1107,35 @@ class _PaymentPageState extends State<PaymentPage> {
           ],
         ],
       ),
+    );
+  }
+
+  // ─── Tax Breakdown Row ────────────────────────────────────────────────────
+
+  Widget _taxBreakdownRow({
+    required String label,
+    required double percent,
+    required double amount,
+    required double base,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Text(
+            '$label (${percent.toStringAsFixed(0)}%)',
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+          ),
+        ),
+        Text(
+          '₹${amount.toStringAsFixed(2)}',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade700,
+          ),
+        ),
+      ],
     );
   }
 
