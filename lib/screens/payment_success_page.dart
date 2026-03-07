@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
+import 'orders.dart';
 
 const kBandiwalaYellow = Color(0xFFFFC107);
 const kWhite = Color(0xFFFFFFFF);
@@ -39,7 +40,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
     "The joy of tasting a fresh, ripe peach in summer is pure bliss!",
     "Every meal is a chance to nourish body and soul.",
     "Great food brings people together, one bite at a time.",
-    "Savor the moment, enjoy the flavor, cherish the memory."
+    "Savor the moment, enjoy the flavor, cherish the memory.",
   ];
 
   late String _randomQuote;
@@ -67,6 +68,9 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
         timer.cancel();
         if (mounted) {
           Navigator.of(context).popUntil((route) => route.isFirst);
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const OrdersPage()));
         }
       }
     });
@@ -105,7 +109,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                         ),
                       ),
                       child: Container(
-                        width: 100,  // ✅ SMALLER
+                        width: 100, // ✅ SMALLER
                         height: 100,
                         decoration: BoxDecoration(
                           color: kWhite,
@@ -121,13 +125,12 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                         child: Image.asset(
                           'assets/images/splash.png',
                           fit: BoxFit.contain,
-                          width: 70,   // ✅ SMALLER
+                          width: 70, // ✅ SMALLER
                           height: 70,
                         ),
                       ),
                     ),
                     const SizedBox(height: 24),
-
 
                     // Success text
                     FadeTransition(
@@ -178,7 +181,9 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                     decoration: BoxDecoration(
                       color: kBandiwalaYellow.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: kBandiwalaYellow.withOpacity(0.2)),
+                      border: Border.all(
+                        color: kBandiwalaYellow.withOpacity(0.2),
+                      ),
                     ),
                     child: Column(
                       children: [
@@ -218,7 +223,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                 Column(
                   children: [
                     Text(
-                      'Redirecting to home in $_countdownSeconds',
+                      'Redirecting to order in $_countdownSeconds',
                       style: TextStyle(
                         fontSize: 15,
                         color: Colors.black54,
@@ -232,23 +237,39 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                         value: _countdownSeconds / 4.0,
                         minHeight: 6,
                         backgroundColor: Colors.grey.shade200,
-                        valueColor: AlwaysStoppedAnimation<Color>(kBandiwalaYellow),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          kBandiwalaYellow,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
-                        onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+                        onPressed: () {
+                          Navigator.of(
+                            context,
+                          ).popUntil((route) => route.isFirst);
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const OrdersPage(),
+                            ),
+                          );
+                        },
                         style: OutlinedButton.styleFrom(
                           foregroundColor: kBandiwalaYellow,
                           side: BorderSide(color: kBandiwalaYellow, width: 2),
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         child: const Text(
-                          'Go Home Now',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          'Go to order page Now',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
