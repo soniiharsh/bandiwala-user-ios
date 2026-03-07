@@ -52,6 +52,7 @@ dependencies:
   sms_autofill: ^2.4.1
   google_fonts: ^6.1.0
   flutter_local_notifications: ^20.1.0 # l
+  marquee: ^2.3.0
 
 dev_dependencies:
   flutter_test:

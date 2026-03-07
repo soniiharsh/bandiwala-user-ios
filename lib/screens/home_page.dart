@@ -12,6 +12,7 @@ import 'bottom_navigation.dart';
 import 'top_bar.dart';
 import 'vendor_items_page.dart';
 import 'cart_screen.dart';
+import 'scrolling_announcement.dart';
 import 'help_screen.dart';
 import 'promotional.dart';
 import 'settings_screen.dart';
@@ -540,6 +541,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
   SavedLocation? _activeAddress;
+  bool _loadingSavedLocation = true;
 
   @override
   void initState() {
@@ -551,13 +553,17 @@ class _HomePageState extends State<HomePage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final saved = prefs.getString('last_used_location');
-      if (saved != null && mounted) {
+      if (mounted) {
         setState(() {
-          _activeAddress = SavedLocation.fromJson(jsonDecode(saved));
+          if (saved != null) {
+            _activeAddress = SavedLocation.fromJson(jsonDecode(saved));
+          }
+          _loadingSavedLocation = false;
         });
       }
     } catch (e) {
       debugPrint('Error loading last used location: $e');
+      if (mounted) setState(() => _loadingSavedLocation = false);
     }
   }
 
@@ -576,6 +582,7 @@ class _HomePageState extends State<HomePage> {
       _HomeTab(
         phoneNumber: widget.phoneNumber,
         activeAddress: _activeAddress,
+        initiallyLoading: _loadingSavedLocation,
         onAddressChanged: (loc) {
           setState(() => _activeAddress = loc);
           _saveLastUsedLocation(loc);
@@ -616,11 +623,13 @@ class _HomePageState extends State<HomePage> {
 class _HomeTab extends StatefulWidget {
   final String? phoneNumber;
   final SavedLocation? activeAddress;
-  final Function(SavedLocation) onAddressChanged;
+  final bool initiallyLoading;
+  final void Function(SavedLocation) onAddressChanged;
 
   const _HomeTab({
     this.phoneNumber,
     this.activeAddress,
+    this.initiallyLoading = false,
     required this.onAddressChanged,
   });
 
@@ -649,14 +658,20 @@ class _HomeTabState extends State<_HomeTab> {
   @override
   void initState() {
     super.initState();
-    _resolveUserLocation();
+    // If we're still waiting for SharedPreferences, don't trigger GPS yet.
+    // didUpdateWidget will catch it when initiallyLoading becomes false.
+    if (!widget.initiallyLoading) {
+      _resolveUserLocation();
+    }
     _checkCustomerName();
   }
 
   @override
   void didUpdateWidget(_HomeTab oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.activeAddress != widget.activeAddress) {
+    // Trigger resolution if address changed OR if we just finished initial loading
+    if (oldWidget.activeAddress != widget.activeAddress ||
+        (oldWidget.initiallyLoading && !widget.initiallyLoading)) {
       _resolveUserLocation();
     }
   }
@@ -779,52 +794,63 @@ class _HomeTabState extends State<_HomeTab> {
     );
   }
 
-  // ─── Resolve Location ──────────────────────────────────────────────────────
+  bool _isResolvingLocation = false;
 
   Future<void> _resolveUserLocation() async {
-    double? lat;
-    double? lng;
+    if (_isResolvingLocation) return;
+    setState(() => _isResolvingLocation = true);
 
-    if (widget.activeAddress != null) {
-      lat = widget.activeAddress!.latitude;
-      lng = widget.activeAddress!.longitude;
-    } else {
-      try {
-        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (!serviceEnabled) {
+    try {
+      double? lat;
+      double? lng;
+
+      if (widget.activeAddress != null) {
+        lat = widget.activeAddress!.latitude;
+        lng = widget.activeAddress!.longitude;
+      } else {
+        try {
+          bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+          if (!serviceEnabled) {
+            _setNoLocation();
+            return;
+          }
+          LocationPermission perm = await Geolocator.checkPermission();
+          if (perm == LocationPermission.denied ||
+              perm == LocationPermission.deniedForever) {
+            _setNoLocation();
+            return;
+          }
+          final pos = await Geolocator.getCurrentPosition(
+            desiredAccuracy: LocationAccuracy.high,
+            timeLimit: const Duration(seconds: 10),
+          );
+          lat = pos.latitude;
+          lng = pos.longitude;
+        } catch (e) {
+          debugPrint('GPS error: $e');
           _setNoLocation();
           return;
         }
-        LocationPermission perm = await Geolocator.checkPermission();
-        if (perm == LocationPermission.denied ||
-            perm == LocationPermission.deniedForever) {
-          _setNoLocation();
-          return;
-        }
-        final pos = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 10),
-        );
-        lat = pos.latitude;
-        lng = pos.longitude;
-      } catch (e) {
-        debugPrint('GPS error: $e');
-        _setNoLocation();
-        return;
+      }
+
+      final zone = getMatchedZone(lat!, lng!);
+      if (mounted) {
+        setState(() {
+          _userLat = lat;
+          _userLng = lng;
+          _matchedZone = zone;
+          _locationChecked = true;
+          _isOutsideAllZones = zone == null;
+        });
+      }
+      if (zone == null) _logUnavailableLocation(lat, lng);
+    } catch (e) {
+      debugPrint('General resolution error: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isResolvingLocation = false);
       }
     }
-
-    final zone = getMatchedZone(lat!, lng!);
-    if (mounted) {
-      setState(() {
-        _userLat = lat;
-        _userLng = lng;
-        _matchedZone = zone;
-        _locationChecked = true;
-        _isOutsideAllZones = zone == null;
-      });
-    }
-    if (zone == null) _logUnavailableLocation(lat, lng);
   }
 
   void _setNoLocation() {
@@ -1005,8 +1031,12 @@ class _HomeTabState extends State<_HomeTab> {
                 );
               },
             ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: ScrollingAnnouncement(),
+            ),
             Expanded(
-              child: !_locationChecked
+              child: widget.initiallyLoading || !_locationChecked
                   ? const Center(
                       child: CircularProgressIndicator(
                         color: bandiwalaYellow,
