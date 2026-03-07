@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'location_picker_page.dart'; // Import your location picker
-import 'package:flutter_map/flutter_map.dart';  // ✅ ADD THIS
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 const kBandiwalaYellow = Color(0xFFFFC107);
 const kWhite = Color(0xFFFFFFFF);
@@ -61,7 +60,10 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: TextStyle(color: Colors.grey.shade700)),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey.shade700),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
@@ -191,32 +193,30 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
       ),
       body: _isLoading
           ? const Center(
-        child: CircularProgressIndicator(
-          color: kBandiwalaYellow,
-          strokeWidth: 3,
-        ),
-      )
+              child: CircularProgressIndicator(
+                color: kBandiwalaYellow,
+                strokeWidth: 3,
+              ),
+            )
           : _savedLocations.isEmpty
           ? _buildEmptyState()
           : RefreshIndicator(
-        color: kBandiwalaYellow,
-        onRefresh: _loadSavedLocations,
-        child: ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: _savedLocations.length,
-          itemBuilder: (context, index) {
-            final location = _savedLocations[index];
-            return _buildAddressCard(location, index);
-          },
-        ),
-      ),
+              color: kBandiwalaYellow,
+              onRefresh: _loadSavedLocations,
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _savedLocations.length,
+                itemBuilder: (context, index) {
+                  final location = _savedLocations[index];
+                  return _buildAddressCard(location, index);
+                },
+              ),
+            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           final result = await Navigator.push<SavedLocation>(
             context,
-            MaterialPageRoute(
-              builder: (context) => const LocationPickerPage(),
-            ),
+            MaterialPageRoute(builder: (context) => const LocationPickerPage()),
           );
           if (result != null) {
             await _loadSavedLocations();
@@ -387,7 +387,11 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
                   children: [
-                    Icon(Icons.home_outlined, size: 16, color: Colors.grey.shade600),
+                    Icon(
+                      Icons.home_outlined,
+                      size: 16,
+                      color: Colors.grey.shade600,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -407,7 +411,11 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.location_on_outlined, size: 16, color: Colors.grey.shade600),
+                Icon(
+                  Icons.location_on_outlined,
+                  size: 16,
+                  color: Colors.grey.shade600,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -466,7 +474,7 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
   late TextEditingController _houseNoController;
   late TextEditingController _phoneController;
   late String _selectedLabel;
-  final MapController _mapController = MapController();
+  GoogleMapController? _mapController;
   bool _isLoading = false;
 
   @override
@@ -476,15 +484,21 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
       widget.existingLocation.latitude,
       widget.existingLocation.longitude,
     );
-    _searchController = TextEditingController(text: widget.existingLocation.address);
-    _houseNoController = TextEditingController(text: widget.existingLocation.houseNo ?? '');
-    _phoneController = TextEditingController(text: widget.existingLocation.phone ?? '');
+    _searchController = TextEditingController(
+      text: widget.existingLocation.address,
+    );
+    _houseNoController = TextEditingController(
+      text: widget.existingLocation.houseNo ?? '',
+    );
+    _phoneController = TextEditingController(
+      text: widget.existingLocation.phone ?? '',
+    );
     _selectedLabel = widget.existingLocation.label ?? 'Other';
 
     // Move map to existing location
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _mapController.move(_selectedPosition, 16.0);
-    });
+    _mapController?.moveCamera(
+      CameraUpdate.newLatLngZoom(_selectedPosition, 16.0),
+    );
   }
 
   Future<void> _updateLocation() async {
@@ -515,7 +529,9 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
       final locationsJson = prefs.getStringList('saved_locations') ?? [];
 
       // Update the location at the specific index
-      locationsJson[widget.locationIndex] = jsonEncode(updatedLocation.toJson());
+      locationsJson[widget.locationIndex] = jsonEncode(
+        updatedLocation.toJson(),
+      );
       await prefs.setStringList('saved_locations', locationsJson);
 
       if (mounted) {
@@ -542,7 +558,11 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
       appBar: AppBar(
         title: const Text(
           'Edit Address',
-          style: TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            color: Colors.black87,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         backgroundColor: kWhite,
         foregroundColor: Colors.black87,
@@ -551,32 +571,33 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
       body: Stack(
         children: [
           // Map (same as LocationPickerPage)
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _selectedPosition,
-              initialZoom: 16.0,
-              onTap: (tapPosition, point) {
-                setState(() => _selectedPosition = point);
-              },
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: _selectedPosition,
+              zoom: 16.0,
             ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
+            onMapCreated: (controller) {
+              _mapController = controller;
+              _mapController?.moveCamera(
+                CameraUpdate.newLatLngZoom(_selectedPosition, 16.0),
+              );
+            },
+            onTap: (point) {
+              setState(() => _selectedPosition = point);
+            },
+            markers: {
+              Marker(
+                markerId: const MarkerId('selected_location'),
+                position: _selectedPosition,
+                icon: BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueRed,
+                ),
               ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: _selectedPosition,
-                    width: 40,
-                    height: 40,
-                    alignment: Alignment.topCenter,
-                    child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
-                  ),
-                ],
-              ),
-            ],
+            },
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
           ),
 
           // Bottom form
@@ -587,7 +608,9 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
             builder: (context, scrollController) => Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.1),
@@ -631,10 +654,15 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
                     decoration: InputDecoration(
                       labelText: 'House No, Landmark *',
                       prefixIcon: const Icon(Icons.home_outlined),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: kBandiwalaYellow, width: 2),
+                        borderSide: const BorderSide(
+                          color: kBandiwalaYellow,
+                          width: 2,
+                        ),
                       ),
                     ),
                   ),
@@ -645,10 +673,15 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
                     decoration: InputDecoration(
                       labelText: 'Phone (optional)',
                       prefixIcon: const Icon(Icons.phone_outlined),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: kBandiwalaYellow, width: 2),
+                        borderSide: const BorderSide(
+                          color: kBandiwalaYellow,
+                          width: 2,
+                        ),
                       ),
                     ),
                   ),
@@ -667,17 +700,20 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
                       ),
                       child: _isLoading
                           ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.black87,
-                        ),
-                      )
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.black87,
+                              ),
+                            )
                           : const Text(
-                        'Update Address',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
+                              'Update Address',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
                   ),
                 ],
@@ -696,7 +732,11 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
         label: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: isSelected ? Colors.black87 : Colors.grey.shade700),
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected ? Colors.black87 : Colors.grey.shade700,
+            ),
             const SizedBox(width: 6),
             Text(label),
           ],

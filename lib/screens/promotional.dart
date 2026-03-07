@@ -74,8 +74,9 @@ class _PromotionalBannerState extends State<PromotionalBanner>
   void _startAutoScroll() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (!mounted || !_pageController.hasClients || _promotions.isEmpty)
+      if (!mounted || !_pageController.hasClients || _promotions.isEmpty) {
         return;
+      }
       _currentPage = (_currentPage + 1) % _promotions.length;
       _pageController.animateToPage(
         _currentPage,
@@ -260,7 +261,17 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
           .orderBy('createdAt', descending: true)
           .get();
 
-      final vendors = snap.docs.map((doc) => _VendorData.fromDoc(doc)).toList();
+      final List<_VendorData> vendors = snap.docs
+          .map((doc) => _VendorData.fromDoc(doc))
+          .toList();
+
+      // Sort by availability (Available vendors first)
+      vendors.sort((a, b) {
+        if (a.isAvailable != b.isAvailable) {
+          return a.isAvailable ? -1 : 1;
+        }
+        return 0; // Maintain createdAt descending order
+      });
       final ids = await _fetchWishlistIds();
 
       if (mounted) {

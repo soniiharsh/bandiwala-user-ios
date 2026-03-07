@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'otp_page.dart';
 import 'home_page.dart';
@@ -46,6 +47,24 @@ class _LoginPageState extends State<LoginPage> {
     await prefs.setString('userPhone', phone);
   }
 
+  Future<void> _createCustomerIfNeeded(String phone) async {
+    try {
+      final customers = FirebaseFirestore.instance.collection('customers');
+      final docRef = customers.doc(phone.replaceAll('+91', ''));
+      final snapshot = await docRef.get();
+
+      if (!snapshot.exists) {
+        await docRef.set({
+          'mobileNumber': phone,
+          'orders': 0,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      debugPrint('Customer creation failed: $e');
+    }
+  }
+
   String? _validatePhone(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Please enter your mobile number';
@@ -82,7 +101,9 @@ class _LoginPageState extends State<LoginPage> {
         verificationCompleted: (PhoneAuthCredential credential) async {
           try {
             await _auth.signInWithCredential(credential);
+            await _createCustomerIfNeeded(phone);
             await _saveLoginState(phone);
+
             if (mounted) {
               setState(() => _isLoading = false);
               Navigator.pushReplacement(

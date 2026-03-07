@@ -1,6 +1,7 @@
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:sms_autofill/sms_autofill.dart';
@@ -30,7 +31,6 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> with CodeAutoFill {
   int _resendTimer = 26;
   bool _canResend = false;
   Timer? _timer;
-  String? _otpCode;
 
   @override
   void initState() {
@@ -57,7 +57,6 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> with CodeAutoFill {
   void codeUpdated() {
     if (mounted && code != null && code!.length == 6) {
       setState(() {
-        _otpCode = code;
         _otpController.text = code!;
       });
 
@@ -109,30 +108,16 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> with CodeAutoFill {
     });
   }
 
-  String? _validateOTP(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return 'Please enter the OTP';
-    }
-    final trimmed = value.trim();
-    if (trimmed.length != 6) {
-      return 'OTP must be 6 digits';
-    }
-    if (!RegExp(r'^[0-9]{6}$').hasMatch(trimmed)) {
-      return 'OTP should contain only numbers';
-    }
-    return null;
-  }
-
-  Future<void> _createCustomerIfNeeded() async {
+  Future<void> _createCustomerIfNeeded(String phone) async {
     try {
       final customers = FirebaseFirestore.instance.collection('customers');
-      final docRef = customers.doc(widget.phoneNumber.replaceAll('+91', ''));
+      final docRef = customers.doc(phone.replaceAll('+91', ''));
 
       final snapshot = await docRef.get();
 
       if (!snapshot.exists) {
         await docRef.set({
-          'mobileNumber': widget.phoneNumber,
+          'mobileNumber': phone,
           'orders': 0,
           'createdAt': FieldValue.serverTimestamp(),
         });
@@ -142,7 +127,31 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> with CodeAutoFill {
     }
   }
 
+  Future<void> _saveLoginState(String phone) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', true);
+      await prefs.setString('userPhone', phone);
+    } catch (e) {
+      debugPrint('Save login state failed: $e');
+    }
+  }
+
+  Future<void> _completeSignIn(String phone) async {
+    await _createCustomerIfNeeded(phone);
+    await _saveLoginState(phone);
+
+    if (!mounted) return;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => HomePage(phoneNumber: phone)),
+      (route) => false,
+    );
+  }
+
   Future<void> _verifyOTP() async {
+    if (_isLoading) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() {
@@ -155,20 +164,16 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> with CodeAutoFill {
         smsCode: _otpController.text.trim(),
       );
 
-      UserCredential userCredential = await _auth.signInWithCredential(credential);
-
-      await _createCustomerIfNeeded();
-
-      if (!mounted) return;
-
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (_) => HomePage(phoneNumber: widget.phoneNumber),
-        ),
-            (route) => false,
-      );
+      await _auth.signInWithCredential(credential);
+      await _completeSignIn(widget.phoneNumber);
     } on FirebaseAuthException catch (e) {
+      // ✅ Handle case where native auto-verification (verificationCompleted)
+      // already signed the user in, making this verification attempt redundant.
+      if (e.code == 'session-expired' && _auth.currentUser != null) {
+        await _completeSignIn(widget.phoneNumber);
+        return;
+      }
+
       String errorMessage;
       switch (e.code) {
         case 'invalid-verification-code':
@@ -223,14 +228,7 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> with CodeAutoFill {
         phoneNumber: widget.phoneNumber,
         verificationCompleted: (PhoneAuthCredential credential) async {
           await _auth.signInWithCredential(credential);
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => HomePage(phoneNumber: widget.phoneNumber),
-              ),
-            );
-          }
+          await _completeSignIn(widget.phoneNumber);
         },
         verificationFailed: (FirebaseAuthException e) {
           if (mounted) {
@@ -308,7 +306,10 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> with CodeAutoFill {
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: IntrinsicHeight(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -370,7 +371,7 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> with CodeAutoFill {
                               if (code?.length == 6) {
                                 Future.delayed(
                                   const Duration(milliseconds: 300),
-                                      () {
+                                  () {
                                     if (mounted) {
                                       _verifyOTP();
                                     }
@@ -397,22 +398,22 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> with CodeAutoFill {
                             ),
                             child: _isLoading
                                 ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.black87,
-                                ),
-                              ),
-                            )
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.black87,
+                                      ),
+                                    ),
+                                  )
                                 : const Text(
-                              'Verify OTP',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                                    'Verify OTP',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                           ),
                         ),
                         const SizedBox(height: 40),
@@ -431,7 +432,9 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> with CodeAutoFill {
                               ),
                               const SizedBox(height: 6),
                               GestureDetector(
-                                onTap: (_canResend && !_isLoading) ? _resendOTP : null,
+                                onTap: (_canResend && !_isLoading)
+                                    ? _resendOTP
+                                    : null,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 12,

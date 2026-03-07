@@ -39,68 +39,68 @@ class OrdersPage extends StatelessWidget {
       body: customerPhone.isEmpty
           ? _buildEmptyState('Please login to view orders', Icons.login)
           : StreamBuilder<QuerySnapshot>(
-        // ✅ FIX: Remove orderBy to avoid index requirement
-        stream: FirebaseFirestore.instance
-            .collection('orders')
-            .where('customerPhone', isEqualTo: customerPhone)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(
-                color: kBandiwalaYellow,
-                strokeWidth: 3,
-              ),
-            );
-          }
+              // ✅ FIX: Remove orderBy to avoid index requirement
+              stream: FirebaseFirestore.instance
+                  .collection('orders')
+                  .where('customerPhone', isEqualTo: customerPhone)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      color: kBandiwalaYellow,
+                      strokeWidth: 3,
+                    ),
+                  );
+                }
 
-          if (snapshot.hasError) {
-            debugPrint('❌ Firestore Error: ${snapshot.error}');
-            return _buildEmptyState(
-              'Something went wrong\nPlease try again',
-              Icons.error_outline,
-            );
-          }
+                if (snapshot.hasError) {
+                  debugPrint('❌ Firestore Error: ${snapshot.error}');
+                  return _buildEmptyState(
+                    'Something went wrong\nPlease try again',
+                    Icons.error_outline,
+                  );
+                }
 
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return _buildEmptyState(
-              'No orders yet',
-              Icons.shopping_bag_outlined,
-            );
-          }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return _buildEmptyState(
+                    'No orders yet',
+                    Icons.shopping_bag_outlined,
+                  );
+                }
 
-          // ✅ Sort in memory instead of Firestore query
-          final sortedDocs = snapshot.data!.docs.toList()
-            ..sort((a, b) {
-              final aData = a.data() as Map<String, dynamic>;
-              final bData = b.data() as Map<String, dynamic>;
-              final aTimestamp = aData['timestamp'] as Timestamp?;
-              final bTimestamp = bData['timestamp'] as Timestamp?;
+                // ✅ Sort in memory instead of Firestore query
+                final sortedDocs = snapshot.data!.docs.toList()
+                  ..sort((a, b) {
+                    final aData = a.data() as Map<String, dynamic>;
+                    final bData = b.data() as Map<String, dynamic>;
+                    final aTimestamp = aData['timestamp'] as Timestamp?;
+                    final bTimestamp = bData['timestamp'] as Timestamp?;
 
-              if (aTimestamp == null || bTimestamp == null) return 0;
-              return bTimestamp.compareTo(aTimestamp); // Descending order
-            });
+                    if (aTimestamp == null || bTimestamp == null) return 0;
+                    return bTimestamp.compareTo(aTimestamp); // Descending order
+                  });
 
-          return RefreshIndicator(
-            color: kBandiwalaYellow,
-            onRefresh: () async {
-              await Future.delayed(const Duration(milliseconds: 500));
-            },
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: sortedDocs.length,
-              itemBuilder: (context, index) {
-                final orderDoc = sortedDocs[index];
-                final orderData = orderDoc.data() as Map<String, dynamic>;
-                return _OrderCard(
-                  orderData: orderData,
-                  orderDocId: orderDoc.id,
+                return RefreshIndicator(
+                  color: kBandiwalaYellow,
+                  onRefresh: () async {
+                    await Future.delayed(const Duration(milliseconds: 500));
+                  },
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: sortedDocs.length,
+                    itemBuilder: (context, index) {
+                      final orderDoc = sortedDocs[index];
+                      final orderData = orderDoc.data() as Map<String, dynamic>;
+                      return _OrderCard(
+                        orderData: orderData,
+                        orderDocId: orderDoc.id,
+                      );
+                    },
+                  ),
                 );
               },
             ),
-          );
-        },
-      ),
     );
   }
 
@@ -115,11 +115,7 @@ class OrdersPage extends StatelessWidget {
               color: kBandiwalaYellow.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              icon,
-              size: 64,
-              color: kBandiwalaYellow,
-            ),
+            child: Icon(icon, size: 64, color: kBandiwalaYellow),
           ),
           const SizedBox(height: 16),
           Text(
@@ -141,10 +137,7 @@ class _OrderCard extends StatelessWidget {
   final Map<String, dynamic> orderData;
   final String orderDocId;
 
-  const _OrderCard({
-    required this.orderData,
-    required this.orderDocId,
-  });
+  const _OrderCard({required this.orderData, required this.orderDocId});
 
   @override
   Widget build(BuildContext context) {
@@ -152,7 +145,8 @@ class _OrderCard extends StatelessWidget {
     final status = orderData['status'] ?? 'unknown';
     final timestamp = orderData['timestamp'] as Timestamp?;
     final grandTotal = orderData['grandTotal'] ?? 0.0;
-    final itemsByVendor = orderData['itemsByVendor'] as Map<String, dynamic>? ?? {};
+    final itemsByVendor =
+        orderData['itemsByVendor'] as Map<String, dynamic>? ?? {};
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -210,13 +204,11 @@ class _OrderCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         timestamp != null
-                            ? DateFormat('dd MMM yyyy, hh:mm a')
-                            .format(timestamp.toDate())
+                            ? DateFormat(
+                                'dd MMM yyyy, hh:mm a',
+                              ).format(timestamp.toDate())
                             : 'Date N/A',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: kTextGrey,
-                        ),
+                        style: const TextStyle(fontSize: 12, color: kTextGrey),
                       ),
                     ],
                   ),
@@ -236,7 +228,8 @@ class _OrderCard extends StatelessWidget {
               separatorBuilder: (context, index) => const Divider(height: 24),
               itemBuilder: (context, index) {
                 final vendorId = itemsByVendor.keys.elementAt(index);
-                final vendorData = itemsByVendor[vendorId] as Map<String, dynamic>;
+                final vendorData =
+                    itemsByVendor[vendorId] as Map<String, dynamic>;
                 return _VendorSection(
                   vendorData: vendorData,
                   vendorId: vendorId,
@@ -350,17 +343,15 @@ class _VendorSection extends StatelessWidget {
   final Map<String, dynamic> vendorData;
   final String vendorId;
 
-  const _VendorSection({
-    required this.vendorData,
-    required this.vendorId,
-  });
+  const _VendorSection({required this.vendorData, required this.vendorId});
 
   @override
   Widget build(BuildContext context) {
     final vendorName = vendorData['vendorName'] ?? 'Unknown Vendor';
     final items = vendorData['items'] as List<dynamic>? ?? [];
     final vendorStatus = vendorData['status'] ?? 'pending';
-    final subtotal = vendorData['subtotal'] ?? vendorData['vendorSubtotal'] ?? 0.0;
+    final subtotal =
+        vendorData['subtotal'] ?? vendorData['vendorSubtotal'] ?? 0.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -374,11 +365,7 @@ class _VendorSection extends StatelessWidget {
                 color: kBandiwalaYellow.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(
-                Icons.store,
-                color: kBandiwalaYellow,
-                size: 18,
-              ),
+              child: const Icon(Icons.store, color: kBandiwalaYellow, size: 18),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -420,10 +407,7 @@ class _VendorSection extends StatelessWidget {
                 Expanded(
                   child: Text(
                     '$name × $quantity',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.black87,
-                    ),
+                    style: const TextStyle(fontSize: 13, color: Colors.black87),
                   ),
                 ),
                 Text(
@@ -437,7 +421,7 @@ class _VendorSection extends StatelessWidget {
               ],
             ),
           );
-        }).toList(),
+        }),
 
         const SizedBox(height: 8),
         Container(

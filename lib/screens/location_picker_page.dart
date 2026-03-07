@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -100,7 +99,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   bool _isNewAddressMode = false;
   bool _isMapReady = false;
 
-  final MapController _mapController = MapController();
+  GoogleMapController? _mapController;
   LatLng? _currentPosition;
   LatLng? _selectedPosition;
   bool _isOutsideHyderabad = false;
@@ -213,8 +212,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           if (name.isNotEmpty) parts.add(name);
           if (street.isNotEmpty && street != name) parts.add(street);
           if (district.isNotEmpty && district != name) parts.add(district);
-          if (city.isNotEmpty && city != name && city != district)
+          if (city.isNotEmpty && city != name && city != district) {
             parts.add(city);
+          }
           if (state.isNotEmpty) parts.add(state);
           return _PlaceSuggestion(
             displayName: parts.isNotEmpty ? parts.take(4).join(', ') : query,
@@ -340,7 +340,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       _fetchedAddress = address.isNotEmpty ? address : suggestion.displayName;
       _isOutsideHyderabad = !_isInHyderabad(pos);
     });
-    if (_isMapReady) _mapController.move(pos, 16.0);
+    if (_mapController != null)
+      _mapController!.animateCamera(CameraUpdate.newLatLng(pos));
   }
 
   // ─── Reverse geocode — returns clean area name only ───────────────────────
@@ -504,7 +505,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         _isFetchingLocation = false;
       });
 
-      if (_isMapReady) _mapController.move(pos, 17.0);
+      if (_mapController != null)
+        _mapController!.animateCamera(CameraUpdate.newLatLngZoom(pos, 17.0));
     } catch (e) {
       debugPrint('Fetch current location error: $e');
       if (!mounted) return;
@@ -552,7 +554,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       _searchController.text = _fetchedAddress;
       _isOutsideHyderabad = !_isInHyderabad(point);
     });
-    _mapController.move(point, _mapController.camera.zoom);
+    if (_mapController != null)
+      _mapController!.animateCamera(CameraUpdate.newLatLng(point));
   }
 
   bool _isDuplicate(SavedLocation loc) =>
@@ -919,45 +922,37 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   Widget _buildMapView() {
     return Stack(
       children: [
-        FlutterMap(
-          mapController: _mapController,
-          options: MapOptions(
-            initialCenter: const LatLng(17.3850, 78.4867),
-            initialZoom: 14.0,
-            onMapReady: () {
-              if (mounted) setState(() => _isMapReady = true);
-              final target = _selectedPosition ?? _currentPosition;
-              if (target != null) _mapController.move(target, 16.0);
-            },
-            onTap: _isNewAddressMode
-                ? (tapPosition, point) => _handleMapTap(point)
-                : null,
+        GoogleMap(
+          initialCameraPosition: const CameraPosition(
+            target: LatLng(17.3850, 78.4867),
+            zoom: 14.0,
           ),
-          children: [
-            TileLayer(
-              urlTemplate:
-                  'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-              subdomains: const ['a', 'b', 'c', 'd'],
-              maxNativeZoom: 20,
-              userAgentPackageName: 'com.bandiwala.user',
-            ),
-            if (_selectedPosition != null)
-              MarkerLayer(
-                markers: [
+          onMapCreated: (controller) {
+            _mapController = controller;
+            if (mounted) setState(() => _isMapReady = true);
+            final target = _selectedPosition ?? _currentPosition;
+            if (target != null) {
+              _mapController!.moveCamera(
+                CameraUpdate.newLatLngZoom(target, 16.0),
+              );
+            }
+          },
+          onTap: _isNewAddressMode ? _handleMapTap : null,
+          markers: _selectedPosition == null
+              ? {}
+              : {
                   Marker(
-                    point: _selectedPosition!,
-                    width: 40,
-                    height: 48,
-                    alignment: Alignment.topCenter,
-                    child: const Icon(
-                      Icons.location_pin,
-                      color: Colors.red,
-                      size: 40,
+                    markerId: const MarkerId('selected_location'),
+                    position: _selectedPosition!,
+                    icon: BitmapDescriptor.defaultMarkerWithHue(
+                      BitmapDescriptor.hueRed,
                     ),
                   ),
-                ],
-              ),
-          ],
+                },
+          myLocationEnabled: true,
+          myLocationButtonEnabled: false,
+          zoomControlsEnabled: false,
+          mapToolbarEnabled: false,
         ),
 
         SafeArea(
