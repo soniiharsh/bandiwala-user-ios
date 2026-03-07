@@ -42,8 +42,8 @@ dependencies:
   geocoding: ^4.0.0
   speech_to_text: ^7.3.0
   shared_preferences: ^2.5.4
-  flutter_map: ^8.2.2 # Latest stable release as of late 2025 :contentReference[oaicite:0]{index=0}
-  latlong2: ^0.9.1
+  intl: ^0.19.0
+  google_maps_flutter: ^2.10.0
   razorpay_flutter: ^1.4.0
   url_launcher: ^6.3.2
   firebase_storage: ^13.0.5
