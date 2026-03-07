@@ -348,7 +348,7 @@ class _PaymentPageState extends State<PaymentPage> {
       final orderId = await _createOrderInFirestore(
         paymentId: 'COD_${DateTime.now().millisecondsSinceEpoch}',
         paymentMethod: 'cod',
-        status: 'confirmed',
+        status: 'order_created',
       );
       _clearCartSafely();
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -436,8 +436,8 @@ class _PaymentPageState extends State<PaymentPage> {
       'customerPhone': customerPhone,
       'deliveryLocation': deliveryLocationMap,
       'deliveryAddress': loc?.fullDisplay ?? 'Not provided',
-      'deliveryLatitude': loc?.latitude,
-      'deliveryLongitude': loc?.longitude,
+      'latitude': loc?.latitude,
+      'longitude': loc?.longitude,
       'status': status,
       'timestamp': FieldValue.serverTimestamp(),
       'itemsTotal': widget.itemsTotal,
@@ -498,7 +498,7 @@ class _PaymentPageState extends State<PaymentPage> {
       final orderId = await _createOrderInFirestore(
         paymentId: paymentId,
         paymentMethod: 'online',
-        status: 'confirmed',
+        status: 'order_created',
       );
       _clearCartSafely();
       WidgetsBinding.instance.addPostFrameCallback((_) {

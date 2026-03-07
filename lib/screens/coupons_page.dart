@@ -251,9 +251,9 @@ class CouponsPage extends StatelessWidget {
                       vendorAmounts: vendorAmounts,
                       onApply: () {
                         if (coupon['isApplicable'] as bool) {
-                          Clipboard.setData(
-                            ClipboardData(text: coupon['couponCode'] as String),
-                          );
+                          // Clipboard.setData(
+                          //   ClipboardData(text: coupon['couponCode'] as String),
+                          // );
                           Navigator.pop(context, coupon);
                         }
                       },
@@ -384,7 +384,7 @@ class _CouponCard extends StatelessWidget {
     if (couponType == 'freebie') {
       final freebieName = coupon['freebieName'] ?? 'FREE ITEM';
       return 'Get $freebieName FREE';
-    } else if (couponType == 'freeDelivery') {
+    } else if (couponType == 'free_delivery') {
       return 'Free Delivery on this order';
     } else {
       // ✅ Fixed: flat ₹ amount, not percentage

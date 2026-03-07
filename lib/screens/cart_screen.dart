@@ -376,7 +376,7 @@ class _CartScreenState extends State<CartScreen> {
     if (couponType == 'discount') {
       return (_appliedCoupon!['discountAmount'] ?? 0).toDouble();
     } else if (couponType == 'freeDelivery' || couponType == 'free_delivery') {
-      return 30.0;
+      return 29.0;
     }
     return 0;
   }
@@ -591,7 +591,7 @@ class _CartScreenState extends State<CartScreen> {
     if (couponType == 'discount') {
       savingsText = 'You saved ₹${_couponDiscount.toInt()} with this coupon';
     } else if (couponType == 'freeDelivery' || couponType == 'free_delivery') {
-      savingsText = 'You saved ₹30 on delivery!';
+      savingsText = 'You saved ₹29 on delivery!';
     } else if (couponType == 'freebie') {
       savingsText =
           'You got ${coupon['freebieName'] ?? 'free item'} free with this coupon';
@@ -855,7 +855,7 @@ class _CartScreenState extends State<CartScreen> {
         (_appliedCoupon!['couponType'] == 'freeDelivery' ||
             _appliedCoupon!['couponType'] == 'free_delivery');
     final hasCouponSavings = _couponDiscount > 0 || isFreeDelivery;
-    final savingsAmount = _couponDiscount + (isFreeDelivery ? 30.0 : 0.0);
+    final savingsAmount = _couponDiscount;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -889,7 +889,7 @@ class _CartScreenState extends State<CartScreen> {
                   const Icon(Icons.celebration, size: 15, color: Colors.white),
                   const SizedBox(width: 6),
                   Text(
-                    isFreeDelivery && _couponDiscount == 0
+                    isFreeDelivery && _couponDiscount > 0
                         ? 'Free delivery applied!'
                         : 'Total savings: ₹${savingsAmount.toStringAsFixed(0)} applied',
                     style: const TextStyle(

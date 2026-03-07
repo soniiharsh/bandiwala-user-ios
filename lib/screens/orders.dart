@@ -378,7 +378,7 @@ class _VendorSection extends StatelessWidget {
                 ),
               ),
             ),
-            _buildVendorStatusChip(vendorStatus),
+            // _buildVendorStatusChip(vendorStatus),
           ],
         ),
         const SizedBox(height: 12),
