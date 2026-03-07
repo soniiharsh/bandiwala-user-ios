@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'bottom_navigation.dart';
 import 'home_page.dart';
-import 'vendor_items_page.dart';
-import 'settings_screen.dart'; // if needed elsewhere
+// if needed elsewhere
 
 class RootScreen extends StatefulWidget {
   final String? phoneNumber;

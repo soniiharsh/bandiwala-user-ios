@@ -213,8 +213,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           if (name.isNotEmpty) parts.add(name);
           if (street.isNotEmpty && street != name) parts.add(street);
           if (district.isNotEmpty && district != name) parts.add(district);
-          if (city.isNotEmpty && city != name && city != district)
+          if (city.isNotEmpty && city != name && city != district) {
             parts.add(city);
+          }
           if (state.isNotEmpty) parts.add(state);
           return _PlaceSuggestion(
             displayName: parts.isNotEmpty ? parts.take(4).join(', ') : query,

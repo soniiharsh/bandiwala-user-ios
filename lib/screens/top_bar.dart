@@ -393,8 +393,7 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
         // Prefer the saved delivery address (has a human-readable string)
         locationAddress = _activeAddress!.address;
         // SavedLocation may carry lat/lng — use them if available
-        if (_activeAddress!.latitude != null &&
-            _activeAddress!.longitude != null) {
+        if (_activeAddress!.longitude != null) {
           lat = _activeAddress!.latitude;
           lng = _activeAddress!.longitude;
         } else if (_currentPosition != null) {

@@ -152,7 +152,7 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
           setState(() {
             _allDocs = snap.docs;
             if (_heroImageUrl.isEmpty && snap.docs.isNotEmpty) {
-              final firstData = snap.docs.first.data() as Map<String, dynamic>;
+              final firstData = snap.docs.first.data();
               _heroImageUrl = firstData['imageUrl'] ?? '';
             }
             _applyFilters();
@@ -169,7 +169,7 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
           if (!mounted) return;
           final applicable = snap.docs
               .where((doc) {
-                final d = doc.data() as Map<String, dynamic>;
+                final d = doc.data();
                 if (d['isWholeApp'] == true) return true;
                 final ids = d['vendorIds'] as List<dynamic>? ?? [];
                 return ids.any(
@@ -177,7 +177,7 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
                       id.toString().trim() == widget.vendorId.toString().trim(),
                 );
               })
-              .map((doc) => doc.data() as Map<String, dynamic>)
+              .map((doc) => doc.data())
               .toList();
           setState(() => _coupons = applicable);
         });

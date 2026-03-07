@@ -278,7 +278,7 @@ class _HomeTabState extends State<_HomeTab> {
       }
     }
 
-    final zone = getMatchedZone(lat!, lng!);
+    final zone = getMatchedZone(lat, lng);
 
     if (mounted) {
       setState(() {
@@ -450,7 +450,17 @@ class _HomeTabState extends State<_HomeTab> {
       }
     }
 
-    return vendorsMap.values.toList();
+    final results = vendorsMap.values.toList();
+
+    // Sort by availability (Available vendors first)
+    results.sort((a, b) {
+      if (a.isAvailable != b.isAvailable) {
+        return a.isAvailable ? -1 : 1;
+      }
+      return 0; // Maintain current relative order for others
+    });
+
+    return results;
   }
 
   // ─── Build ─────────────────────────────────────────────────────────────────
@@ -789,12 +799,35 @@ class _VendorsList extends StatelessWidget {
         final allDocs = snapshot.data!.docs;
 
         // ── Filter using universal matcher ─────────────────────────────────
-        final docs = matchedZone == null
-            ? allDocs
-            : allDocs.where((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                return _vendorServesZone(data, matchedZone!);
-              }).toList();
+        final List<QueryDocumentSnapshot> docs =
+            (matchedZone == null
+                    ? allDocs
+                    : allDocs.where((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        return _vendorServesZone(data, matchedZone!);
+                      }))
+                .toList();
+
+        // Sort by availability (Available vendors first)
+        docs.sort((a, b) {
+          final aData = a.data() as Map<String, dynamic>;
+          final bData = b.data() as Map<String, dynamic>;
+
+          final aAvailable = aData['isAvailable'] ?? true;
+          final bAvailable = bData['isAvailable'] ?? true;
+
+          if (aAvailable != bAvailable) {
+            return aAvailable ? -1 : 1;
+          }
+
+          // Secondary sort: Keep the existing createdAt descending order
+          final aTime = aData['createdAt'] as Timestamp?;
+          final bTime = bData['createdAt'] as Timestamp?;
+          if (aTime != null && bTime != null) {
+            return bTime.compareTo(aTime);
+          }
+          return 0;
+        });
 
         if (docs.isEmpty) {
           return Center(
@@ -1238,7 +1271,7 @@ class _VendorCardState extends State<_VendorCard> {
                 color: Colors.black.withOpacity(0.55),
                 alignment: Alignment.center,
                 child: const Text(
-                  'Currently Unavailable',
+                  'Vendor currently offline',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
