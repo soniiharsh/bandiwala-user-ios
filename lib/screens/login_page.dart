@@ -208,7 +208,7 @@ class _LoginPageState extends State<LoginPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Welcome to Bandiwala',
+                          'Welcome to BandiWala',
                           style: TextStyle(
                             fontSize: 26,
                             fontWeight: FontWeight.w700,
