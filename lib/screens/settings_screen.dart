@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'splash_screen.dart';
 import 'login_page.dart';
 import 'orders.dart';
@@ -301,6 +302,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (confirmed == true) {
       try {
+        // ✅ Clear local session state
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('isLoggedIn', false);
+        await prefs.remove('userPhone');
+        await prefs.remove('active_delivery_address');
+
         await FirebaseAuth.instance.signOut();
         if (mounted) {
           Navigator.pushAndRemoveUntil(
@@ -311,6 +318,114 @@ class _SettingsScreenState extends State<SettingsScreen> {
         }
       } catch (e) {
         debugPrint('Logout error: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Logout failed: $e')));
+        }
+      }
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Delete Account',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.redAccent,
+          ),
+        ),
+        content: const Text(
+          'This action is permanent and cannot be undone. All your orders, addresses, and profile data will be lost.\n\nAre you sure you want to delete your account?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Delete Permanently'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      if (mounted) setState(() => _isLoading = true);
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          final phone = user.phoneNumber?.replaceAll('+91', '');
+
+          if (phone != null && phone.isNotEmpty) {
+            // Optional: Mark account as deleted in Firestore instead of hard delete
+            // for record keeping, or hard delete if required by privacy laws.
+            await FirebaseFirestore.instance
+                .collection('customers')
+                .doc(phone)
+                .update({
+                  'status': 'deleted',
+                  'deletedAt': FieldValue.serverTimestamp(),
+                });
+          }
+
+          // Delete user from Firebase Auth
+          await user.delete();
+
+          // Clear local state
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('isLoggedIn', false);
+          await prefs.remove('userPhone');
+          await prefs.remove('active_delivery_address');
+
+          if (mounted) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const SplashScreen()),
+              (route) => false,
+            );
+          }
+        }
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'requires-recent-login') {
+          if (mounted) {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Authentication Required'),
+                content: const Text(
+                  'For security reasons, you need to login again before deleting your account.',
+                ),
+                actions: [
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _logout(); // Force logout so they have to login again
+                    },
+                    child: const Text('Login Again'),
+                  ),
+                ],
+              ),
+            );
+          }
+        } else {
+          debugPrint('Delete account error: $e');
+        }
+      } catch (e) {
+        debugPrint('Delete account error: $e');
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
@@ -727,6 +842,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             child: _buildHelpSupportItem(),
           ),
+          if (!_isGuest) ...[
+            const SizedBox(height: 16),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200, width: 1.5),
+              ),
+              child: _buildMenuItem(
+                icon: Icons.delete_forever_outlined,
+                title: 'Delete Account',
+                onTap: _deleteAccount,
+                isDestructive: true,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -736,22 +867,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required IconData icon,
     required String title,
     required VoidCallback onTap,
+    bool isDestructive = false,
   }) {
+    final color = isDestructive ? Colors.redAccent : Colors.black87;
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: Colors.black87),
+            Icon(icon, size: 22, color: color),
             const SizedBox(width: 16),
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
-                  color: Colors.black87,
+                  color: color,
                 ),
               ),
             ),

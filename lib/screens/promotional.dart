@@ -221,10 +221,7 @@ class RecommendedVendorsStrip extends StatefulWidget {
 class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
     with AutomaticKeepAliveClientMixin, RouteAware {
   int _activeTab = 0;
-  List<_VendorData> _allVendors = [];
   Set<String> _wishlistIds = {};
-  bool _isLoading = true;
-  bool _hasLoaded = false;
 
   static final routeObserver = RouteObserver<ModalRoute<void>>();
 
@@ -234,7 +231,7 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
   @override
   void initState() {
     super.initState();
-    _loadVendors();
+    _refreshWishlist(); // Only refresh wishlist from prefs
   }
 
   @override
@@ -253,46 +250,7 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
   @override
   void didPopNext() => _refreshWishlist();
 
-  Future<void> _loadVendors() async {
-    if (_hasLoaded) return;
-    try {
-      final snap = await FirebaseFirestore.instance
-          .collection('items')
-          .orderBy('createdAt', descending: true)
-          .get();
-
-      final List<_VendorData> vendors = snap.docs
-          .map((doc) => _VendorData.fromDoc(doc))
-          .toList();
-
-      // Sort by availability (Available vendors first)
-      vendors.sort((a, b) {
-        if (a.isAvailable != b.isAvailable) {
-          return a.isAvailable ? -1 : 1;
-        }
-        return 0; // Maintain createdAt descending order
-      });
-      final ids = await _fetchWishlistIds();
-
-      if (mounted) {
-        setState(() {
-          _allVendors = vendors;
-          _wishlistIds = ids;
-          _isLoading = false;
-          _hasLoaded = true;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading vendor strip: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasLoaded = true;
-        });
-      }
-    }
-  }
-
+  /// Light refresh — just reload wishlist IDs from local storage
   Future<void> _refreshWishlist() async {
     final ids = await _fetchWishlistIds();
     if (mounted) setState(() => _wishlistIds = ids);
@@ -332,24 +290,6 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
     );
   }
 
-  // ✅ Available vendors first, unavailable last — within each group order preserved
-  List<_VendorData> get _displayed {
-    List<_VendorData> list;
-    if (_activeTab == 1) {
-      list = _allVendors.where((v) => _wishlistIds.contains(v.id)).toList();
-    } else {
-      list = List<_VendorData>.from(_allVendors);
-    }
-
-    // Stable sort: available first, then unavailable
-    list.sort((a, b) {
-      if (a.isAvailable == b.isAvailable) return 0;
-      return a.isAvailable ? -1 : 1;
-    });
-
-    return list;
-  }
-
   void _openVendor(BuildContext context, _VendorData vendor) {
     if (!vendor.isAvailable) return;
     Navigator.of(context).push(
@@ -367,6 +307,7 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ── Tabs — centred ─────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
@@ -387,12 +328,44 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
 
         const SizedBox(height: 14),
 
+        // ── Horizontal vendor scroll (Real-time) ────────────────────────
         SizedBox(
           height: 215,
-          child: _isLoading
-              ? _buildShimmer()
-              : _displayed.isEmpty
-              ? Center(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('items')
+                .orderBy('createdAt', descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return const Center(child: Text('Error loading vendors'));
+              }
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return _buildShimmer();
+              }
+
+              final allVendors = snapshot.data!.docs
+                  .map((doc) => _VendorData.fromDoc(doc))
+                  .toList();
+
+              // Filter & Sort logic
+              List<_VendorData> displayed;
+              if (_activeTab == 1) {
+                displayed = allVendors
+                    .where((v) => _wishlistIds.contains(v.id))
+                    .toList();
+              } else {
+                displayed = allVendors;
+              }
+
+              // Stability sort by availability
+              displayed.sort((a, b) {
+                if (a.isAvailable == b.isAvailable) return 0;
+                return a.isAvailable ? -1 : 1;
+              });
+
+              if (displayed.isEmpty) {
+                return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -417,21 +390,25 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
                       ),
                     ],
                   ),
-                )
-              : ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _displayed.length,
-                  itemBuilder: (ctx, i) {
-                    final v = _displayed[i];
-                    return _VendorMiniCard(
-                      vendor: v,
-                      isFavourite: _wishlistIds.contains(v.id),
-                      onFavouriteTap: () => _toggleWishlist(v),
-                      onTap: () => _openVendor(ctx, v),
-                    );
-                  },
-                ),
+                );
+              }
+
+              return ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: displayed.length,
+                itemBuilder: (ctx, i) {
+                  final v = displayed[i];
+                  return _VendorMiniCard(
+                    vendor: v,
+                    isFavourite: _wishlistIds.contains(v.id),
+                    onFavouriteTap: () => _toggleWishlist(v),
+                    onTap: () => _openVendor(ctx, v),
+                  );
+                },
+              );
+            },
+          ),
         ),
       ],
     );

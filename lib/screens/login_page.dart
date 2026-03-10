@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 import 'otp_page.dart';
 import 'home_page.dart';
 
@@ -24,8 +25,11 @@ class _LoginPageState extends State<LoginPage> {
   void initState() {
     super.initState();
     _checkIfLoggedIn();
-    // ✅ App Check debug provider activated in main.dart handles reCAPTCHA/Play Integrity
-    // No need for appVerificationDisabledForTesting here anymore
+    if (kDebugMode) {
+      FirebaseAuth.instance.setSettings(
+        appVerificationDisabledForTesting: true,
+      );
+    }
   }
 
   Future<void> _checkIfLoggedIn() async {
@@ -56,7 +60,6 @@ class _LoginPageState extends State<LoginPage> {
       if (!snapshot.exists) {
         await docRef.set({
           'mobileNumber': phone,
-          'orders': 0,
           'createdAt': FieldValue.serverTimestamp(),
         });
       }

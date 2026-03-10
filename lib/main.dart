@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'firebase_options.dart';
 import 'screens/cart_store.dart';
@@ -11,8 +12,6 @@ import 'services/notification_service.dart';
 import 'services/version_checker.dart';
 
 import 'package:flutter/foundation.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 
 const String APP_VERSION = '1.0.0'; // From pubspec.yaml
 
@@ -31,22 +30,23 @@ Future<void> main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  try {
-    await FirebaseAppCheck.instance.activate(
-      androidProvider: kDebugMode
-          ? AndroidProvider.debug
-          : AndroidProvider.playIntegrity,
-      appleProvider: kDebugMode
-          ? AppleProvider.debug
-          : AppleProvider.deviceCheck,
-    );
-    if (kDebugMode) {
-      print('✅ Firebase App Check initialized successfully');
+  // Optimize Firestore: enable local persistence and unlimited cache
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+  );
+
+  if (!kDebugMode) {
+    try {
+      await FirebaseAppCheck.instance.activate(
+        androidProvider: AndroidProvider.playIntegrity,
+        appleProvider: AppleProvider.deviceCheck,
+      );
+    } catch (e) {
+      // Silently fail if App Check can't activate (non-critical for auth flow)
     }
-  } catch (e) {
-    if (kDebugMode) {
-      print('❌ Firebase App Check initialization failed: $e');
-    }
+  } else {
+    print('⚠️ App Check SKIPPED in debug mode');
   }
 
   await cartStore.loadFromDisk();
@@ -102,13 +102,12 @@ class _VersionCheckWrapperState extends State<VersionCheckWrapper> {
 
   Future<void> _checkVersion() async {
     try {
-      final updateRequired = await VersionChecker.isUpdateRequired(APP_VERSION);
-      final minimumVersion = await VersionChecker.getMinimumVersion();
+      final result = await VersionChecker.checkAppVersion(APP_VERSION);
 
       if (mounted) {
         setState(() {
-          _updateRequired = updateRequired;
-          _minimumVersion = minimumVersion;
+          _updateRequired = result.updateRequired;
+          _minimumVersion = result.minimumVersion;
           _isChecking = false;
         });
       }

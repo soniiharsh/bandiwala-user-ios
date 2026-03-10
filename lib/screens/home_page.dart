@@ -13,10 +13,9 @@ import 'top_bar.dart';
 import 'vendor_items_page.dart';
 import 'cart_screen.dart';
 import 'scrolling_announcement.dart';
-import 'help_screen.dart';
 import 'promotional.dart';
-import 'settings_screen.dart';
 import 'location_picker_page.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 // ─── Service Zone Model ───────────────────────────────────────────────────────
 
@@ -1231,10 +1230,37 @@ class _HomeTabState extends State<_HomeTab> {
         ),
         const SizedBox(height: 16),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const Text(
               'Vendors near you',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(width: 8),
+            // ── Live badge ─────────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _LiveDot(),
+                  const SizedBox(width: 4),
+                  Text(
+                    'LIVE',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.green.shade700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
             ),
             if (_matchedZone != null) ...[
               const SizedBox(width: 8),
@@ -1242,7 +1268,7 @@ class _HomeTabState extends State<_HomeTab> {
                 child: Text(
                   'in $_matchedZone',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     color: Colors.grey.shade600,
                     fontStyle: FontStyle.italic,
                   ),
@@ -1255,6 +1281,53 @@ class _HomeTabState extends State<_HomeTab> {
         const SizedBox(height: 12),
         _VendorsList(matchedZone: _matchedZone),
       ],
+    );
+  }
+}
+
+// ─── Live Dot (pulsing green circle for real-time indicator) ─────────────────
+
+class _LiveDot extends StatefulWidget {
+  @override
+  State<_LiveDot> createState() => _LiveDotState();
+}
+
+class _LiveDotState extends State<_LiveDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _scale = Tween<double>(
+      begin: 0.6,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scale,
+      child: Container(
+        width: 6,
+        height: 6,
+        decoration: BoxDecoration(
+          color: Colors.green.shade600,
+          shape: BoxShape.circle,
+        ),
+      ),
     );
   }
 }
@@ -1587,10 +1660,20 @@ class _VendorCardState extends State<_VendorCard> {
                     height: 160,
                     width: double.infinity,
                     child: widget.imageUrl.isNotEmpty
-                        ? Image.network(
-                            widget.imageUrl,
+                        ? CachedNetworkImage(
+                            imageUrl: widget.imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
+                            memCacheHeight: 400,
+                            placeholder: (context, url) => Container(
+                              color: Colors.grey.shade100,
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFFFFC107),
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
                               color: Colors.grey.shade200,
                               child: const Center(child: Icon(Icons.store)),
                             ),

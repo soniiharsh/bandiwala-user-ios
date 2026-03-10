@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import '../models/service_zone.dart';
 
 // ─── Shared model ─────────────────────────────────────────────────────────────
 
@@ -112,6 +113,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   final TextEditingController _phoneController = TextEditingController();
 
   List<SavedLocation> _savedLocations = [];
+  List<ServiceZone> _serviceZones = [];
   bool _isFetchingLocation = false;
   String _selectedLabel = 'Home';
   String _fetchedAddress = '';
@@ -119,6 +121,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   List<_PlaceSuggestion> _suggestions = [];
   bool _isSearching = false;
   bool _showSuggestions = false;
+  bool _isMapIdleUpdating = false;
   Timer? _debounce;
 
   final http.Client _httpClient = http.Client();
@@ -139,6 +142,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   void initState() {
     super.initState();
     _loadSavedLocations();
+    _loadServiceZones();
     _searchController.addListener(_onSearchChanged);
     _searchFocusNode.addListener(() {
       if (!_searchFocusNode.hasFocus && mounted) {
@@ -161,6 +165,15 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     _phoneController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadServiceZones() async {
+    final zones = await fetchServiceZones();
+    if (mounted) {
+      setState(() {
+        _serviceZones = zones;
+      });
+    }
   }
 
   void _onSearchChanged() {
@@ -563,8 +576,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     });
   }
 
-  Future<void> _handleMapTap(LatLng point) async {
+  Future<void> _updateAddressFromMapIdle(LatLng point) async {
     if (!_isNewAddressMode || !_isMapReady) return;
+    if (_isMapIdleUpdating) return;
+
+    _isMapIdleUpdating = true;
     _searchFocusNode.unfocus();
     if (mounted) {
       setState(() {
@@ -579,9 +595,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       _fetchedAddress = address.isNotEmpty ? address : 'Selected Location';
       _searchController.text = _fetchedAddress;
       _isOutsideHyderabad = !_isInHyderabad(point);
+      _isMapIdleUpdating = false;
     });
-    if (_mapController != null)
-      _mapController!.animateCamera(CameraUpdate.newLatLng(point));
   }
 
   bool _isDuplicate(SavedLocation loc) =>
@@ -957,6 +972,19 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
+  Set<Circle> _buildServiceAreaCircles() {
+    return _serviceZones.map((zone) {
+      return Circle(
+        circleId: CircleId(zone.name),
+        center: LatLng(zone.lat, zone.lng),
+        radius: zone.radiusMeters,
+        fillColor: bandiwalaYellow.withOpacity(0.15),
+        strokeColor: bandiwalaYellow,
+        strokeWidth: 2,
+      );
+    }).toSet();
+  }
+
   Widget _buildMapView() {
     return Stack(
       children: [
@@ -975,23 +1003,32 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               );
             }
           },
-          onTap: _isNewAddressMode ? _handleMapTap : null,
-          markers: _selectedPosition == null
-              ? {}
-              : {
-                  Marker(
-                    markerId: const MarkerId('selected_location'),
-                    position: _selectedPosition!,
-                    icon: BitmapDescriptor.defaultMarkerWithHue(
-                      BitmapDescriptor.hueRed,
-                    ),
-                  ),
-                },
+          onCameraMove: (position) {
+            if (_isNewAddressMode) {
+              _selectedPosition = position.target;
+            }
+          },
+          onCameraIdle: () {
+            if (_isNewAddressMode && _selectedPosition != null && _isMapReady) {
+              _updateAddressFromMapIdle(_selectedPosition!);
+            }
+          },
+          markers: {}, // No markers as we use the center pin
+          circles: _buildServiceAreaCircles(),
           myLocationEnabled: true,
           myLocationButtonEnabled: false,
           zoomControlsEnabled: false,
           mapToolbarEnabled: false,
         ),
+
+        // Uber-style center pin
+        if (_isNewAddressMode)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: 35.0),
+              child: Icon(Icons.location_on, size: 45, color: Colors.red),
+            ),
+          ),
 
         SafeArea(
           child: Column(

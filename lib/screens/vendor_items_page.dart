@@ -8,7 +8,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'orders.dart';
 import 'bottom_navigation.dart';
 import 'cart_screen.dart';
-import 'help_screen.dart';
 import 'cart_store.dart';
 import 'home_page.dart'; // WishlistManager + WishlistVendor
 
@@ -93,7 +92,10 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
   List<QueryDocumentSnapshot> _filteredDocs = [];
   String _heroImageUrl = '';
   bool _isWishlisted = false;
-  bool _loadingMeta = true;
+
+  // Real-time vendor availability
+  bool _isVendorOnline = true;
+  StreamSubscription<DocumentSnapshot>? _vendorDocSub;
 
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
@@ -107,7 +109,7 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
   @override
   void initState() {
     super.initState();
-    _loadVendorMeta();
+    _subscribeVendorDoc(); // replaces one-shot _loadVendorMeta
     _subscribeItems();
     _subscribeCoupons();
     _checkWishlist();
@@ -118,26 +120,34 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
   void dispose() {
     _searchCtrl.removeListener(_onSearch);
     _searchCtrl.dispose();
+    _vendorDocSub?.cancel();
     _itemsSub?.cancel();
     _couponsSub?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadVendorMeta() async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('items')
-          .doc(widget.vendorId)
-          .get();
-      if (mounted) {
-        setState(() {
-          _vendorMeta = doc.data();
-          _loadingMeta = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _loadingMeta = false);
-    }
+  /// Real-time stream on the vendor doc; updates both metadata AND isAvailable.
+  void _subscribeVendorDoc() {
+    _vendorDocSub = FirebaseFirestore.instance
+        .collection('items')
+        .doc(widget.vendorId)
+        .snapshots()
+        .listen(
+          (doc) {
+            if (!mounted) return;
+            setState(() {
+              _vendorMeta = doc.data();
+              _isVendorOnline = (doc.data()?['isAvailable'] as bool?) ?? true;
+              // Update hero image from meta when not yet set
+              if (_heroImageUrl.isEmpty) {
+                _heroImageUrl = _vendorMeta?['imageUrl'] ?? '';
+              }
+            });
+          },
+          onError: (_) {
+            if (mounted) setState(() {});
+          },
+        );
   }
 
   void _subscribeItems() {
@@ -619,6 +629,7 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
             category: d['category'] ?? '',
             description: d['description'] ?? '',
             isAvailable: d['isAvailable'] ?? true,
+            isVendorOnline: _isVendorOnline, // ← real-time vendor gate
             isVeg: d['isVeg'] ?? true,
             price: (d['price'] ?? 0).toDouble(),
             rating: (d['rating'] ?? 4.2).toDouble(),
@@ -660,6 +671,7 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
         vendorId: widget.vendorId,
         vendorName: widget.vendorName,
         allDocs: _allDocs,
+        isVendorOnline: _isVendorOnline, // ← pass real-time status
       ),
     );
   }
@@ -783,6 +795,7 @@ class _ItemCard extends StatelessWidget {
   final String category;
   final String description;
   final bool isAvailable;
+  final bool isVendorOnline; // ← NEW: vendor-level gate
   final bool isVeg;
   final double price;
   final double rating;
@@ -797,6 +810,7 @@ class _ItemCard extends StatelessWidget {
     required this.category,
     required this.description,
     required this.isAvailable,
+    this.isVendorOnline = true,
     required this.isVeg,
     required this.price,
     required this.rating,
@@ -821,6 +835,7 @@ class _ItemCard extends StatelessWidget {
         rating: rating,
         ratingCount: ratingCount,
         isAvailable: isAvailable,
+        isVendorOnline: isVendorOnline, // ← pass real-time status
       ),
     );
   }
@@ -832,7 +847,8 @@ class _ItemCard extends StatelessWidget {
     return GestureDetector(
       onTap: () => _showDetail(context),
       child: IgnorePointer(
-        ignoring: !isAvailable,
+        // Block all taps when vendor is offline OR item is unavailable
+        ignoring: !isVendorOnline || !isAvailable,
         child: Stack(
           children: [
             Container(
@@ -1007,6 +1023,7 @@ class _ItemCard extends StatelessWidget {
                             itemName: name,
                             price: price,
                             isAvailable: isAvailable,
+                            isVendorOnline: isVendorOnline, // ← gate
                           ),
                         ],
                       ),
@@ -1015,11 +1032,12 @@ class _ItemCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (!isAvailable)
+            // ── Offline overlay ─────────────────────────────────────
+            if (!isVendorOnline || !isAvailable)
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.65),
+                    color: Colors.white.withOpacity(0.7),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Center(
@@ -1029,12 +1047,16 @@ class _ItemCard extends StatelessWidget {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.red.shade600,
+                        color: !isVendorOnline
+                            ? Colors.deepOrange.shade600
+                            : Colors.red.shade600,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Text(
-                        '😴 OFFLINE NOW',
-                        style: TextStyle(
+                      child: Text(
+                        !isVendorOnline
+                            ? '🔴 VENDOR OFFLINE'
+                            : '😴 OFFLINE NOW',
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
@@ -1058,11 +1080,13 @@ class _MenuSheet extends StatelessWidget {
   final String vendorId;
   final String vendorName;
   final List<QueryDocumentSnapshot> allDocs;
+  final bool isVendorOnline; // ← NEW
 
   const _MenuSheet({
     required this.vendorId,
     required this.vendorName,
     required this.allDocs,
+    this.isVendorOnline = true,
   });
 
   @override
@@ -1200,6 +1224,7 @@ class _MenuSheet extends StatelessWidget {
                         itemName: d['name'] ?? '',
                         price: (d['price'] ?? 0).toDouble(),
                         isAvailable: d['isAvailable'] ?? true,
+                        isVendorOnline: isVendorOnline, // ← gate
                       ),
                     ),
                     onTap: () {
@@ -1221,6 +1246,7 @@ class _MenuSheet extends StatelessWidget {
                           rating: (d['rating'] ?? 4.2).toDouble(),
                           ratingCount: (d['ratingCount'] ?? 0).toInt(),
                           isAvailable: d['isAvailable'] ?? true,
+                          isVendorOnline: isVendorOnline, // ← gate
                         ),
                       );
                     },
@@ -1255,6 +1281,7 @@ class ProductDetailOverlay extends StatefulWidget {
   final double rating;
   final int ratingCount;
   final bool isAvailable;
+  final bool isVendorOnline; // ← NEW
 
   const ProductDetailOverlay({
     super.key,
@@ -1270,6 +1297,7 @@ class ProductDetailOverlay extends StatefulWidget {
     required this.rating,
     required this.ratingCount,
     required this.isAvailable,
+    this.isVendorOnline = true,
   });
 
   @override
@@ -1456,6 +1484,9 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
     );
 
     // Bottom action bar (qty stepper + add button)
+    // canAdd: both the individual item AND the vendor must be available
+    final bool canAdd = widget.isAvailable && widget.isVendorOnline;
+
     final bottomBar = Container(
       padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + bottomPad),
       decoration: BoxDecoration(
@@ -1466,12 +1497,15 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
         children: [
           Container(
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF3CD),
+              color: canAdd ? const Color(0xFFFFF3CD) : Colors.grey.shade100,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               children: [
-                _StepBtn(icon: Icons.remove, onTap: _decrement),
+                _StepBtn(
+                  icon: Icons.remove,
+                  onTap: canAdd ? _decrement : () {},
+                ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   child: Text(
@@ -1479,17 +1513,18 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
+                      color: canAdd ? Colors.black : Colors.grey.shade400,
                     ),
                   ),
                 ),
-                _StepBtn(icon: Icons.add, onTap: _increment),
+                _StepBtn(icon: Icons.add, onTap: canAdd ? _increment : () {}),
               ],
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
-              onPressed: widget.isAvailable
+              onPressed: canAdd
                   ? () {
                       final vc = cartStore.cartByVendor[widget.vendorId];
                       final already =
@@ -1529,8 +1564,8 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                     }
                   : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: _kYellow,
-                foregroundColor: Colors.black,
+                backgroundColor: canAdd ? _kYellow : Colors.grey.shade300,
+                foregroundColor: canAdd ? Colors.black : Colors.grey.shade600,
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -1538,9 +1573,11 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                 ),
               ),
               child: Text(
-                widget.isAvailable
-                    ? 'Total  ₹${(widget.price * quantity).toStringAsFixed(0)}'
-                    : 'OFFLINE NOW',
+                !widget.isVendorOnline
+                    ? '🔴 Vendor Offline'
+                    : !widget.isAvailable
+                    ? '😴 Item Offline'
+                    : 'Total  ₹${(widget.price * quantity).toStringAsFixed(0)}',
                 style: GoogleFonts.poppins(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -1705,6 +1742,7 @@ class _ItemCounter extends StatefulWidget {
   final String itemName;
   final double price;
   final bool isAvailable;
+  final bool isVendorOnline; // ← NEW
 
   const _ItemCounter({
     required this.vendorId,
@@ -1713,6 +1751,7 @@ class _ItemCounter extends StatefulWidget {
     required this.itemName,
     required this.price,
     required this.isAvailable,
+    this.isVendorOnline = true,
   });
 
   @override
@@ -1763,6 +1802,31 @@ class _ItemCounterState extends State<_ItemCounter> {
 
   @override
   Widget build(BuildContext context) {
+    // Hard-block when vendor is offline, regardless of item.isAvailable
+    if (!widget.isVendorOnline) {
+      return SizedBox(
+        width: double.infinity,
+        height: 32,
+        child: OutlinedButton(
+          onPressed: null,
+          style: OutlinedButton.styleFrom(
+            padding: EdgeInsets.zero,
+            side: BorderSide(color: Colors.deepOrange.shade300),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          child: Text(
+            'VENDOR OFFLINE',
+            style: GoogleFonts.poppins(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: Colors.deepOrange.shade400,
+            ),
+          ),
+        ),
+      );
+    }
     if (!widget.isAvailable) {
       return SizedBox(
         width: double.infinity,

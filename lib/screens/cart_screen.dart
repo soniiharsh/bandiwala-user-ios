@@ -3,89 +3,22 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
 import 'dart:math';
+import '../models/service_zone.dart';
 import 'cart_store.dart';
 import 'location_picker_page.dart';
 import 'payment_page.dart';
 import 'coupons_page.dart';
 import 'login_page.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 const kBandiwalaYellow = Color(0xFFFFC107);
 
-// ─── Service Zone Model ───────────────────────────────────────────────────────
-
-class _ServiceZone {
-  final String name;
-  final double lat;
-  final double lng;
-  final double radiusMeters;
-  const _ServiceZone({
-    required this.name,
-    required this.lat,
-    required this.lng,
-    required this.radiusMeters,
-  });
-}
-
-const List<_ServiceZone> _kServiceZones = [
-  _ServiceZone(
-    name: 'KPHB - Kukatpally Housing Board Colony',
-    lat: 17.476388,
-    lng: 78.390350,
-    radiusMeters: 805.83,
-  ),
-  _ServiceZone(
-    name: 'KPHB - Kukatpally Housing Board Colony',
-    lat: 17.485210,
-    lng: 78.376959,
-    radiusMeters: 941.10,
-  ),
-  _ServiceZone(
-    name: 'KPHB - Kukatpally Housing Board Colony',
-    lat: 17.490998,
-    lng: 78.393568,
-    radiusMeters: 1020.00,
-  ),
-  _ServiceZone(
-    name: 'KPHB - Kukatpally Housing Board Colony',
-    lat: 17.493208,
-    lng: 78.383281,
-    radiusMeters: 750.00,
-  ),
-  _ServiceZone(
-    name: 'Madhapur',
-    lat: 17.446960,
-    lng: 78.391101,
-    radiusMeters: 1225.23,
-  ),
-  _ServiceZone(
-    name: 'Nizampet',
-    lat: 17.509248,
-    lng: 78.373744,
-    radiusMeters: 1471.04,
-  ),
-  _ServiceZone(
-    name: 'Pragathi Nagar',
-    lat: 17.522838,
-    lng: 78.396081,
-    radiusMeters: 1380.00,
-  ),
-  _ServiceZone(
-    name: 'Addagutta',
-    lat: 17.503804,
-    lng: 78.396080,
-    radiusMeters: 1029.53,
-  ),
-  _ServiceZone(
-    name: 'Gajularamaram',
-    lat: 17.536753,
-    lng: 78.396639,
-    radiusMeters: 491.73,
-  ),
-];
+List<ServiceZone> _serviceZones = List.from(kServiceZones);
 
 String? _getMatchedZone(double lat, double lng) {
-  for (final zone in _kServiceZones) {
+  for (final zone in _serviceZones) {
     final dist = _haversine(lat, lng, zone.lat, zone.lng);
     if (dist <= zone.radiusMeters) return zone.name;
   }
@@ -160,18 +93,27 @@ class _CartScreenState extends State<CartScreen> {
 
   Map<String, bool> _vendorDeliverable = {};
   Map<String, bool> _itemAvailability = {}; // itemId -> isAvailable
+  Map<String, bool> _vendorOnlineStatus =
+      {}; // vendorId -> isAvailable (real-time)
   bool _checkingDelivery = false;
-  bool _checkingItems = false;
+
+  // ── Real-time stream subscriptions ──
+  final Map<String, StreamSubscription<DocumentSnapshot>> _itemStreams = {};
+  final Map<String, StreamSubscription<DocumentSnapshot>> _vendorStreams = {};
 
   @override
   void initState() {
     super.initState();
     cartStore.addListener(_onCartChanged);
-    _selectedAddress = widget.deliveryAddress;
+    _initServiceZones();
+    _setupRealtimeStreams();
+  }
+
+  Future<void> _initServiceZones() async {
+    _serviceZones = await fetchServiceZones();
     if (_selectedAddress != null) {
       _checkDeliveryForAllVendors(_selectedAddress!);
     }
-    _checkAllItemsAvailability();
   }
 
   @override
@@ -188,7 +130,85 @@ class _CartScreenState extends State<CartScreen> {
   void dispose() {
     cartStore.removeListener(_onCartChanged);
     _scrollController.dispose();
+    _cancelAllStreams();
     super.dispose();
+  }
+
+  void _cancelAllStreams() {
+    for (final sub in _itemStreams.values) {
+      sub.cancel();
+    }
+    _itemStreams.clear();
+    for (final sub in _vendorStreams.values) {
+      sub.cancel();
+    }
+    _vendorStreams.clear();
+  }
+
+  /// Sets up real-time Firestore streams for every vendor and item in cart.
+  /// Cancels old streams first so this is safe to call on cart changes.
+  void _setupRealtimeStreams() {
+    _cancelAllStreams();
+
+    for (final vendorEntry in cartStore.cartByVendor.entries) {
+      final vendorId = vendorEntry.key;
+      final items = vendorEntry.value.items;
+
+      // ── Vendor-level online/offline stream ─────────────────────────────────
+      if (!_vendorStreams.containsKey(vendorId)) {
+        final vendorSub = FirebaseFirestore.instance
+            .collection('items')
+            .doc(vendorId)
+            .snapshots()
+            .listen(
+              (doc) {
+                if (!mounted) return;
+                setState(() {
+                  if (doc.exists) {
+                    _vendorOnlineStatus[vendorId] =
+                        (doc.data()?['isAvailable'] as bool?) ?? true;
+                  } else {
+                    _vendorOnlineStatus[vendorId] = false;
+                  }
+                });
+              },
+              onError: (e) {
+                debugPrint('Vendor stream error $vendorId: $e');
+              },
+            );
+        _vendorStreams[vendorId] = vendorSub;
+      }
+
+      // ── Per-item availability streams ───────────────────────────────────────
+      for (final item in items) {
+        final streamKey = '${vendorId}__${item.id}';
+        if (!_itemStreams.containsKey(streamKey)) {
+          final itemSub = FirebaseFirestore.instance
+              .collection('items')
+              .doc(vendorId)
+              .collection('items')
+              .doc(item.id)
+              .snapshots()
+              .listen(
+                (doc) {
+                  if (!mounted) return;
+                  setState(() {
+                    if (doc.exists) {
+                      _itemAvailability[item.id] =
+                          (doc.data()?['isAvailable'] as bool?) ?? true;
+                    } else {
+                      _itemAvailability[item.id] = false;
+                    }
+                  });
+                },
+                onError: (e) {
+                  debugPrint('Item stream error ${item.id}: $e');
+                },
+              );
+          _itemStreams[streamKey] = itemSub;
+        }
+      }
+    }
   }
 
   void _onCartChanged() {
@@ -197,7 +217,8 @@ class _CartScreenState extends State<CartScreen> {
     if (_selectedAddress != null) {
       _checkDeliveryForAllVendors(_selectedAddress!);
     }
-    _checkAllItemsAvailability();
+    // Re-setup streams to include any newly added vendors/items
+    _setupRealtimeStreams();
     setState(() {});
   }
 
@@ -240,55 +261,23 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  Future<void> _checkAllItemsAvailability() async {
-    if (!mounted || cartStore.cartByVendor.isEmpty) return;
-    setState(() => _checkingItems = true);
-
-    final Map<String, bool> availability = {};
-
-    for (final vendorEntry in cartStore.cartByVendor.entries) {
-      final vendorId = vendorEntry.key;
-      final items = vendorEntry.value.items;
-
-      for (final item in items) {
-        try {
-          final doc = await FirebaseFirestore.instance
-              .collection('items')
-              .doc(vendorId)
-              .collection('items')
-              .doc(item.id)
-              .get();
-
-          if (doc.exists) {
-            availability[item.id] = doc.data()?['isAvailable'] ?? true;
-          } else {
-            availability[item.id] = false; // Item deleted?
-          }
-        } catch (e) {
-          debugPrint('Item check error for ${item.id}: $e');
-          availability[item.id] = true; // Fallback to true on error
-        }
-      }
-    }
-
-    if (mounted) {
-      setState(() {
-        _itemAvailability = availability;
-        _checkingItems = false;
-      });
-    }
-  }
-
   bool get _hasUnavailableItems {
-    for (final vendor in cartStore.cartByVendor.values) {
-      for (final item in vendor.items) {
+    for (final vendorEntry in cartStore.cartByVendor.entries) {
+      if (_vendorOnlineStatus[vendorEntry.key] == false) return true;
+      for (final item in vendorEntry.value.items) {
         if (_itemAvailability[item.id] == false) return true;
       }
     }
     return false;
   }
 
-  bool get _hasUndeliverableVendors => _vendorDeliverable.values.any((v) => !v);
+  bool get _hasVendorOffline => cartStore.cartByVendor.keys.any(
+    (vendorId) => _vendorOnlineStatus[vendorId] == false,
+  );
+
+  bool get _hasUndeliverableVendors => cartStore.cartByVendor.keys.any(
+    (vendorId) => _vendorDeliverable[vendorId] == false,
+  );
 
   bool _isGuestUser() {
     final phone =
@@ -924,14 +913,16 @@ class _CartScreenState extends State<CartScreen> {
                           ...cartStore.cartByVendor.entries.map((entry) {
                             final canDeliver =
                                 _vendorDeliverable[entry.key] ?? true;
+                            final isVendorOnline =
+                                _vendorOnlineStatus[entry.key] ?? true;
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 VendorCartSection(
                                   vendorId: entry.key,
                                   vendorCart: entry.value,
-                                  itemAvailability:
-                                      _itemAvailability, // Pass item availability
+                                  itemAvailability: _itemAvailability,
+                                  isVendorOnline: isVendorOnline,
                                   onQuantityChanged: (itemId, delta) {
                                     cartStore.updateQuantity(
                                       vendorId: entry.key,
@@ -1002,11 +993,13 @@ class _CartScreenState extends State<CartScreen> {
     final hasCouponSavings = _couponDiscount > 0 || isFreeDelivery;
     final savingsAmount = _couponDiscount;
 
-    // New: Determine if checkout should be disabled
+    // Determine if checkout should be disabled
+    final bool hasVendorOffline = _hasVendorOffline;
     final bool disableCheckout =
         _checkingDelivery ||
         _selectedAddress == null ||
         _hasUndeliverableVendors ||
+        hasVendorOffline ||
         hasUnavailableItems;
 
     return Container(
@@ -1080,10 +1073,6 @@ class _CartScreenState extends State<CartScreen> {
                 ],
               ),
               const SizedBox(width: 6),
-              Text(
-                '+ taxes & delivery',
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-              ),
               const Spacer(),
             ],
           ),
@@ -1135,8 +1124,48 @@ class _CartScreenState extends State<CartScreen> {
               ),
             ),
 
-          // New: Unavailable items warning strip
-          if (hasUnavailableItems)
+          // Vendor offline strip (real-time)
+          if (hasVendorOffline)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.deepOrange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.deepOrange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: Colors.deepOrange.shade600,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'One or more vendors are currently offline',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.deepOrange.shade800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Unavailable items warning strip
+          if (hasUnavailableItems && !hasVendorOffline)
             Padding(
               padding: const EdgeInsets.only(top: 8, bottom: 4),
               child: Container(
@@ -1194,11 +1223,9 @@ class _CartScreenState extends State<CartScreen> {
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-              onPressed: (disableCheckout || _checkingItems)
-                  ? null
-                  : _handlePlaceOrder, // Disable if any condition met including loading
+              onPressed: disableCheckout ? null : _handlePlaceOrder,
               style: ElevatedButton.styleFrom(
-                backgroundColor: (disableCheckout || _checkingItems)
+                backgroundColor: disableCheckout
                     ? Colors.grey.shade300
                     : kBandiwalaYellow,
                 foregroundColor: Colors.black,
@@ -1207,29 +1234,22 @@ class _CartScreenState extends State<CartScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: _checkingItems
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.black54,
-                      ),
-                    )
-                  : Text(
-                      _selectedAddress == null
-                          ? 'Select Delivery Address'
-                          : _hasUndeliverableVendors
-                          ? 'Cannot Deliver to Address'
-                          : hasUnavailableItems
-                          ? 'Remove Unavailable Items'
-                          : 'Proceed to Checkout',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
+              child: Text(
+                _selectedAddress == null
+                    ? 'Select Delivery Address'
+                    : _hasUndeliverableVendors
+                    ? 'Cannot Deliver to Address'
+                    : hasVendorOffline
+                    ? 'Vendor Offline — Cannot Checkout'
+                    : hasUnavailableItems
+                    ? 'Remove Unavailable Items'
+                    : 'Proceed to Checkout',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.3,
+                ),
+              ),
             ),
           ),
         ],
@@ -1679,12 +1699,28 @@ class SuggestionCard extends StatelessWidget {
                   top: Radius.circular(10),
                 ),
                 child: imageUrl.isNotEmpty
-                    ? Image.network(
-                        imageUrl,
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl,
                         width: 140,
                         height: 95,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        memCacheWidth: 300,
+                        placeholder: (context, url) => Container(
+                          width: 140,
+                          height: 95,
+                          color: Colors.grey.shade100,
+                          child: const Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: kBandiwalaYellow,
+                              ),
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
                           width: 140,
                           height: 95,
                           color: Colors.grey.shade200,
@@ -2033,14 +2069,26 @@ class CouponSectionWidget extends StatelessWidget {
                                   appliedCoupon!['freebieImageUrl'] != null
                               ? ClipRRect(
                                   borderRadius: BorderRadius.circular(12),
-                                  child: Image.network(
-                                    appliedCoupon!['freebieImageUrl'],
+                                  child: CachedNetworkImage(
+                                    imageUrl: appliedCoupon!['freebieImageUrl'],
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.redeem,
-                                      color: Colors.white,
-                                      size: 24,
+                                    memCacheWidth: 150,
+                                    memCacheHeight: 150,
+                                    placeholder: (context, url) => Container(
+                                      color: Colors.grey.shade100,
+                                      child: const Center(
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.green,
+                                        ),
+                                      ),
                                     ),
+                                    errorWidget: (context, url, error) =>
+                                        const Icon(
+                                          Icons.redeem,
+                                          color: Colors.white,
+                                          size: 24,
+                                        ),
                                   ),
                                 )
                               : Icon(
@@ -2160,7 +2208,8 @@ class CouponSectionWidget extends StatelessWidget {
 class VendorCartSection extends StatelessWidget {
   final String vendorId;
   final VendorCart vendorCart;
-  final Map<String, bool> itemAvailability; // New: item availability map
+  final Map<String, bool> itemAvailability;
+  final bool isVendorOnline;
   final void Function(String itemId, int delta) onQuantityChanged;
   final double vendorTotal;
 
@@ -2168,48 +2217,247 @@ class VendorCartSection extends StatelessWidget {
     super.key,
     required this.vendorId,
     required this.vendorCart,
-    required this.itemAvailability, // Required
+    required this.itemAvailability,
+    this.isVendorOnline = true,
     required this.onQuantityChanged,
     required this.vendorTotal,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 350),
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: isVendorOnline
+              ? Colors.grey.shade200
+              : Colors.deepOrange.shade300,
+          width: isVendorOnline ? 1 : 1.5,
+        ),
+        boxShadow: isVendorOnline
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.deepOrange.withOpacity(0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            vendorCart.vendorName,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
-          ...vendorCart.items.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: CartLineItem(
-                item: item,
-                isAvailable:
-                    itemAvailability[item.id] ?? true, // Pass availability
-                onQuantityChanged: (delta) => onQuantityChanged(item.id, delta),
+          // ── Vendor offline banner ────────────────────────────────────────
+          if (!isVendorOnline)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.deepOrange.shade600,
+                    Colors.deepOrange.shade800,
+                  ],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(15),
+                ),
+              ),
+              child: Row(
+                children: [
+                  // Pulsing dot
+                  _PulsingDot(color: Colors.white),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${vendorCart.vendorName} is currently offline',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      'OFFLINE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              'Subtotal: ₹${vendorTotal.toStringAsFixed(0)}',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+
+          // ── Items list ──────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Vendor name row with live dot
+                Row(
+                  children: [
+                    if (isVendorOnline) ...[
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Expanded(
+                      child: Text(
+                        vendorCart.vendorName,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: isVendorOnline
+                              ? Colors.black87
+                              : Colors.grey.shade500,
+                        ),
+                      ),
+                    ),
+                    if (isVendorOnline)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.green.shade200),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 5,
+                              height: 5,
+                              decoration: const BoxDecoration(
+                                color: Colors.green,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'LIVE',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.green.shade700,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Items
+                ...vendorCart.items.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Opacity(
+                      opacity: isVendorOnline ? 1.0 : 0.55,
+                      child: CartLineItem(
+                        item: item,
+                        // If vendor is offline, treat all items as unavailable
+                        isAvailable: isVendorOnline
+                            ? (itemAvailability[item.id] ?? true)
+                            : false,
+                        onQuantityChanged: (delta) =>
+                            onQuantityChanged(item.id, delta),
+                      ),
+                    ),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Subtotal: ₹${vendorTotal.toStringAsFixed(0)}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isVendorOnline
+                          ? Colors.black87
+                          : Colors.grey.shade400,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Pulsing Dot (used in VendorCartSection offline banner) ──────────────────
+
+class _PulsingDot extends StatefulWidget {
+  final Color color;
+  const _PulsingDot({required this.color});
+
+  @override
+  State<_PulsingDot> createState() => _PulsingDotState();
+}
+
+class _PulsingDotState extends State<_PulsingDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _anim = Tween<double>(
+      begin: 0.4,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _anim,
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle),
       ),
     );
   }

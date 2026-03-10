@@ -11,6 +11,7 @@ import 'settings_screen.dart';
 import 'location_picker_page.dart';
 import 'vendor_items_page.dart';
 import 'cart_store.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 const Color _kYellow = Color(0xFFFFC107);
 
@@ -1196,10 +1197,25 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
         child: Center(child: fallback),
       );
     }
-    return Image.network(
-      url,
+    return CachedNetworkImage(
+      imageUrl: url,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
+      memCacheWidth: 200,
+      memCacheHeight: 200,
+      placeholder: (context, url) => Container(
+        color: Colors.grey.shade100,
+        child: const Center(
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Color(0xFFFFC107),
+            ),
+          ),
+        ),
+      ),
+      errorWidget: (context, url, error) => Container(
         color: Colors.grey.shade200,
         child: Center(child: fallback),
       ),
