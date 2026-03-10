@@ -148,11 +148,16 @@ class _StatusConfig {
 
 _StatusConfig _resolveStatusConfig(String status) {
   switch (status) {
-    case 'confirmed':
     case 'order_created':
       return const _StatusConfig(
-        label: 'Order Confirmed',
+        label: 'Order Created',
         subtitle: 'Your order has been placed',
+        icon: Icons.check_circle_rounded,
+      );
+    case 'confirmed':
+      return const _StatusConfig(
+        label: 'Order Confirmed',
+        subtitle: 'Your order will soon be prepared',
         icon: Icons.check_circle_rounded,
       );
     case 'preparing':
@@ -172,6 +177,30 @@ _StatusConfig _resolveStatusConfig(String status) {
         label: 'Order Ready',
         subtitle: 'Out for delivery soon',
         icon: Icons.delivery_dining_rounded,
+      );
+    case 'out_for_delivery':
+      return const _StatusConfig(
+        label: 'Out for Delivery',
+        subtitle: 'Your order is on the way',
+        icon: Icons.two_wheeler_rounded,
+      );
+    case 'delivered':
+      return const _StatusConfig(
+        label: 'Delivered',
+        subtitle: 'Your order has been delivered',
+        icon: Icons.done_all_rounded,
+      );
+    case 'completed':
+      return const _StatusConfig(
+        label: 'Completed',
+        subtitle: 'Order completed successfully',
+        icon: Icons.celebration_rounded,
+      );
+    case 'cancelled':
+      return const _StatusConfig(
+        label: 'Cancelled',
+        subtitle: 'Order has been cancelled',
+        icon: Icons.cancel_rounded,
       );
     default:
       return const _StatusConfig(
@@ -281,7 +310,7 @@ class _OrderStatusBarContent extends StatelessWidget {
           splashColor: Colors.black.withOpacity(0.06),
           highlightColor: Colors.black.withOpacity(0.04),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
                 // ── Pulsing icon ────────────────────────────────────────
@@ -302,7 +331,6 @@ class _OrderStatusBarContent extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
-                              // ✅ Black text
                               color: Colors.black87,
                               letterSpacing: 0.1,
                             ),
@@ -332,12 +360,15 @@ class _OrderStatusBarContent extends StatelessWidget {
                       // Subtitle + dot + amount + COD
                       Row(
                         children: [
-                          Text(
-                            cfg.subtitle,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.black87.withOpacity(0.7),
-                              fontWeight: FontWeight.w500,
+                          Flexible(
+                            child: Text(
+                              cfg.subtitle,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.black87.withOpacity(0.7),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -384,30 +415,6 @@ class _OrderStatusBarContent extends StatelessWidget {
                     ],
                   ),
                 ),
-
-                // ── View button — black bg + yellow text ────────────────
-                GestureDetector(
-                  onTap: onViewTap,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black87,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'View',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFFFFC107),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
 
                 // ── Dismiss button ──────────────────────────────────────
                 GestureDetector(
@@ -689,9 +696,11 @@ class _HomeTabState extends State<_HomeTab> {
     if (phone == null || phone == 'GUEST') return;
 
     try {
+      // Normalize: always remove +91 for document ID
+      final phoneWithoutCode = phone.replaceAll('+91', '');
       final doc = await FirebaseFirestore.instance
           .collection('customers')
-          .doc(phone)
+          .doc(phoneWithoutCode)
           .get();
 
       final name = doc.data()?['name'] as String? ?? '';
@@ -764,9 +773,11 @@ class _HomeTabState extends State<_HomeTab> {
               if (name.isEmpty) return;
               Navigator.pop(ctx);
               try {
+                // Normalize: always remove +91 for document ID
+                final phoneWithoutCode = phone.replaceAll('+91', '');
                 await FirebaseFirestore.instance
                     .collection('customers')
-                    .doc(phone)
+                    .doc(phoneWithoutCode)
                     .set({
                       'name': name,
                       'phone': phone,

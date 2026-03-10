@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/notification_service.dart';
 import 'splash_screen.dart';
 import 'login_page.dart';
 import 'orders.dart';
@@ -227,7 +228,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           widget.phoneNumber ?? FirebaseAuth.instance.currentUser?.phoneNumber;
       if (phone == null) return;
 
-      await FirebaseFirestore.instance.collection('customers').doc(phone).set({
+      // Normalize: always remove +91 for document ID
+      final phoneWithoutCode = phone.replaceAll('+91', '');
+      await FirebaseFirestore.instance.collection('customers').doc(phoneWithoutCode).set({
         'name': name,
         'phone': phone,
       }, SetOptions(merge: true));
@@ -304,6 +307,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       try {
         // ✅ Clear local session state
         final prefs = await SharedPreferences.getInstance();
+        final phone = prefs.getString('userPhone');
+        
+        // Delete FCM token from Firestore
+        if (phone != null) {
+          await NotificationService().deleteCustomerToken(phone);
+        }
+        
         await prefs.setBool('isLoggedIn', false);
         await prefs.remove('userPhone');
         await prefs.remove('active_delivery_address');

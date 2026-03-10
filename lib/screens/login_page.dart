@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
+import '../services/notification_service.dart';
 import 'otp_page.dart';
 import 'home_page.dart';
 
@@ -54,12 +55,14 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _createCustomerIfNeeded(String phone) async {
     try {
       final customers = FirebaseFirestore.instance.collection('customers');
-      final docRef = customers.doc(phone.replaceAll('+91', ''));
+      // Normalize: always remove +91 for document ID
+      final phoneWithoutCode = phone.replaceAll('+91', '');
+      final docRef = customers.doc(phoneWithoutCode);
       final snapshot = await docRef.get();
 
       if (!snapshot.exists) {
         await docRef.set({
-          'mobileNumber': phone,
+          'phone': phone, // Store full number with +91
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
@@ -106,6 +109,9 @@ class _LoginPageState extends State<LoginPage> {
             await _auth.signInWithCredential(credential);
             await _createCustomerIfNeeded(phone);
             await _saveLoginState(phone);
+            
+            // Update FCM token
+            await NotificationService().updateCustomerToken(phone);
 
             if (mounted) {
               setState(() => _isLoading = false);

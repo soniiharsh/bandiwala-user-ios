@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:sms_autofill/sms_autofill.dart';
+import '../services/notification_service.dart';
 import 'home_page.dart';
 
 class OTPVerifyScreen extends StatefulWidget {
@@ -111,14 +112,15 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> with CodeAutoFill {
   Future<void> _createCustomerIfNeeded(String phone) async {
     try {
       final customers = FirebaseFirestore.instance.collection('customers');
-      final docRef = customers.doc(phone.replaceAll('+91', ''));
+      // Normalize: always remove +91 for document ID
+      final phoneWithoutCode = phone.replaceAll('+91', '');
+      final docRef = customers.doc(phoneWithoutCode);
 
       final snapshot = await docRef.get();
 
       if (!snapshot.exists) {
         await docRef.set({
-          'mobileNumber': phone,
-          'orders': 0,
+          'phone': phone, // Store full number with +91
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
@@ -140,6 +142,9 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> with CodeAutoFill {
   Future<void> _completeSignIn(String phone) async {
     await _createCustomerIfNeeded(phone);
     await _saveLoginState(phone);
+    
+    // Update FCM token
+    await NotificationService().updateCustomerToken(phone);
 
     if (!mounted) return;
 

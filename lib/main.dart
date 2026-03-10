@@ -4,16 +4,17 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:package_info_plus/package_info_plus.dart';
+
 import 'firebase_options.dart';
 import 'screens/cart_store.dart';
 import 'screens/splash_screen.dart';
 import 'screens/update_required_screen.dart';
 import 'services/notification_service.dart';
 import 'services/version_checker.dart';
-
 import 'package:flutter/foundation.dart';
 
-const String APP_VERSION = '1.0.0'; // From pubspec.yaml
+String APP_VERSION = '1.0.0'; // Fallback version
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,23 +37,47 @@ Future<void> main() async {
     cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
   );
 
-  if (!kDebugMode) {
-    try {
-      await FirebaseAppCheck.instance.activate(
-        androidProvider: AndroidProvider.playIntegrity,
-        appleProvider: AppleProvider.deviceCheck,
-      );
-    } catch (e) {
-      // Silently fail if App Check can't activate (non-critical for auth flow)
+  try {
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: kDebugMode
+          ? AndroidProvider.debug
+          : AndroidProvider.playIntegrity,
+      appleProvider: kDebugMode
+          ? AppleProvider.debug
+          : AppleProvider.deviceCheck,
+    );
+
+    if (kDebugMode) {
+      print('🧪 App Check running with DEBUG provider');
+      print('Register the debug token in Firebase Console → App Check');
+    } else {
+      print('🔒 App Check running with Play Integrity');
     }
-  } else {
-    print('⚠️ App Check SKIPPED in debug mode');
+  } catch (e, stack) {
+    if (kDebugMode) {
+      print('❌ App Check initialization failed');
+      print(e);
+      print(stack);
+    }
   }
 
   await cartStore.loadFromDisk();
 
   // Initialize notifications and subscribe to admin topic
   await NotificationService().initialize();
+
+  // Get app version from pubspec.yaml
+  try {
+    final packageInfo = await PackageInfo.fromPlatform();
+    APP_VERSION = packageInfo.version;
+    if (kDebugMode) {
+      print('📱 App Version: $APP_VERSION (Build ${packageInfo.buildNumber})');
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      print('⚠️ Failed to get app version: $e');
+    }
+  }
 
   runApp(const MyApp());
 }

@@ -1,6 +1,7 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Handle background messages
 @pragma('vm:entry-point')
@@ -160,5 +161,54 @@ class NotificationService {
       print('📩 Local notification tapped: ${response.payload}');
     }
     // Handle navigation
+  }
+
+  // ── FCM Token Management ──────────────────────────────────────────────────
+
+  Future<void> updateCustomerToken(String phone) async {
+    try {
+      String? token = await _messaging.getToken();
+      if (token != null) {
+        // Normalize: always remove +91 for document ID
+        final phoneWithoutCode = phone.replaceAll('+91', '');
+        
+        await FirebaseFirestore.instance
+            .collection('customers')
+            .doc(phoneWithoutCode)
+            .set({
+          'FCMToken': token,
+        }, SetOptions(merge: true));
+        
+        if (kDebugMode) {
+          print('✅ FCM token updated for customer: $phoneWithoutCode');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error updating customer FCM token: $e');
+      }
+    }
+  }
+
+  Future<void> deleteCustomerToken(String phone) async {
+    try {
+      // Normalize: always remove +91 for document ID
+      final phoneWithoutCode = phone.replaceAll('+91', '');
+      
+      await FirebaseFirestore.instance
+          .collection('customers')
+          .doc(phoneWithoutCode)
+          .update({
+        'FCMToken': FieldValue.delete(),
+      });
+      
+      if (kDebugMode) {
+        print('✅ FCM token deleted for customer: $phoneWithoutCode');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error deleting customer FCM token: $e');
+      }
+    }
   }
 }
