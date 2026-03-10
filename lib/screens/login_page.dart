@@ -96,7 +96,7 @@ class _LoginPageState extends State<LoginPage> {
     if (!(_phoneFormKey.currentState?.validate() ?? false)) return;
     setState(() => _isLoading = true);
 
-    final phone = '+91${_phoneController.text.trim()}';
+    final phone = '${_phoneController.text.trim()}';
 
     try {
       await _auth.verifyPhoneNumber(

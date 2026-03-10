@@ -12,6 +12,7 @@ import 'location_picker_page.dart';
 import 'vendor_items_page.dart';
 import 'cart_store.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 const Color _kYellow = Color(0xFFFFC107);
 
@@ -208,6 +209,13 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
   }
 
   void _startListening() async {
+    // Check and request microphone permission explicitly
+    var status = await Permission.microphone.status;
+    if (!status.isGranted) {
+      status = await Permission.microphone.request();
+      if (!status.isGranted) return;
+    }
+
     if (!_speechEnabled || _isListening) return;
     try {
       await _speech.listen(
