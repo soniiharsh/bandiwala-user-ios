@@ -96,7 +96,7 @@ class _LoginPageState extends State<LoginPage> {
     if (!(_phoneFormKey.currentState?.validate() ?? false)) return;
     setState(() => _isLoading = true);
 
-    final phone = '${_phoneController.text.trim()}';
+    final phone = '+91${_phoneController.text.trim()}';
 
     try {
       await _auth.verifyPhoneNumber(
@@ -109,7 +109,7 @@ class _LoginPageState extends State<LoginPage> {
             await _auth.signInWithCredential(credential);
             await _createCustomerIfNeeded(phone);
             await _saveLoginState(phone);
-            
+
             // Update FCM token
             await NotificationService().updateCustomerToken(phone);
 
