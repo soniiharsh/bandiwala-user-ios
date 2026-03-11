@@ -20,7 +20,7 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.bandiwala.user"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "28.2.13676358"
+    ndkVersion = flutter.ndkVersion
 
 
 
@@ -60,7 +60,7 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             }
             ndk {
-                debugSymbolLevel = "none"
+                debugSymbolLevel = "FULL"
             }
         }
     }

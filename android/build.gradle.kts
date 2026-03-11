@@ -11,6 +11,11 @@ allprojects {
             force("org.jetbrains.kotlin:kotlin-stdlib-common:2.1.0")
         }
     }
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        compilerOptions {
+            apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
+        }
+    }
 }
 
 val newBuildDir: Directory =
