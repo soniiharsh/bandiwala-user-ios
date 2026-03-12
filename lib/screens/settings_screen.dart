@@ -142,9 +142,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           widget.phoneNumber ?? FirebaseAuth.instance.currentUser?.phoneNumber;
       if (phone == null || phone == 'GUEST') return;
 
+      // Normalize: always remove +91 for document ID
+      final phoneWithoutCode = phone.replaceAll('+91', '');
       final doc = await FirebaseFirestore.instance
           .collection('customers')
-          .doc(phone)
+          .doc(phoneWithoutCode)
           .get();
 
       if (doc.exists) {
@@ -230,10 +232,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       // Normalize: always remove +91 for document ID
       final phoneWithoutCode = phone.replaceAll('+91', '');
-      await FirebaseFirestore.instance.collection('customers').doc(phoneWithoutCode).set({
-        'name': name,
-        'phone': phone,
-      }, SetOptions(merge: true));
+      await FirebaseFirestore.instance
+          .collection('customers')
+          .doc(phoneWithoutCode)
+          .set({'name': name, 'phone': phone}, SetOptions(merge: true));
 
       if (mounted) {
         setState(() {
@@ -308,12 +310,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // ✅ Clear local session state
         final prefs = await SharedPreferences.getInstance();
         final phone = prefs.getString('userPhone');
-        
+
         // Delete FCM token from Firestore
         if (phone != null) {
           await NotificationService().deleteCustomerToken(phone);
         }
-        
+
         await prefs.setBool('isLoggedIn', false);
         await prefs.remove('userPhone');
         await prefs.remove('active_delivery_address');
