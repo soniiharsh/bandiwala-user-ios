@@ -53,6 +53,7 @@ dependencies:
   flutter_local_notifications: ^20.1.0 # l
   marquee: ^2.3.0
   package_info_plus: ^8.0.0
+  firebase_analytics: ^12.1.3
 
 dev_dependencies:
   flutter_test:

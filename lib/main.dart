@@ -12,6 +12,7 @@ import 'screens/splash_screen.dart';
 import 'screens/update_required_screen.dart';
 import 'services/notification_service.dart';
 import 'services/version_checker.dart';
+import 'services/analytics_service.dart';
 import 'package:flutter/foundation.dart';
 
 String APP_VERSION = '1.0.0'; // Fallback version
@@ -79,6 +80,8 @@ Future<void> main() async {
     }
   }
 
+  await AnalyticsService.logAppOpen();
+
   runApp(const MyApp());
 }
 
@@ -101,6 +104,7 @@ class MyApp extends StatelessWidget {
           scaffoldBackgroundColor: Colors.white,
         ),
         debugShowCheckedModeBanner: false,
+        navigatorObservers: [AnalyticsService.observer],
         home: const VersionCheckWrapper(),
       ),
     );

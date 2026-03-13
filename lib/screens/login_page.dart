@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../services/notification_service.dart';
 import 'otp_page.dart';
 import 'home_page.dart';
+import '../services/analytics_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -109,6 +110,7 @@ class _LoginPageState extends State<LoginPage> {
             await _auth.signInWithCredential(credential);
             await _createCustomerIfNeeded(phone);
             await _saveLoginState(phone);
+            await AnalyticsService.logLogin(loginMethod: 'phone_auto');
 
             // Update FCM token
             await NotificationService().updateCustomerToken(phone);
@@ -184,6 +186,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _continueAsGuest() {
+    AnalyticsService.logLogin(loginMethod: 'guest');
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const HomePage(phoneNumber: 'GUEST')),

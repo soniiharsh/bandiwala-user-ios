@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/analytics_service.dart';
 
 const kBandiwalaYellow = Color(0xFFFFC107);
 
@@ -106,6 +107,13 @@ class CartStore extends ChangeNotifier {
           existing.copyWith(quantity: existing.quantity + 1);
     }
 
+    AnalyticsService.logAddToCart(
+      itemId: itemId,
+      itemName: itemName,
+      itemCategory: 'food',
+      price: price,
+      quantity: 1,
+    );
     _saveToDisk();
     notifyListeners();
   }

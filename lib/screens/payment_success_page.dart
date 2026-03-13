@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
 import 'orders.dart';
+import '../services/analytics_service.dart';
 
 const kBandiwalaYellow = Color(0xFFFFC107);
 const kWhite = Color(0xFFFFFFFF);
@@ -58,6 +59,14 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
     _randomQuote = _quotes[random.nextInt(_quotes.length)];
 
     _animationController.forward();
+
+    // Log the successful purchase
+    AnalyticsService.logPurchase(
+      transactionId: widget.paymentId,
+      value: widget.amount,
+      currency: 'INR', // Assuming INR for Bandiwala
+      items: [], // At this point we might not have the full cart details without looking up the order, but we can log the total value
+    );
 
     _navigationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) return;

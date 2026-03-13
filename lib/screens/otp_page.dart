@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:sms_autofill/sms_autofill.dart';
 import '../services/notification_service.dart';
 import 'home_page.dart';
+import '../services/analytics_service.dart';
 
 class OTPVerifyScreen extends StatefulWidget {
   final String phoneNumber;
@@ -142,6 +143,7 @@ class _OTPVerifyScreenState extends State<OTPVerifyScreen> with CodeAutoFill {
   Future<void> _completeSignIn(String phone) async {
     await _createCustomerIfNeeded(phone);
     await _saveLoginState(phone);
+    await AnalyticsService.logLogin(loginMethod: 'phone_manual');
     
     // Update FCM token
     await NotificationService().updateCustomerToken(phone);
