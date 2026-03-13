@@ -12,6 +12,7 @@ import 'terms_conditions.dart';
 import 'cancellation_policy.dart';
 import 'refund_policy.dart';
 import 'help_support.dart';
+import 'cart_store.dart';
 
 const Color kBandiwalaYellow = Color(0xFFFFC107);
 
@@ -315,10 +316,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (phone != null) {
           await NotificationService().deleteCustomerToken(phone);
         }
-
-        await prefs.setBool('isLoggedIn', false);
-        await prefs.remove('userPhone');
-        await prefs.remove('active_delivery_address');
+        await prefs.clear();
+        await cartStore.clear();
 
         await FirebaseAuth.instance.signOut();
         if (mounted) {
@@ -397,9 +396,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           // Clear local state
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('isLoggedIn', false);
-          await prefs.remove('userPhone');
-          await prefs.remove('active_delivery_address');
+          await prefs.clear();
+          await cartStore.clear();
 
           if (mounted) {
             Navigator.pushAndRemoveUntil(
