@@ -1,29 +1,25 @@
-// topbar.dart — Full updated file
-
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
-import 'dart:convert';
-import 'settings_screen.dart';
-import 'location_picker_page.dart';
-import 'vendor_items_page.dart';
-import 'cart_store.dart';
+import '../screens/profile_page.dart';
+import '../models/app_user.dart';
+import '../screens/location_picker_page.dart';
+import '../screens/vendor_items_page.dart';
+import '../providers/cart_provider.dart';
+import '../providers/vendors_provider.dart';
+import '../providers/items_provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 const Color _kYellow = Color(0xFFFFC107);
 
-// ─── Model ────────────────────────────────────────────────────────────────────
+// ─── Search result model ──────────────────────────────────────────────────────
 
 class _VendorResult {
-  final String vendorId;
-  final String vendorName;
-  final String vendorCategory;
-  final String vendorImageUrl;
-  final String address;
+  final String vendorId, vendorName, vendorCategory, vendorImageUrl, address;
   final double rating;
   final bool isAvailable;
   final List<Map<String, dynamic>> matchingItems;
@@ -40,44 +36,33 @@ class _VendorResult {
   });
 }
 
-// ─── BandiwalaTopBar ──────────────────────────────────────────────────────────
+// ─── TopBar ───────────────────────────────────────────────────────────────────
+// Owns search entirely. Category filtering lives in home_page.
 
-class BandiwalaTopBar extends StatefulWidget {
-  final String? phoneNumber;
+class TopBar extends ConsumerStatefulWidget {
   final Function(bool)? onLocationError;
-  final TextEditingController? searchController;
-  final Function(String)? onSearchSubmitted;
-  final VoidCallback? onSearchCleared;
-  final Function(SavedLocation)? onAddressChanged;
+  final Function(SavedAddress)? onAddressChanged;
+  final SavedAddress? activeAddress;
 
-  const BandiwalaTopBar({
+  const TopBar({
     super.key,
-    this.phoneNumber,
     this.onLocationError,
-    this.searchController,
-    this.onSearchSubmitted,
-    this.onSearchCleared,
     this.onAddressChanged,
+    this.activeAddress,
   });
 
-  static const Color bandiwalaYellow = _kYellow;
-
   @override
-  State<BandiwalaTopBar> createState() => _BandiwalaTopBarState();
+  ConsumerState<TopBar> createState() => _TopBarState();
 }
 
-class _BandiwalaTopBarState extends State<BandiwalaTopBar>
-    with WidgetsBindingObserver {
-  static const double _minLat = 17.25;
-  static const double _maxLat = 17.55;
-  static const double _minLng = 78.25;
-  static const double _maxLng = 78.65;
+class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
+  static const double _minLat = 17.25, _maxLat = 17.55;
+  static const double _minLng = 78.25, _maxLng = 78.65;
 
   // ── Location ───────────────────────────────────────────────────────────────
-  SavedLocation? _activeAddress;
+  SavedAddress? _activeAddress;
   String _displayLocation = 'Fetching location...';
   bool _isLocationError = false;
-  Position? _currentPosition;
   StreamSubscription<Position>? _positionSub;
 
   // ── Speech ─────────────────────────────────────────────────────────────────
@@ -89,24 +74,27 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
   double _walletBalance = 0.0;
 
   // ── Search ─────────────────────────────────────────────────────────────────
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
   bool _isTyping = false;
   bool _isSearchActive = false;
   bool _isLoadingSearch = false;
   List<_VendorResult> _searchResults = [];
   String _searchQuery = '';
-  final FocusNode _searchFocus = FocusNode();
-
-  // ──────────────────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initSpeech();
-    _loadActiveAddress();
     _startLocationUpdates();
     _loadWalletBalance();
-    widget.searchController?.addListener(_onSearchTextChanged);
+    _searchController.addListener(_onSearchTextChanged);
+    if (widget.activeAddress != null) {
+      _activeAddress = widget.activeAddress;
+      _displayLocation =
+          widget.activeAddress!.label ?? widget.activeAddress!.geolocation;
+    }
   }
 
   @override
@@ -114,9 +102,24 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
     WidgetsBinding.instance.removeObserver(this);
     _positionSub?.cancel();
     _speech.stop();
+    _searchController.removeListener(_onSearchTextChanged);
+    _searchController.dispose();
     _searchFocus.dispose();
-    widget.searchController?.removeListener(_onSearchTextChanged);
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(TopBar old) {
+    super.didUpdateWidget(old);
+    if (widget.activeAddress != old.activeAddress &&
+        widget.activeAddress != null) {
+      setState(() {
+        _activeAddress = widget.activeAddress;
+        _displayLocation =
+            widget.activeAddress!.label ?? widget.activeAddress!.geolocation;
+        _isLocationError = false;
+      });
+    }
   }
 
   @override
@@ -126,51 +129,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
       _startLocationUpdates();
       _loadWalletBalance();
     }
-  }
-
-  // ─── Address ───────────────────────────────────────────────────────────────
-
-  Future<void> _loadActiveAddress() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString('active_delivery_address');
-      if (jsonStr != null && mounted) {
-        final loc = SavedLocation.fromJson(
-          jsonDecode(jsonStr) as Map<String, dynamic>,
-        );
-        setState(() {
-          _activeAddress = loc;
-          _displayLocation = loc.label ?? loc.address;
-          _isLocationError = false;
-        });
-        widget.onAddressChanged?.call(loc);
-      }
-    } catch (e) {
-      debugPrint('Load address error: $e');
-    }
-  }
-
-  Future<void> _persistActiveAddress(SavedLocation loc) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        'active_delivery_address',
-        jsonEncode(loc.toJson()),
-      );
-    } catch (e) {
-      debugPrint('Persist address error: $e');
-    }
-  }
-
-  void _onAddressSelected(SavedLocation location) {
-    if (!mounted) return;
-    setState(() {
-      _activeAddress = location;
-      _displayLocation = location.label ?? location.address;
-      _isLocationError = false;
-    });
-    _persistActiveAddress(location);
-    widget.onAddressChanged?.call(location);
   }
 
   // ─── Wallet ────────────────────────────────────────────────────────────────
@@ -183,9 +141,7 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
           () => _walletBalance = prefs.getDouble('wallet_balance') ?? 0.0,
         );
       }
-    } catch (e) {
-      debugPrint('Wallet error: $e');
-    }
+    } catch (_) {}
   }
 
   // ─── Speech ────────────────────────────────────────────────────────────────
@@ -199,7 +155,7 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
         if (status == 'done' || status == 'notListening') {
           if (mounted) setState(() => _isListening = false);
           if (status == 'done') {
-            final text = widget.searchController?.text.trim() ?? '';
+            final text = _searchController.text.trim();
             if (text.isNotEmpty) _handleSearchSubmit();
           }
         }
@@ -209,20 +165,18 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
   }
 
   void _startListening() async {
-    // Check and request microphone permission explicitly
     var status = await Permission.microphone.status;
     if (!status.isGranted) {
       status = await Permission.microphone.request();
       if (!status.isGranted) return;
     }
-
     if (!_speechEnabled || _isListening) return;
     try {
       await _speech.listen(
         onResult: (result) {
           if (mounted && result.recognizedWords.isNotEmpty) {
             final words = result.recognizedWords;
-            widget.searchController?.text =
+            _searchController.text =
                 words[0].toUpperCase() + words.substring(1);
             setState(() {});
           }
@@ -245,8 +199,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
   }
 
   // ─── Location ──────────────────────────────────────────────────────────────
-
-  Position? getCurrentPosition() => _currentPosition;
 
   Future<void> _startLocationUpdates() async {
     try {
@@ -276,7 +228,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
             ),
           ).listen(
             (pos) {
-              _currentPosition = pos;
               if (_activeAddress == null) _updateLocationDisplay(pos);
             },
             onError: (_) {
@@ -309,12 +260,10 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 10),
       );
-      _currentPosition = pos;
       if (_activeAddress == null) await _updateLocationDisplay(pos);
     } catch (_) {
-      if (_activeAddress == null && mounted) {
+      if (_activeAddress == null && mounted)
         setState(() => _displayLocation = 'Getting location...');
-      }
     }
   }
 
@@ -334,33 +283,44 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
       lat >= _minLat && lat <= _maxLat && lng >= _minLng && lng <= _maxLng;
 
   Future<void> _showLocationPicker() async {
-    final result = await Navigator.push<SavedLocation>(
+    final result = await Navigator.push<SavedAddress>(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            LocationPickerPage(onLocationSelected: _onAddressSelected),
+        builder: (_) => LocationPickerPage(
+          activeAddress: _activeAddress,
+          onLocationSelected: _onAddressSelected,
+        ),
       ),
     );
     if (result != null) _onAddressSelected(result);
   }
 
+  void _onAddressSelected(SavedAddress location) {
+    if (!mounted) return;
+    setState(() {
+      _activeAddress = location;
+      _displayLocation = location.label ?? location.geolocation;
+      _isLocationError = false;
+    });
+    widget.onAddressChanged?.call(location);
+  }
+
   // ─── Search ────────────────────────────────────────────────────────────────
 
   void _onSearchTextChanged() {
-    final text = widget.searchController?.text.trim() ?? '';
+    final text = _searchController.text.trim();
     if (mounted) setState(() => _isTyping = text.isNotEmpty);
   }
 
   void _handleSearchSubmit() {
-    final text = widget.searchController?.text.trim() ?? '';
+    final text = _searchController.text.trim();
     if (text.isEmpty) return;
     FocusScope.of(context).unfocus();
-    widget.onSearchSubmitted?.call(text);
     _runSearch(text);
   }
 
   void _clearSearch() {
-    widget.searchController?.clear();
+    _searchController.clear();
     _searchFocus.unfocus();
     FocusScope.of(context).unfocus();
     if (mounted) {
@@ -372,73 +332,7 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
         _searchQuery = '';
       });
     }
-    widget.onSearchCleared?.call();
   }
-
-  // ─── Log no-result search to Firestore ───────────────────────────────────
-  //
-  // Document shape written to  logs/{auto-id} :
-  // {
-  //   "type"        : "no_result_search",
-  //   "reason"      : "User searched for an item that returned no results",
-  //   "searchQuery" : "<what the user typed>",
-  //   "phoneNumber" : "<user's phone number or 'unknown'>",
-  //   "location"    : {
-  //                     "latitude"  : <double | null>,
-  //                     "longitude" : <double | null>,
-  //                     "address"   : "<saved address string or 'unknown'>"
-  //                   },
-  //   "timestamp"   : <Firestore server timestamp>
-  // }
-
-  Future<void> _logNoResultSearch(String query) async {
-    try {
-      // ── Collect location info ─────────────────────────────────────────
-      double? lat;
-      double? lng;
-      String locationAddress = 'unknown';
-
-      if (_activeAddress != null) {
-        // Prefer the saved delivery address (has a human-readable string)
-        locationAddress = _activeAddress!.address;
-        // SavedLocation may carry lat/lng — use them if available
-        if (_activeAddress!.longitude != null) {
-          lat = _activeAddress!.latitude;
-          lng = _activeAddress!.longitude;
-        } else if (_currentPosition != null) {
-          lat = _currentPosition!.latitude;
-          lng = _currentPosition!.longitude;
-        }
-      } else if (_currentPosition != null) {
-        lat = _currentPosition!.latitude;
-        lng = _currentPosition!.longitude;
-        locationAddress = _displayLocation;
-      }
-
-      // ── Write log document ────────────────────────────────────────────
-      await FirebaseFirestore.instance.collection('logs').add({
-        'type': 'no_result_search',
-        'reason': 'User searched for an item that returned no results',
-        'searchQuery': query,
-        'phoneNumber': widget.phoneNumber?.isNotEmpty == true
-            ? widget.phoneNumber
-            : 'unknown',
-        'location': {
-          'latitude': lat,
-          'longitude': lng,
-          'address': locationAddress,
-        },
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-
-      debugPrint('[Log] No-result search logged: "$query"');
-    } catch (e) {
-      // Logging must never crash the app
-      debugPrint('[Log] Failed to write no-result log: $e');
-    }
-  }
-
-  // ─── Run search ───────────────────────────────────────────────────────────
 
   Future<void> _runSearch(String query) async {
     if (query.trim().isEmpty) return;
@@ -451,81 +345,81 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
 
     try {
       final terms = _searchQuery.split(' ').where((t) => t.isNotEmpty).toList();
-      final vendorSnap = await FirebaseFirestore.instance
-          .collection('items')
-          .get();
+      final items = ref.read(allAvailableItemsProvider).valueOrNull ?? [];
+      final vendors = ref.read(vendorsStreamProvider).valueOrNull ?? [];
+      final vendorMap = {for (final v in vendors) v.id: v};
       final Map<String, _VendorResult> map = {};
 
-      for (final vDoc in vendorSnap.docs) {
-        final vData = vDoc.data();
-        final vendorNameLow = (vData['name'] ?? '').toString().toLowerCase();
-        final vendorCatLow = (vData['category'] ?? '').toString().toLowerCase();
-        final vendorMatches = terms.any(
-          (t) => vendorNameLow.contains(t) || vendorCatLow.contains(t),
+      for (final item in items) {
+        if (item.vendorId.isEmpty) continue;
+        final n = item.name.toLowerCase();
+        final c = item.category.toLowerCase();
+        final desc = item.description.toLowerCase();
+        final tags = item.tags.map((t) => t.toLowerCase()).toList();
+        final hit = terms.any(
+          (t) =>
+              n.contains(t) ||
+              c.contains(t) ||
+              desc.contains(t) ||
+              tags.any((tag) => tag.contains(t)),
         );
+        if (!hit) continue;
+        final vendor = vendorMap[item.vendorId];
+        if (vendor == null) continue;
+        map.putIfAbsent(
+          item.vendorId,
+          () => _VendorResult(
+            vendorId: vendor.id,
+            vendorName: vendor.name,
+            vendorCategory: vendor.category,
+            vendorImageUrl: vendor.imageUrl,
+            address: vendor.address,
+            rating: vendor.rating,
+            isAvailable: vendor.isAvailable,
+            matchingItems: [],
+          ),
+        );
+        map[item.vendorId]!.matchingItems.add({
+          'id': item.id,
+          'name': item.name,
+          'price': item.price,
+          'imageUrl': item.imageUrl,
+          'category': item.category,
+          'description': item.description,
+          'isVeg': item.isVeg,
+          'rating': 4.2,
+          'ratingCount': 0,
+        });
+      }
 
-        final itemSnap = await FirebaseFirestore.instance
-            .collection('items')
-            .doc(vDoc.id)
-            .collection('items')
-            .where('isAvailable', isEqualTo: true)
-            .get();
-
-        final List<Map<String, dynamic>> hits = [];
-        for (final iDoc in itemSnap.docs) {
-          final d = iDoc.data();
-          final n = (d['name'] ?? '').toString().toLowerCase();
-          final c = (d['category'] ?? '').toString().toLowerCase();
-          final desc = (d['description'] ?? '').toString().toLowerCase();
-          final tags = (d['tags'] as List<dynamic>? ?? [])
-              .map((t) => t.toString().toLowerCase())
-              .toList();
-          final itemHit = terms.any(
-            (t) =>
-                n.contains(t) ||
-                c.contains(t) ||
-                desc.contains(t) ||
-                tags.any((tag) => tag.contains(t)),
-          );
-          if (itemHit || vendorMatches) {
-            hits.add({
-              'id': iDoc.id,
-              'name': d['name'],
-              'price': d['price'],
-              'imageUrl': d['imageUrl'] ?? '',
-              'category': d['category'] ?? '',
-              'description': d['description'] ?? '',
-              'isVeg': d['isVeg'] ?? true,
-              'rating': d['rating'] ?? 4.2,
-              'ratingCount': d['ratingCount'] ?? 0,
-            });
-          }
-        }
-
-        if (vendorMatches || hits.isNotEmpty) {
-          map[vDoc.id] = _VendorResult(
-            vendorId: vDoc.id,
-            vendorName: vData['name'] ?? 'Vendor',
-            vendorCategory: vData['category'] ?? '',
-            vendorImageUrl: vData['imageUrl'] ?? '',
-            address: vData['address'] ?? '',
-            rating: (vData['rating'] ?? 4.2).toDouble(),
-            isAvailable: vData['isAvailable'] ?? true,
-            matchingItems: hits,
+      // Also match vendors by name/category
+      for (final vendor in vendors) {
+        final vn = vendor.name.toLowerCase();
+        final vc = vendor.category.toLowerCase();
+        if (terms.any((t) => vn.contains(t) || vc.contains(t)) &&
+            !map.containsKey(vendor.id)) {
+          map[vendor.id] = _VendorResult(
+            vendorId: vendor.id,
+            vendorName: vendor.name,
+            vendorCategory: vendor.category,
+            vendorImageUrl: vendor.imageUrl,
+            address: vendor.address,
+            rating: vendor.rating,
+            isAvailable: vendor.isAvailable,
+            matchingItems: [],
           );
         }
       }
 
       if (mounted) {
         setState(() {
-          _searchResults = map.values.toList();
+          _searchResults = map.values.toList()
+            ..sort(
+              (a, b) =>
+                  a.isAvailable == b.isAvailable ? 0 : (a.isAvailable ? -1 : 1),
+            );
           _isLoadingSearch = false;
         });
-
-        // ── Log to Firestore if no results found ──────────────────────
-        if (_searchResults.isEmpty) {
-          await _logNoResultSearch(query.trim());
-        }
       }
     } catch (e) {
       debugPrint('Search error: $e');
@@ -540,7 +434,7 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
     final hasAddr = _activeAddress != null;
     final topLabel = hasAddr ? _activeAddress!.shortLabel : 'Current Location';
     final displayText = hasAddr
-        ? _activeAddress!.address
+        ? _activeAddress!.geolocation
         : (_isLocationError
               ? 'Currently serving only Hyderabad'
               : _displayLocation);
@@ -600,7 +494,7 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
                               vertical: 1,
                             ),
                             decoration: BoxDecoration(
-                              color: _kYellow.withOpacity(0.15),
+                              color: _kYellow.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -640,10 +534,10 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
                       ),
                     ),
                     if (hasAddr &&
-                        _activeAddress!.houseNo != null &&
-                        _activeAddress!.houseNo!.isNotEmpty)
+                        _activeAddress!.address != null &&
+                        _activeAddress!.address!.isNotEmpty)
                       Text(
-                        _activeAddress!.houseNo!,
+                        _activeAddress!.address!,
                         style: TextStyle(
                           fontSize: 11,
                           color: Colors.grey.shade600,
@@ -664,9 +558,11 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: _kYellow.withOpacity(0.15),
+                      color: _kYellow.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: _kYellow.withOpacity(0.4)),
+                      border: Border.all(
+                        color: _kYellow.withValues(alpha: 0.4),
+                      ),
                     ),
                     child: const Text(
                       'Change',
@@ -721,10 +617,7 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
               InkWell(
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        SettingsScreen(phoneNumber: widget.phoneNumber),
-                  ),
+                  MaterialPageRoute(builder: (_) => const ProfilePage()),
                 ),
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
@@ -768,7 +661,7 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
-                          controller: widget.searchController,
+                          controller: _searchController,
                           focusNode: _searchFocus,
                           onSubmitted: (_) => _handleSearchSubmit(),
                           textInputAction: TextInputAction.search,
@@ -822,7 +715,7 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
           ),
         ),
 
-        // ── Search results panel (inline, below search bar) ───────────────
+        // ── Search results panel ──────────────────────────────────────────
         if (_isSearchActive) _buildResultsPanel(),
       ],
     );
@@ -839,7 +732,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
         ),
       );
     }
-
     if (_searchResults.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
@@ -861,8 +753,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
         ),
       );
     }
-
-    // All results rendered with same layout — vendor name + horizontal items
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -872,8 +762,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
     );
   }
 
-  // ─── Vendor block: header + horizontal item strip ─────────────────────────
-
   Widget _buildVendorBlock(_VendorResult vendor) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -881,7 +769,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Vendor header ─────────────────────────────────────────────
           GestureDetector(
             onTap: () => _openVendor(vendor),
             child: Padding(
@@ -896,7 +783,7 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
+                      color: Colors.black.withValues(alpha: 0.06),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -904,7 +791,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
                 ),
                 child: Row(
                   children: [
-                    // Vendor thumb
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: SizedBox(
@@ -925,8 +811,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
                       ),
                     ),
                     const SizedBox(width: 10),
-
-                    // Name + meta
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -978,8 +862,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
                         ],
                       ),
                     ),
-
-                    // View menu pill
                     const SizedBox(width: 8),
                     GestureDetector(
                       onTap: () => _openVendor(vendor),
@@ -1007,8 +889,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
               ),
             ),
           ),
-
-          // ── Horizontal item strip ─────────────────────────────────────
           if (vendor.matchingItems.isNotEmpty) ...[
             const SizedBox(height: 10),
             SizedBox(
@@ -1027,8 +907,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
     );
   }
 
-  // ─── Compact item card ────────────────────────────────────────────────────
-
   Widget _buildItemCard(_VendorResult vendor, Map<String, dynamic> item) {
     final bool isVeg = item['isVeg'] ?? true;
     final String imageUrl = item['imageUrl'] ?? '';
@@ -1046,7 +924,7 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -1058,7 +936,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(14),
@@ -1072,7 +949,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
                 ),
               ),
             ),
-
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
@@ -1080,7 +956,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Veg dot + category
                     Row(
                       children: [
                         Container(
@@ -1116,8 +991,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
                       ],
                     ),
                     const SizedBox(height: 3),
-
-                    // Name
                     Text(
                       name,
                       maxLines: 1,
@@ -1129,8 +1002,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
                       ),
                     ),
                     const SizedBox(height: 3),
-
-                    // Price
                     Text(
                       '₹ ${price.toStringAsFixed(0)}',
                       style: const TextStyle(
@@ -1139,10 +1010,7 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
                         color: Colors.black87,
                       ),
                     ),
-
                     const Spacer(),
-
-                    // ADD / counter
                     _ItemCounter(
                       vendorId: vendor.vendorId,
                       vendorName: vendor.vendorName,
@@ -1160,8 +1028,6 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
       ),
     );
   }
-
-  // ─── Navigation ───────────────────────────────────────────────────────────
 
   void _openVendor(_VendorResult vendor) {
     Navigator.of(context).push(
@@ -1196,34 +1062,28 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
     );
   }
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────
-
   Widget _netImg(String url, {required Widget fallback}) {
-    if (url.isEmpty) {
+    if (url.isEmpty)
       return Container(
         color: Colors.grey.shade200,
         child: Center(child: fallback),
       );
-    }
     return CachedNetworkImage(
       imageUrl: url,
       fit: BoxFit.cover,
       memCacheWidth: 200,
       memCacheHeight: 200,
-      placeholder: (context, url) => Container(
+      placeholder: (_, __) => Container(
         color: Colors.grey.shade100,
         child: const Center(
           child: SizedBox(
             width: 16,
             height: 16,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: Color(0xFFFFC107),
-            ),
+            child: CircularProgressIndicator(strokeWidth: 2, color: _kYellow),
           ),
         ),
       ),
-      errorWidget: (context, url, error) => Container(
+      errorWidget: (_, __, ___) => Container(
         color: Colors.grey.shade200,
         child: Center(child: fallback),
       ),
@@ -1233,11 +1093,8 @@ class _BandiwalaTopBarState extends State<BandiwalaTopBar>
 
 // ─── Item ADD / counter widget ────────────────────────────────────────────────
 
-class _ItemCounter extends StatefulWidget {
-  final String vendorId;
-  final String vendorName;
-  final String itemId;
-  final String itemName;
+class _ItemCounter extends ConsumerWidget {
+  final String vendorId, vendorName, itemId, itemName;
   final double price;
   final bool isAvailable;
 
@@ -1251,54 +1108,32 @@ class _ItemCounter extends StatefulWidget {
   });
 
   @override
-  State<_ItemCounter> createState() => _ItemCounterState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cart = ref.watch(cartProvider);
+    final vc = cart.cartByVendor[vendorId];
+    final q =
+        vc?.items
+            .firstWhere(
+              (i) => i.id == itemId,
+              orElse: () => CartItem(id: '', name: '', price: 0, quantity: 0),
+            )
+            .quantity ??
+        0;
 
-class _ItemCounterState extends State<_ItemCounter> {
-  @override
-  void initState() {
-    super.initState();
-    cartStore.addListener(_rebuild);
-  }
+    void add() => ref
+        .read(cartProvider.notifier)
+        .addItem(
+          vendorId: vendorId,
+          vendorName: vendorName,
+          itemId: itemId,
+          itemName: itemName,
+          price: price,
+        );
+    void delta(int d) => ref
+        .read(cartProvider.notifier)
+        .updateQuantity(vendorId: vendorId, itemId: itemId, delta: d);
 
-  @override
-  void dispose() {
-    cartStore.removeListener(_rebuild);
-    super.dispose();
-  }
-
-  void _rebuild() {
-    if (mounted) setState(() {});
-  }
-
-  int get _qty {
-    final vc = cartStore.cartByVendor[widget.vendorId];
-    if (vc == null) return 0;
-    return vc.items
-        .firstWhere(
-          (i) => i.id == widget.itemId,
-          orElse: () => CartItem(id: '', name: '', price: 0, quantity: 0),
-        )
-        .quantity;
-  }
-
-  void _add() => cartStore.addItem(
-    vendorId: widget.vendorId,
-    vendorName: widget.vendorName,
-    itemId: widget.itemId,
-    itemName: widget.itemName,
-    price: widget.price,
-  );
-
-  void _delta(int d) => cartStore.updateQuantity(
-    vendorId: widget.vendorId,
-    itemId: widget.itemId,
-    delta: d,
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    if (!widget.isAvailable) {
+    if (!isAvailable) {
       return Container(
         height: 28,
         width: double.infinity,
@@ -1314,13 +1149,12 @@ class _ItemCounterState extends State<_ItemCounter> {
       );
     }
 
-    final q = _qty;
     if (q == 0) {
       return SizedBox(
         height: 28,
         width: double.infinity,
         child: OutlinedButton(
-          onPressed: _add,
+          onPressed: add,
           style: OutlinedButton.styleFrom(
             padding: EdgeInsets.zero,
             side: const BorderSide(color: Colors.black87, width: 1.2),
@@ -1352,7 +1186,7 @@ class _ItemCounterState extends State<_ItemCounter> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           GestureDetector(
-            onTap: () => _delta(-1),
+            onTap: () => delta(-1),
             child: const SizedBox(
               width: 28,
               height: 28,
@@ -1368,7 +1202,7 @@ class _ItemCounterState extends State<_ItemCounter> {
             ),
           ),
           GestureDetector(
-            onTap: () => _delta(1),
+            onTap: () => delta(1),
             child: const SizedBox(
               width: 28,
               height: 28,

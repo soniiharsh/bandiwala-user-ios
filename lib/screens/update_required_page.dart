@@ -3,20 +3,21 @@ import 'package:url_launcher/url_launcher.dart';
 
 const kBandiwalaYellow = Color(0xFFFFC107);
 
-class UpdateRequiredScreen extends StatelessWidget {
+class UpdateRequiredPage extends StatelessWidget {
   final String currentVersion;
   final String minimumVersion;
 
-  const UpdateRequiredScreen({
+  const UpdateRequiredPage({
     super.key,
     required this.currentVersion,
     required this.minimumVersion,
   });
 
   Future<void> _openPlayStore() async {
-    const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.bandiwala.user';
+    const playStoreUrl =
+        'https://play.google.com/store/apps/details?id=com.bandiwala.user';
     final uri = Uri.parse(playStoreUrl);
-    
+
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }

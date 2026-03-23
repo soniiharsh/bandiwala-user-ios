@@ -1,474 +1,200 @@
-import 'dart:async';
-import 'package:shared_preferences/shared_preferences.dart';
-
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:sms_autofill/sms_autofill.dart';
-import '../services/notification_service.dart';
-import 'home_page.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/user_provider.dart';
 import '../services/analytics_service.dart';
+import 'nav_page.dart';
 
-class OTPVerifyScreen extends StatefulWidget {
+class OtpPage extends ConsumerStatefulWidget {
   final String phoneNumber;
   final String verificationId;
 
-  const OTPVerifyScreen({
+  const OtpPage({
     super.key,
     required this.phoneNumber,
     required this.verificationId,
   });
 
   @override
-  State<OTPVerifyScreen> createState() => _OTPVerifyScreenState();
+  ConsumerState<OtpPage> createState() => _OtpPageState();
 }
 
-class _OTPVerifyScreenState extends State<OTPVerifyScreen> with CodeAutoFill {
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController _otpController = TextEditingController();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+class _OtpPageState extends ConsumerState<OtpPage> {
+  static const Color _yellow = Color(0xFFFFC107);
 
-  static const Color bandiwalaYellow = Color(0xFFFFC107);
+  final _otpController = TextEditingController();
   bool _isLoading = false;
-  int _resendTimer = 26;
-  bool _canResend = false;
-  Timer? _timer;
 
   @override
-  void initState() {
-    super.initState();
-    _startResendTimer();
-    _listenForOTP(); // ✅ System will request permission automatically
+  void dispose() {
+    _otpController.dispose();
+    super.dispose();
   }
 
-  // ✅ Listen for incoming SMS OTP (system handles permission)
-  Future<void> _listenForOTP() async {
-    try {
-      // This will trigger system permission dialog automatically
-      listenForCode();
-
-      final signature = await SmsAutoFill().getAppSignature;
-      debugPrint('📱 App Signature: $signature');
-    } catch (e) {
-      debugPrint('❌ SMS AutoFill Error: $e');
-    }
-  }
-
-  // ✅ Called when OTP is auto-detected
-  @override
-  void codeUpdated() {
-    if (mounted && code != null && code!.length == 6) {
-      setState(() {
-        _otpController.text = code!;
-      });
-
-      // Show success feedback
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.white, size: 20),
-              SizedBox(width: 12),
-              Text('OTP detected automatically'),
-            ],
-          ),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-
-      // Auto-verify after a short delay
-      Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted) {
-          _verifyOTP();
-        }
-      });
-    }
-  }
-
-  void _startResendTimer() {
-    _timer?.cancel();
-    _resendTimer = 26;
-    _canResend = false;
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_resendTimer > 0) {
-        if (mounted) {
-          setState(() {
-            _resendTimer--;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _canResend = true;
-          });
-        }
-        timer.cancel();
-      }
-    });
-  }
-
-  Future<void> _createCustomerIfNeeded(String phone) async {
-    try {
-      final customers = FirebaseFirestore.instance.collection('customers');
-      // Normalize: always remove +91 for document ID
-      final phoneWithoutCode = phone.replaceAll('+91', '');
-      final docRef = customers.doc(phoneWithoutCode);
-
-      final snapshot = await docRef.get();
-
-      if (!snapshot.exists) {
-        await docRef.set({
-          'phone': phone, // Store full number with +91
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      }
-    } catch (e) {
-      debugPrint('Customer creation failed: $e');
-    }
-  }
-
-  Future<void> _saveLoginState(String phone) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isLoggedIn', true);
-      await prefs.setString('userPhone', phone);
-    } catch (e) {
-      debugPrint('Save login state failed: $e');
-    }
-  }
-
-  Future<void> _completeSignIn(String phone) async {
-    await _createCustomerIfNeeded(phone);
-    await _saveLoginState(phone);
-    await AnalyticsService.logLogin(loginMethod: 'phone_manual');
-    
-    // Update FCM token
-    await NotificationService().updateCustomerToken(phone);
-
+  void _showError(String msg) {
     if (!mounted) return;
-
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => HomePage(phoneNumber: phone)),
-      (route) => false,
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
     );
   }
 
   Future<void> _verifyOTP() async {
-    if (_isLoading) return;
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    final otp = _otpController.text.trim();
+    if (otp.length != 6) {
+      _showError('Enter a valid 6-digit OTP');
+      return;
+    }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      PhoneAuthCredential credential = PhoneAuthProvider.credential(
+      final credential = PhoneAuthProvider.credential(
         verificationId: widget.verificationId,
-        smsCode: _otpController.text.trim(),
+        smsCode: otp,
       );
 
-      await _auth.signInWithCredential(credential);
-      await _completeSignIn(widget.phoneNumber);
+      final result = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
+      final user = result.user;
+      if (user == null) throw Exception('Sign-in failed');
+
+      await _upsertUser(user);
+      await AnalyticsService.logLogin(loginMethod: 'phone_otp');
+
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const NavPage()),
+          (r) => false,
+        );
+      }
     } on FirebaseAuthException catch (e) {
-      // ✅ Handle case where native auto-verification (verificationCompleted)
-      // already signed the user in, making this verification attempt redundant.
-      if (e.code == 'session-expired' && _auth.currentUser != null) {
-        await _completeSignIn(widget.phoneNumber);
-        return;
-      }
-
-      String errorMessage;
-      switch (e.code) {
-        case 'invalid-verification-code':
-          errorMessage = 'Invalid OTP. Please check and try again.';
-          break;
-        case 'session-expired':
-          errorMessage = 'OTP session expired. Please request a new one.';
-          break;
-        case 'invalid-phone-number':
-          errorMessage = 'Invalid phone number. Please try again.';
-          break;
-        default:
-          errorMessage = 'Verification failed: ${e.message ?? 'Unknown error'}';
-      }
-
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        setState(() => _isLoading = false);
+        _showError(e.message ?? 'Invalid OTP. Please try again.');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Something went wrong: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
+        _showError('Error: $e');
       }
     }
   }
 
-  Future<void> _resendOTP() async {
-    if (_isLoading) return;
-
-    setState(() {
-      _isLoading = true;
-      _canResend = false;
-    });
-
-    try {
-      await _auth.verifyPhoneNumber(
-        phoneNumber: widget.phoneNumber,
-        verificationCompleted: (PhoneAuthCredential credential) async {
-          await _auth.signInWithCredential(credential);
-          await _completeSignIn(widget.phoneNumber);
-        },
-        verificationFailed: (FirebaseAuthException e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Resend failed: ${e.message ?? 'Unknown error'}'),
-                backgroundColor: Colors.redAccent,
-              ),
-            );
-          }
-        },
-        codeSent: (String newVerificationId, int? resendToken) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('New OTP sent successfully!'),
-                backgroundColor: Colors.green,
-              ),
-            );
-
-            _startResendTimer();
-            _listenForOTP();
-          }
-        },
-        codeAutoRetrievalTimeout: (String verificationId) {},
-        timeout: const Duration(seconds: 60),
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Resend failed: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+  Future<void> _upsertUser(User user) async {
+    final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+    final doc = await docRef.get();
+    if (!doc.exists) {
+      await docRef.set({
+        'id': user.uid,
+        'phone': user.phoneNumber ?? widget.phoneNumber,
+        'name': '',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      if (kDebugMode) print('Created new user doc: ${user.uid}');
     }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _otpController.dispose();
-    cancel();
-    super.dispose();
+    await ref.read(userProvider.notifier).updateFcmToken(user.uid);
   }
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        elevation: 0,
         backgroundColor: Colors.white,
+        elevation: 0,
         foregroundColor: Colors.black87,
-        title: const Text(
-          'Verify OTP',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
       ),
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              padding: EdgeInsets.only(bottom: bottomInset),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: IntrinsicHeight(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          'Verify OTP',
-                          style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "We've sent a 6-digit code to\n${widget.phoneNumber}",
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade600,
-                            height: 1.4,
-                          ),
-                          textAlign: TextAlign.start,
-                        ),
-                        const SizedBox(height: 32),
-
-                        // ✅ Pin Field with visible cursor
-                        Form(
-                          key: _formKey,
-                          child: PinFieldAutoFill(
-                            controller: _otpController,
-                            codeLength: 6,
-                            autoFocus: true,
-                            cursor: Cursor(
-                              width: 2,
-                              height: 24,
-                              color: bandiwalaYellow,
-                              radius: const Radius.circular(1),
-                              enabled: true,
-                            ),
-                            decoration: UnderlineDecoration(
-                              textStyle: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black87,
-                              ),
-                              colorBuilder: FixedColorBuilder(
-                                Colors.grey.shade300,
-                              ),
-                              bgColorBuilder: FixedColorBuilder(
-                                Colors.transparent,
-                              ),
-                              lineHeight: 2,
-                              lineStrokeCap: StrokeCap.round,
-                            ),
-                            currentCode: _otpController.text,
-                            onCodeSubmitted: (code) {
-                              _verifyOTP();
-                            },
-                            onCodeChanged: (code) {
-                              if (code?.length == 6) {
-                                Future.delayed(
-                                  const Duration(milliseconds: 300),
-                                  () {
-                                    if (mounted) {
-                                      _verifyOTP();
-                                    }
-                                  },
-                                );
-                              }
-                            },
-                          ),
-                        ),
-
-                        const SizedBox(height: 32),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _verifyOTP,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: bandiwalaYellow,
-                              foregroundColor: Colors.black87,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                            ),
-                            child: _isLoading
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.black87,
-                                      ),
-                                    ),
-                                  )
-                                : const Text(
-                                    'Verify OTP',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(height: 40),
-                        Center(
-                          child: Column(
-                            children: [
-                              Text(
-                                _canResend
-                                    ? "Didn't receive OTP?"
-                                    : 'Resend code in $_resendTimer s',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey.shade600,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 6),
-                              GestureDetector(
-                                onTap: (_canResend && !_isLoading)
-                                    ? _resendOTP
-                                    : null,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 4,
-                                  ),
-                                  child: Text(
-                                    'Resend OTP',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: (_canResend && !_isLoading)
-                                          ? bandiwalaYellow
-                                          : Colors.grey.shade400,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 24),
+              const Text(
+                'Enter OTP',
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Sent to ${widget.phoneNumber}',
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 40),
+              TextField(
+                controller: _otpController,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                autofocus: true,
+                enabled: !_isLoading,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 8,
+                ),
+                decoration: InputDecoration(
+                  counterText: '',
+                  hintText: '------',
+                  hintStyle: TextStyle(
+                    color: Colors.grey.shade400,
+                    letterSpacing: 8,
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 18),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: _yellow, width: 1.6),
                   ),
                 ),
+                onSubmitted: (_) => _verifyOTP(),
               ),
-            );
-          },
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _verifyOTP,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _yellow,
+                    foregroundColor: Colors.black87,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    disabledBackgroundColor: _yellow.withValues(alpha: 0.6),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.black87,
+                            ),
+                          ),
+                        )
+                      : const Text(
+                          'Verify OTP',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

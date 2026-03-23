@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'cart_store.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/cart_provider.dart';
 
-class BandiwalaBottomNavigation extends StatefulWidget {
+class BandiwalaBottomNavigation extends ConsumerWidget {
   final int currentIndex;
   final ValueChanged<int> onItemSelected;
 
@@ -11,57 +12,30 @@ class BandiwalaBottomNavigation extends StatefulWidget {
     required this.onItemSelected,
   });
 
-  @override
-  State<BandiwalaBottomNavigation> createState() =>
-      _BandiwalaBottomNavigationState();
-}
-
-class _BandiwalaBottomNavigationState extends State<BandiwalaBottomNavigation> {
   static const Color bandiwalaYellow = Color(0xFFFFC107);
 
   @override
-  void initState() {
-    super.initState();
-    cartStore.addListener(_onCartChanged);
-  }
-
-  @override
-  void dispose() {
-    cartStore.removeListener(_onCartChanged);
-    super.dispose();
-  }
-
-  void _onCartChanged() {
-    if (mounted) setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cartItemCount = cartStore.totalItemCount;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cartItemCount = ref.watch(cartProvider).totalItemCount;
 
     return BottomNavigationBar(
-      currentIndex: widget.currentIndex,
+      currentIndex: currentIndex,
       selectedItemColor: bandiwalaYellow,
       unselectedItemColor: Colors.grey.shade500,
       backgroundColor: Colors.white,
       type: BottomNavigationBarType.fixed,
-      onTap: widget.onItemSelected,
+      onTap: onItemSelected,
       items: [
-        // ── Home ─────────────────────────────────────────────────────────
         const BottomNavigationBarItem(
           icon: Icon(Icons.home_outlined),
           activeIcon: Icon(Icons.home),
           label: 'Home',
         ),
-
-        // ── Cart ─────────────────────────────────────────────────────────
         BottomNavigationBarItem(
           icon: _CartIcon(count: cartItemCount, filled: false),
           activeIcon: _CartIcon(count: cartItemCount, filled: true),
           label: 'Cart',
         ),
-
-        // ── Orders ───────────────────────────────────────────────────────
         const BottomNavigationBarItem(
           icon: Icon(Icons.receipt_long_outlined),
           activeIcon: Icon(Icons.receipt_long),
@@ -72,7 +46,6 @@ class _BandiwalaBottomNavigationState extends State<BandiwalaBottomNavigation> {
   }
 }
 
-// ── Cart icon with badge ──────────────────────────────────────────────────────
 class _CartIcon extends StatelessWidget {
   final int count;
   final bool filled;

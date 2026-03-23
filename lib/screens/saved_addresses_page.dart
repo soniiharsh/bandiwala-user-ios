@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import 'location_picker_page.dart'; // Import your location picker
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/user_provider.dart';
+import '../models/app_user.dart';
+import 'location_picker_page.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 const kBandiwalaYellow = Color(0xFFFFC107);
@@ -10,39 +11,17 @@ const kBorderGrey = Color(0xFFE5E7EB);
 const kTextGrey = Color(0xFF6B7280);
 const kLightGrey = Color(0xFFF9FAFB);
 
-class SavedAddressesPage extends StatefulWidget {
+class SavedAddressesPage extends ConsumerStatefulWidget {
   const SavedAddressesPage({super.key});
 
   @override
-  State<SavedAddressesPage> createState() => _SavedAddressesPageState();
+  ConsumerState<SavedAddressesPage> createState() => _SavedAddressesPageState();
 }
 
-class _SavedAddressesPageState extends State<SavedAddressesPage> {
-  List<SavedLocation> _savedLocations = [];
-  bool _isLoading = true;
+class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
+  bool _isLoading = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadSavedLocations();
-  }
-
-  Future<void> _loadSavedLocations() async {
-    setState(() => _isLoading = true);
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final locationsJson = prefs.getStringList('saved_locations') ?? [];
-      setState(() {
-        _savedLocations = locationsJson
-            .map((json) => SavedLocation.fromJson(jsonDecode(json)))
-            .toList();
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Error loading locations: $e');
-      setState(() => _isLoading = false);
-    }
-  }
+  SavedAddress _toSavedAddress(SavedAddress a) => a;
 
   Future<void> _deleteLocation(int index) async {
     final confirmed = await showDialog<bool>(
@@ -82,15 +61,8 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
 
     if (confirmed == true) {
       try {
-        final prefs = await SharedPreferences.getInstance();
-        final locationsJson = prefs.getStringList('saved_locations') ?? [];
-        locationsJson.removeAt(index);
-        await prefs.setStringList('saved_locations', locationsJson);
-
-        setState(() {
-          _savedLocations.removeAt(index);
-        });
-
+        setState(() => _isLoading = true);
+        await ref.read(userProvider.notifier).deleteAddress(index);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -113,15 +85,14 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
             ),
           );
         }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
       }
     }
   }
 
-  Future<void> _editLocation(int index) async {
-    final location = _savedLocations[index];
-
-    // Navigate to location picker with pre-filled data
-    final result = await Navigator.push<SavedLocation>(
+  Future<void> _editLocation(int index, SavedAddress location) async {
+    final result = await Navigator.push<SavedAddress>(
       context,
       MaterialPageRoute(
         builder: (context) => LocationPickerEditMode(
@@ -132,18 +103,27 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
     );
 
     if (result != null) {
-      await _loadSavedLocations(); // Reload all locations
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Address updated successfully'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+      try {
+        await ref
+            .read(userProvider.notifier)
+            .updateAddress(
+              index,
+              result,
+            );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Address updated successfully'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-          ),
-        );
+          );
+        }
+      } catch (e) {
+        debugPrint('Error updating location: $e');
       }
     }
   }
@@ -172,6 +152,10 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final savedAddresses =
+        ref.watch(userProvider).valueOrNull?.savedAddresses ?? [];
+    final savedLocations = savedAddresses.map(_toSavedAddress).toList();
+
     return Scaffold(
       backgroundColor: kLightGrey,
       appBar: AppBar(
@@ -198,29 +182,22 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
                 strokeWidth: 3,
               ),
             )
-          : _savedLocations.isEmpty
+          : savedLocations.isEmpty
           ? _buildEmptyState()
-          : RefreshIndicator(
-              color: kBandiwalaYellow,
-              onRefresh: _loadSavedLocations,
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _savedLocations.length,
-                itemBuilder: (context, index) {
-                  final location = _savedLocations[index];
-                  return _buildAddressCard(location, index);
-                },
-              ),
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: savedLocations.length,
+              itemBuilder: (context, index) {
+                return _buildAddressCard(savedLocations[index], index);
+              },
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          final result = await Navigator.push<SavedLocation>(
+          await Navigator.push<SavedAddress>(
             context,
             MaterialPageRoute(builder: (context) => const LocationPickerPage()),
           );
-          if (result != null) {
-            await _loadSavedLocations();
-          }
+          // No need to setState — userProvider stream updates automatically
         },
         backgroundColor: kBandiwalaYellow,
         foregroundColor: Colors.black87,
@@ -272,15 +249,12 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
           const SizedBox(height: 32),
           ElevatedButton.icon(
             onPressed: () async {
-              final result = await Navigator.push<SavedLocation>(
+              await Navigator.push<SavedAddress>(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const LocationPickerPage(),
                 ),
               );
-              if (result != null) {
-                await _loadSavedLocations();
-              }
             },
             icon: const Icon(Icons.add_location_alt, color: Colors.black87),
             label: const Text(
@@ -304,7 +278,7 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
     );
   }
 
-  Widget _buildAddressCard(SavedLocation location, int index) {
+  Widget _buildAddressCard(SavedAddress location, int index) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -352,9 +326,9 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
                           color: Colors.black87,
                         ),
                       ),
-                      if (location.phone != null && location.phone!.isNotEmpty)
+                      if (location.phone.isNotEmpty)
                         Text(
-                          location.phone!,
+                          location.phone,
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey.shade600,
@@ -364,7 +338,7 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
                   ),
                 ),
                 IconButton(
-                  onPressed: () => _editLocation(index),
+                  onPressed: () => _editLocation(index, location),
                   icon: const Icon(Icons.edit_outlined),
                   color: kBandiwalaYellow,
                   tooltip: 'Edit',
@@ -382,7 +356,7 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
             const SizedBox(height: 12),
 
             // House number/Landmark
-            if (location.houseNo != null && location.houseNo!.isNotEmpty)
+            if (location.address != null && location.address!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
@@ -395,7 +369,7 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        location.houseNo!,
+                        location.address!,
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -407,7 +381,7 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
                 ),
               ),
 
-            // Full address
+            // Full area geolocation
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -419,7 +393,7 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    location.address,
+                    location.geolocation,
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.grey.shade700,
@@ -454,8 +428,8 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
 }
 
 // ✅ NEW: Edit Mode for Location Picker
-class LocationPickerEditMode extends StatefulWidget {
-  final SavedLocation existingLocation;
+class LocationPickerEditMode extends ConsumerStatefulWidget {
+  final SavedAddress existingLocation;
   final int locationIndex;
 
   const LocationPickerEditMode({
@@ -465,14 +439,15 @@ class LocationPickerEditMode extends StatefulWidget {
   });
 
   @override
-  State<LocationPickerEditMode> createState() => _LocationPickerEditModeState();
+  ConsumerState<LocationPickerEditMode> createState() => _LocationPickerEditModeState();
 }
 
-class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
+class _LocationPickerEditModeState extends ConsumerState<LocationPickerEditMode> {
   late LatLng _selectedPosition;
   late TextEditingController _searchController;
-  late TextEditingController _houseNoController;
+  late TextEditingController _addressController;
   late TextEditingController _phoneController;
+  late TextEditingController _customLabelController;
   late String _selectedLabel;
   GoogleMapController? _mapController;
   bool _isLoading = false;
@@ -485,15 +460,23 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
       widget.existingLocation.longitude,
     );
     _searchController = TextEditingController(
-      text: widget.existingLocation.address,
+      text: widget.existingLocation.geolocation,
     );
-    _houseNoController = TextEditingController(
-      text: widget.existingLocation.houseNo ?? '',
+    _addressController = TextEditingController(
+      text: widget.existingLocation.address ?? '',
     );
     _phoneController = TextEditingController(
-      text: widget.existingLocation.phone ?? '',
+      text: widget.existingLocation.phone,
     );
-    _selectedLabel = widget.existingLocation.label ?? 'Other';
+    _customLabelController = TextEditingController();
+    
+    final label = widget.existingLocation.label ?? 'Other';
+    if (label != 'Home' && label != 'Work') {
+      _selectedLabel = 'Other';
+      _customLabelController.text = label;
+    } else {
+      _selectedLabel = label;
+    }
 
     // Move map to existing location
     _mapController?.moveCamera(
@@ -502,7 +485,7 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
   }
 
   Future<void> _updateLocation() async {
-    if (_houseNoController.text.trim().isEmpty) {
+    if (_addressController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter house number or landmark')),
       );
@@ -512,27 +495,23 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
     setState(() => _isLoading = true);
 
     try {
-      final updatedLocation = SavedLocation(
-        address: _searchController.text.trim().isEmpty
+      final updatedLocation = SavedAddress(
+        geolocation: _searchController.text.trim().isEmpty
             ? 'Selected Location'
             : _searchController.text.trim(),
         latitude: _selectedPosition.latitude,
         longitude: _selectedPosition.longitude,
-        houseNo: _houseNoController.text.trim(),
-        phone: _phoneController.text.trim().isNotEmpty
-            ? _phoneController.text.trim()
-            : null,
-        label: _selectedLabel,
+        address: _addressController.text.trim(),
+        phone: _phoneController.text.trim(),
+        label: _selectedLabel == 'Other' ? _customLabelController.text.trim() : _selectedLabel,
       );
 
-      final prefs = await SharedPreferences.getInstance();
-      final locationsJson = prefs.getStringList('saved_locations') ?? [];
-
-      // Update the location at the specific index
-      locationsJson[widget.locationIndex] = jsonEncode(
-        updatedLocation.toJson(),
-      );
-      await prefs.setStringList('saved_locations', locationsJson);
+      if (updatedLocation.phone.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a phone number')),
+        );
+        return;
+      }
 
       if (mounted) {
         Navigator.pop(context, updatedLocation);
@@ -650,9 +629,9 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
                   ),
                   const SizedBox(height: 16),
                   TextField(
-                    controller: _houseNoController,
+                    controller: _addressController,
                     decoration: InputDecoration(
-                      labelText: 'House No, Landmark *',
+                      labelText: 'Address (House No, Building, Area) *',
                       prefixIcon: const Icon(Icons.home_outlined),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -671,7 +650,7 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
                     decoration: InputDecoration(
-                      labelText: 'Phone (optional)',
+                      labelText: 'Phone *',
                       prefixIcon: const Icon(Icons.phone_outlined),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -685,6 +664,26 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
                       ),
                     ),
                   ),
+                  if (_selectedLabel == 'Other') ...[
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _customLabelController,
+                      decoration: InputDecoration(
+                        labelText: 'Custom Label *',
+                        prefixIcon: const Icon(Icons.label_outline),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: kBandiwalaYellow,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
@@ -758,8 +757,9 @@ class _LocationPickerEditModeState extends State<LocationPickerEditMode> {
   @override
   void dispose() {
     _searchController.dispose();
-    _houseNoController.dispose();
+    _addressController.dispose();
     _phoneController.dispose();
+    _customLabelController.dispose();
     super.dispose();
   }
 }

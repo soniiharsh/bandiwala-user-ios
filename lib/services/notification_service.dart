@@ -1,7 +1,6 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Handle background messages
 @pragma('vm:entry-point')
@@ -45,7 +44,9 @@ class NotificationService {
     }
 
     // Initialize local notifications
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -72,7 +73,8 @@ class NotificationService {
 
     await _localNotifications
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(androidChannel);
 
     // Set background message handler
@@ -105,19 +107,6 @@ class NotificationService {
     } catch (e) {
       if (kDebugMode) {
         print('❌ Failed to subscribe to admin topic: $e');
-      }
-    }
-  }
-
-  Future<void> unsubscribeFromAdminTopic() async {
-    try {
-      await _messaging.unsubscribeFromTopic('admin');
-      if (kDebugMode) {
-        print('✅ Unsubscribed from admin topic');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Failed to unsubscribe from admin topic: $e');
       }
     }
   }
@@ -163,52 +152,8 @@ class NotificationService {
     // Handle navigation
   }
 
-  // ── FCM Token Management ──────────────────────────────────────────────────
+  // ── FCM Token ─────────────────────────────────────────────────────────────
+  // Returns the current FCM token. Firestore writes are handled by UserNotifier.
 
-  Future<void> updateCustomerToken(String phone) async {
-    try {
-      String? token = await _messaging.getToken();
-      if (token != null) {
-        // Normalize: always remove +91 for document ID
-        final phoneWithoutCode = phone.replaceAll('+91', '');
-        
-        await FirebaseFirestore.instance
-            .collection('customers')
-            .doc(phoneWithoutCode)
-            .set({
-          'FCMToken': token,
-        }, SetOptions(merge: true));
-        
-        if (kDebugMode) {
-          print('✅ FCM token updated for customer: $phoneWithoutCode');
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error updating customer FCM token: $e');
-      }
-    }
-  }
-
-  Future<void> deleteCustomerToken(String phone) async {
-    try {
-      // Normalize: always remove +91 for document ID
-      final phoneWithoutCode = phone.replaceAll('+91', '');
-      
-      await FirebaseFirestore.instance
-          .collection('customers')
-          .doc(phoneWithoutCode)
-          .update({
-        'FCMToken': FieldValue.delete(),
-      });
-      
-      if (kDebugMode) {
-        print('✅ FCM token deleted for customer: $phoneWithoutCode');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error deleting customer FCM token: $e');
-      }
-    }
-  }
+  Future<String?> getToken() => _messaging.getToken();
 }

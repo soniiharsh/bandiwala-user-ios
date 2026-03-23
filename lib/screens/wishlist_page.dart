@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'vendor_items_page.dart';
-import 'home_page.dart'; // WishlistManager + WishlistVendor
+import '../widgets/vendor_card.dart'; // WishlistManager + WishlistVendor
 
 const _kBandiwalaYellow = Color(0xFFFFC107);
 const _kWhite = Color(0xFFFFFFFF);

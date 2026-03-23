@@ -1,12 +1,14 @@
-// payment_page.dart
-
+import 'package:BandiWala/providers/pricing_config_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:razorpay_flutter/razorpay_flutter.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'cart_store.dart';
+import '../providers/cart_provider.dart';
+import '../providers/coupons_provider.dart';
+import '../models/order.dart';
+import '../models/app_user.dart';
+import '../services/payment_service.dart';
 import 'payment_success_page.dart';
-import 'location_picker_page.dart';
+import 'coupons_page.dart';
 
 const kBandiwalaYellow = Color(0xFFFFC107);
 const kWhite = Color(0xFFFFFFFF);
@@ -14,23 +16,20 @@ const kBorderGrey = Color(0xFFE5E7EB);
 const kTextGrey = Color(0xFF6B7280);
 const kBgGrey = Color(0xFFF9FAFB);
 
-// ─── Tax Constants ────────────────────────────────────────────────────────────
+// ─── Pricing Config Model ─────────────────────────────────────────────────────
 
 const double kFoodTaxPercent = 5.0;
 const double kDeliveryTaxPercent = 18.0;
 const double kPlatformFeeTaxPercent = 18.0;
 
-// ─── Pricing Config Model ─────────────────────────────────────────────────────
-
-class _PricingConfig {
+class PricingConfig {
   final double deliveryCharge;
   final double platformFee;
-  // taxPercent kept for Firestore compat but individual rates are constants above
   final double foodTaxPercent;
   final double deliveryTaxPercent;
   final double platformFeeTaxPercent;
 
-  const _PricingConfig({
+  const PricingConfig({
     required this.deliveryCharge,
     required this.platformFee,
     this.foodTaxPercent = kFoodTaxPercent,
@@ -38,10 +37,10 @@ class _PricingConfig {
     this.platformFeeTaxPercent = kPlatformFeeTaxPercent,
   });
 
-  factory _PricingConfig.defaults() =>
-      const _PricingConfig(deliveryCharge: 29, platformFee: 10);
+  factory PricingConfig.defaults() =>
+      const PricingConfig(deliveryCharge: 29, platformFee: 10);
 
-  factory _PricingConfig.fromMap(Map<String, dynamic> map) => _PricingConfig(
+  factory PricingConfig.fromMap(Map<String, dynamic> map) => PricingConfig(
     deliveryCharge: (map['deliveryCharge'] ?? 29).toDouble(),
     platformFee: (map['platformFee'] ?? 10).toDouble(),
     foodTaxPercent: (map['foodTaxPercent'] ?? kFoodTaxPercent).toDouble(),
@@ -54,47 +53,48 @@ class _PricingConfig {
 
 // ─── PaymentPage ──────────────────────────────────────────────────────────────
 
-class PaymentPage extends StatefulWidget {
+class PaymentPage extends ConsumerStatefulWidget {
   final double itemsTotal;
-  final SavedLocation? deliveryLocation;
-  final Map<String, dynamic>? appliedCoupon;
-  final double couponDiscount;
+  final SavedAddress? deliveryLocation;
 
   const PaymentPage({
     super.key,
     required this.itemsTotal,
     this.deliveryLocation,
-    this.appliedCoupon,
-    this.couponDiscount = 0,
   });
 
   @override
-  State<PaymentPage> createState() => _PaymentPageState();
+  ConsumerState<PaymentPage> createState() => _PaymentPageState();
 }
 
 enum _PaymentMethod { online, cod }
 
-class _PaymentPageState extends State<PaymentPage> {
-  late Razorpay _razorpay;
+class _PaymentPageState extends ConsumerState<PaymentPage> {
+  late PaymentService _paymentService;
   bool _isProcessing = false;
-  bool _isLoadingPricing = true;
   bool _taxBreakdownExpanded = false;
   _PaymentMethod _selectedMethod = _PaymentMethod.online;
 
-  _PricingConfig _pricing = _PricingConfig.defaults();
+  Map<String, dynamic>? _appliedCoupon;
+  double _couponDiscount = 0;
 
-  // ── Computed values ────────────────────────────────────────────────────────
+  // ── Pricing ───────────────────────────────────────────────────────────────
 
-  bool get _isFreeDelivery =>
-      widget.appliedCoupon != null &&
-      (widget.appliedCoupon!['couponType'] == 'freeDelivery' ||
-          widget.appliedCoupon!['couponType'] == 'free_delivery');
+  PricingConfig get _pricing {
+    final data = ref.watch(pricingConfigProvider).valueOrNull ?? {};
+    return data.isEmpty
+        ? PricingConfig.defaults()
+        : PricingConfig.fromMap(data);
+  }
+
+  // ── Computed values ───────────────────────────────────────────────────────
+
+  bool get _isFreeDelivery => _appliedCoupon?['couponType'] == 'free_delivery';
 
   double get _deliveryCharge => _isFreeDelivery ? 0.0 : _pricing.deliveryCharge;
 
   double get _platformFee => _pricing.platformFee;
 
-  // ── Split tax getters ──────────────────────────────────────────────────────
   double get _foodTax => widget.itemsTotal * (_pricing.foodTaxPercent / 100);
 
   double get _deliveryTax =>
@@ -105,457 +105,182 @@ class _PaymentPageState extends State<PaymentPage> {
 
   double get _totalTaxAmount => _foodTax + _deliveryTax + _platformFeeTax;
 
-  // ── Grand total ────────────────────────────────────────────────────────────
   double get _grandTotal {
-    final discountToApply = _isFreeDelivery ? 0.0 : widget.couponDiscount;
+    final discount = _isFreeDelivery ? 0.0 : _couponDiscount;
     return widget.itemsTotal +
         _deliveryCharge +
         _platformFee +
         _totalTaxAmount -
-        discountToApply;
+        discount;
   }
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
-    _razorpay = Razorpay();
-    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
-    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
-    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
-    _fetchPricingConfig();
+    _paymentService = PaymentService(
+      buildOrder: _buildOrder,
+      onSuccess: _onOrderSuccess,
+      onError: _onOrderError,
+    );
   }
 
   @override
   void dispose() {
-    _razorpay.clear();
+    _paymentService.dispose();
     super.dispose();
   }
 
-  // ── Fetch pricing ──────────────────────────────────────────────────────────
+  // ── Order builder (snapshot of current state) ─────────────────────────────
 
-  Future<void> _fetchPricingConfig() async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('pricing_config')
-          .doc('defaults')
-          .get();
-      if (doc.exists && doc.data() != null) {
-        if (mounted) {
-          setState(() {
-            _pricing = _PricingConfig.fromMap(doc.data()!);
-            _isLoadingPricing = false;
-          });
-        }
-      } else {
-        if (mounted) setState(() => _isLoadingPricing = false);
-      }
-    } catch (e) {
-      debugPrint('Pricing config fetch error: $e — using defaults');
-      if (mounted) setState(() => _isLoadingPricing = false);
+  AppOrder _buildOrder() {
+    final user = FirebaseAuth.instance.currentUser;
+    final cart = ref.read(cartProvider);
+    final loc = widget.deliveryLocation!;
+
+    final List<String> vendorIds = [];
+    final Map<String, VendorOrder> itemsByVendor = {};
+
+    for (final entry in cart.cartByVendor.entries) {
+      vendorIds.add(entry.key);
+      itemsByVendor[entry.key] = VendorOrder(
+        vendorName: entry.value.vendorName,
+        items: {
+          for (final item in entry.value.items)
+            item.id: OrderItem(
+              name: item.name,
+              price: item.price,
+              quantity: item.quantity,
+            ),
+        },
+      );
+    }
+
+    return AppOrder(
+      id: '',
+      userId: user?.uid ?? '',
+      customerPhone: loc.phone,
+      deliveryAddress: OrderDeliveryAddress.fromSavedAddress(loc),
+      itemsByVendor: itemsByVendor,
+      vendorIds: vendorIds,
+      paymentMethod: '',
+      paymentId: '',
+      deliveryFee: _deliveryCharge,
+      platformFee: _platformFee,
+      foodTax: _foodTax,
+      deliveryTax: _deliveryTax,
+      platformTax: _platformFeeTax > 0,
+      couponApplied: _appliedCoupon != null,
+      couponCode: _appliedCoupon?['couponCode'] ?? '',
+      couponType: _appliedCoupon?['couponType'] ?? '',
+      couponDiscount: _isFreeDelivery ? 0.0 : _couponDiscount,
+      couponMaxDiscountableAmount:
+          (_appliedCoupon?['maxDiscountableAmount'] ?? 0).toDouble(),
+      grandTotal: _grandTotal,
+      status: 'order_created',
+    );
+  }
+
+  // ── Payment callbacks ─────────────────────────────────────────────────────
+
+  void _onOrderSuccess(String orderId) {
+    ref.read(cartProvider.notifier).clear();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PaymentSuccessPage(
+            paymentId: orderId,
+            amount: _grandTotal,
+            orderId: orderId,
+          ),
+        ),
+      );
+    });
+  }
+
+  void _onOrderError(String message) {
+    if (!mounted) return;
+    setState(() => _isProcessing = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
+  // ── Coupon logic ──────────────────────────────────────────────────────────
+
+  double _calculateCouponDiscount() {
+    if (_appliedCoupon == null) return 0;
+    final type = _appliedCoupon!['couponType'] ?? '';
+    if (type == 'free_delivery') return 0.0;
+
+    final total =
+        widget.itemsTotal + _deliveryCharge + _platformFee + _totalTaxAmount;
+    final discount = (_appliedCoupon!['discount'] ?? 0).toDouble();
+    final maxDiscountable = (_appliedCoupon!['maxDiscountableAmount'] ?? 0)
+        .toDouble();
+
+    if (type == 'flat_off') return discount;
+    if (type == 'discount') {
+      final pct = total * (discount / 100);
+      return maxDiscountable > 0
+          ? pct.clamp(0, maxDiscountable).toDouble()
+          : pct;
+    }
+    return 0;
+  }
+
+  Future<void> _showAllCoupons() async {
+    final cart = ref.read(cartProvider);
+    final selected = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CouponsPage(cartAmount: cart.grandTotal),
+      ),
+    );
+    if (selected != null && mounted) {
+      setState(() {
+        _appliedCoupon = selected;
+        _couponDiscount = _calculateCouponDiscount();
+      });
+      if (selected['id'] != null) incrementCouponUsage(selected['id']);
     }
   }
 
-  // ── Razorpay ───────────────────────────────────────────────────────────────
+  void _removeCoupon() => setState(() {
+    _appliedCoupon = null;
+    _couponDiscount = 0;
+  });
 
-  void _openRazorpay() {
+  // ── Actions ───────────────────────────────────────────────────────────────
+
+  void _handlePrimaryAction() {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
-
-    final options = {
-      'key': 'rzp_live_SIEw0ZGDGbPgTd',
-      'amount': (_grandTotal * 100).toInt(),
-      'name': 'Bandiwala',
-      'description': 'Street food delivery',
-      'prefill': {
-        'contact':
-            FirebaseAuth.instance.currentUser?.phoneNumber ?? '9999999999',
-        'email': 'customer@bandiwala.in',
-      },
-      'external': {
-        'wallets': ['paytm'],
-      },
-    };
-
-    try {
-      _razorpay.open(options);
-    } catch (e) {
-      debugPrint('Razorpay Error: $e');
-      setState(() => _isProcessing = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Payment failed to initialize')),
-        );
-      }
+    if (_selectedMethod == _PaymentMethod.cod) {
+      _showCodConfirmationDialog();
+    } else {
+      _paymentService.openRazorpay(_grandTotal);
     }
   }
-
-  // ── COD Confirmation Dialog ────────────────────────────────────────────────
 
   Future<void> _showCodConfirmationDialog() async {
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.money_rounded,
-                color: Colors.green.shade600,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Confirm Cash on Delivery',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 12),
-            Text(
-              'You are placing an order with Cash on Delivery.',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: kBandiwalaYellow.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kBandiwalaYellow.withOpacity(0.3)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Amount to pay on delivery',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  Text(
-                    '₹${_grandTotal.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: kBandiwalaYellow,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.info_outline, size: 14, color: Colors.grey.shade500),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Please keep exact change ready. Our delivery partner will collect payment at your doorstep.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-          ],
-        ),
-        actionsPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 12,
-        ),
-        actions: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(color: Colors.grey.shade300),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(
-                      color: Colors.black54,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kBandiwalaYellow,
-                    foregroundColor: Colors.black87,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text(
-                    'Place Order',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+      builder: (ctx) => _CodConfirmDialog(grandTotal: _grandTotal),
     );
-
-    if (confirmed == true) await _placeCodOrder();
-  }
-
-  // ── COD ────────────────────────────────────────────────────────────────────
-
-  Future<void> _placeCodOrder() async {
-    if (_isProcessing) return;
-    setState(() => _isProcessing = true);
-
-    try {
-      final orderId = await _createOrderInFirestore(
-        paymentId: 'COD_${DateTime.now().millisecondsSinceEpoch}',
-        paymentMethod: 'cod',
-        status: 'order_created',
-      );
-      _clearCartSafely();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => PaymentSuccessPage(
-                paymentId: orderId,
-                amount: _grandTotal,
-                orderId: orderId,
-              ),
-            ),
-          );
-        }
-      });
-    } catch (e) {
-      debugPrint('COD Order Error: $e');
-      setState(() => _isProcessing = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to place order: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  // ── Firestore order creation ───────────────────────────────────────────────
-
-  Future<String> _createOrderInFirestore({
-    required String paymentId,
-    required String paymentMethod,
-    required String status,
-  }) async {
-    final user = FirebaseAuth.instance.currentUser;
-    final customerPhone =
-        user?.phoneNumber ?? 'guest_${DateTime.now().millisecondsSinceEpoch}';
-    final orderId = 'ORD_${DateTime.now().millisecondsSinceEpoch}';
-
-    final Map<String, dynamic> itemsByVendor = {};
-    for (final entry in cartStore.cartByVendor.entries) {
-      final vendorId = entry.key;
-      double vendorSubtotal = 0;
-      final itemsCopy = entry.value.items.map((item) {
-        vendorSubtotal += item.price * item.quantity;
-        return {
-          'itemId': item.id,
-          'name': item.name,
-          'price': item.price,
-          'quantity': item.quantity,
-          'lineTotal': item.price * item.quantity,
-        };
-      }).toList();
-
-      itemsByVendor[vendorId] = {
-        'vendorName': entry.value.vendorName,
-        'items': itemsCopy,
-        'vendorSubtotal': vendorSubtotal,
-        'status': 'pending',
-        'orderReceivedAt': FieldValue.serverTimestamp(),
-        'statusUpdatedAt': FieldValue.serverTimestamp(),
-      };
-    }
-
-    final loc = widget.deliveryLocation;
-    final Map<String, dynamic> deliveryLocationMap = loc != null
-        ? {
-            'address': loc.address,
-            'latitude': loc.latitude,
-            'longitude': loc.longitude,
-            'houseNo': loc.houseNo ?? '',
-            'phone': loc.phone ?? '',
-            'label': loc.label ?? 'Other',
-            'geopoint': GeoPoint(loc.latitude, loc.longitude),
-          }
-        : {};
-
-    final orderData = {
-      'orderId': orderId,
-      'paymentId': paymentId,
-      'paymentMethod': paymentMethod,
-      'customerPhone': customerPhone,
-      'deliveryLocation': deliveryLocationMap,
-      'deliveryAddress': loc?.fullDisplay ?? 'Not provided',
-      'latitude': loc?.latitude,
-      'longitude': loc?.longitude,
-      'status': status,
-      'timestamp': FieldValue.serverTimestamp(),
-      'itemsTotal': widget.itemsTotal,
-      'deliveryCharge': _deliveryCharge,
-      'platformFee': _platformFee,
-      // Split tax stored in Firestore
-      'foodTaxPercent': _pricing.foodTaxPercent,
-      'deliveryTaxPercent': _pricing.deliveryTaxPercent,
-      'platformFeeTaxPercent': _pricing.platformFeeTaxPercent,
-      'foodTaxAmount': _foodTax,
-      'deliveryTaxAmount': _deliveryTax,
-      'platformFeeTaxAmount': _platformFeeTax,
-      'totalTaxAmount': _totalTaxAmount,
-      'couponDiscount': _isFreeDelivery ? 0.0 : widget.couponDiscount,
-      'grandTotal': _grandTotal,
-      'couponApplied': widget.appliedCoupon != null,
-      'couponCode': widget.appliedCoupon?['couponCode'] ?? '',
-      'couponType': widget.appliedCoupon?['couponType'] ?? '',
-      'freeDelivery': _isFreeDelivery,
-      'itemsByVendor': itemsByVendor,
-    };
-
-    await FirebaseFirestore.instance.collection('orders').add(orderData);
-    debugPrint(
-      '✅ Order: $orderId | $paymentMethod | Total: $_grandTotal | Lat: ${loc?.latitude}',
-    );
-    return orderId;
-  }
-
-  void _clearCartSafely() {
-    final vendorIds = List<String>.from(cartStore.cartByVendor.keys);
-    for (final vendorId in vendorIds) {
-      final vendorCart = cartStore.cartByVendor[vendorId];
-      if (vendorCart != null) {
-        final itemIds = List<String>.from(
-          vendorCart.items.map((item) => item.id),
-        );
-        for (final itemId in itemIds) {
-          cartStore.updateQuantity(
-            vendorId: vendorId,
-            itemId: itemId,
-            delta: -999,
-          );
-        }
-      }
-    }
-  }
-
-  // ── Razorpay callbacks ─────────────────────────────────────────────────────
-
-  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
-    final paymentId = response.paymentId ?? '';
-    if (paymentId.isEmpty) {
-      setState(() => _isProcessing = false);
-      return;
-    }
-    try {
-      final orderId = await _createOrderInFirestore(
-        paymentId: paymentId,
-        paymentMethod: 'online',
-        status: 'order_created',
-      );
-      _clearCartSafely();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => PaymentSuccessPage(
-                paymentId: paymentId,
-                amount: _grandTotal,
-                orderId: orderId,
-              ),
-            ),
-          );
-        }
-      });
-    } catch (e) {
-      setState(() => _isProcessing = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Order error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _handlePaymentError(PaymentFailureResponse response) {
-    setState(() => _isProcessing = false);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Payment Failed: ${response.message ?? 'Unknown error'}',
-          ),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    }
-  }
-
-  void _handleExternalWallet(ExternalWalletResponse response) {
-    debugPrint('Wallet: ${response.walletName}');
-  }
-
-  void _handlePrimaryAction() {
-    if (_selectedMethod == _PaymentMethod.cod) {
-      _showCodConfirmationDialog();
+    if (confirmed == true) {
+      await _paymentService.placeCodOrder();
     } else {
-      _openRazorpay();
+      setState(() => _isProcessing = false);
     }
   }
 
-  // ─── Build ─────────────────────────────────────────────────────────────────
+  // ─── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -579,7 +304,7 @@ class _PaymentPageState extends State<PaymentPage> {
           child: Container(height: 1, color: kBorderGrey),
         ),
       ),
-      body: _isLoadingPricing
+      body: ref.watch(pricingConfigProvider).isLoading
           ? const Center(
               child: CircularProgressIndicator(color: kBandiwalaYellow),
             )
@@ -603,6 +328,10 @@ class _PaymentPageState extends State<PaymentPage> {
                       const SizedBox(height: 8),
                       _billDetailsCard(),
                       const SizedBox(height: 16),
+                      _sectionLabel('Offers & Coupons'),
+                      const SizedBox(height: 8),
+                      _couponSection(),
+                      const SizedBox(height: 16),
                       _sectionLabel('Payment Method'),
                       const SizedBox(height: 8),
                       _paymentMethodCard(),
@@ -616,150 +345,117 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── Section label ────────────────────────────────────────────────────────
-
-  Widget _sectionLabel(String text) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w700,
-        color: kTextGrey,
-        letterSpacing: 0.5,
-      ),
-    );
-  }
-
-  // ─── Order Summary ────────────────────────────────────────────────────────
+  Widget _sectionLabel(String text) => Text(
+    text,
+    style: const TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      color: kTextGrey,
+      letterSpacing: 0.5,
+    ),
+  );
 
   Widget _orderSummaryCard() {
-    final vendors = cartStore.cartByVendor.entries.toList();
-    return Container(
-      decoration: BoxDecoration(
-        color: kWhite,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kBorderGrey),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    final cart = ref.watch(cartProvider);
+    final vendors = cart.cartByVendor.entries.toList();
+    return _card(
       child: Column(
-        children: [
-          ...vendors.asMap().entries.map((entry) {
-            final idx = entry.key;
-            final e = entry.value;
-            final isLast = idx == vendors.length - 1;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+        children: vendors.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final e = entry.value;
+          final isLast = idx == vendors.length - 1;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: kBandiwalaYellow.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.store_rounded,
+                        size: 15,
+                        color: kBandiwalaYellow,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        e.value.vendorName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ...e.value.items.map(
+                (item) => Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(6),
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.only(right: 8, top: 2),
                         decoration: BoxDecoration(
-                          color: kBandiwalaYellow.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.store_rounded,
-                          size: 15,
-                          color: kBandiwalaYellow,
+                          shape: BoxShape.circle,
+                          color: Colors.grey.shade400,
                         ),
                       ),
-                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          e.value.vendorName,
+                          '${item.name}  ×${item.quantity}',
                           style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            color: Colors.black87,
                           ),
+                        ),
+                      ),
+                      Text(
+                        '₹${(item.price * item.quantity).toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
                 ),
-                ...e.value.items.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          margin: const EdgeInsets.only(right: 8, top: 2),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.grey.shade400,
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            '${item.name}  ×${item.quantity}',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          '₹${(item.price * item.quantity).toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Subtotal: ₹${cart.vendorTotal(e.key).toStringAsFixed(0)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      'Subtotal: ₹${cartStore.vendorTotal(e.key).toStringAsFixed(0)}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                if (!isLast) Divider(height: 1, color: Colors.grey.shade100),
-              ],
-            );
-          }),
-        ],
+              ),
+              if (!isLast) Divider(height: 1, color: Colors.grey.shade100),
+            ],
+          );
+        }).toList(),
       ),
     );
   }
 
-  // ─── Address Card ─────────────────────────────────────────────────────────
-
   Widget _addressCard() {
     final loc = widget.deliveryLocation!;
-    return Container(
+    return _card(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: kWhite,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kBorderGrey),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -823,41 +519,22 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── Bill Details Card ────────────────────────────────────────────────────
-
   Widget _billDetailsCard() {
     final hasCouponDiscount =
-        widget.couponDiscount > 0 &&
-        widget.appliedCoupon != null &&
-        widget.appliedCoupon!['couponType'] != 'freeDelivery' &&
-        widget.appliedCoupon!['couponType'] != 'free_delivery';
-
+        _couponDiscount > 0 &&
+        _appliedCoupon != null &&
+        _appliedCoupon!['couponType'] != 'free_delivery';
     final totalSavings = _isFreeDelivery
         ? _pricing.deliveryCharge
-        : widget.couponDiscount;
+        : _couponDiscount;
 
-    return Container(
+    return _card(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: kWhite,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kBorderGrey),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Items Total
           _billRow('Items Total', '₹${widget.itemsTotal.toStringAsFixed(0)}'),
           const SizedBox(height: 10),
-
-          // Delivery Charge
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -879,7 +556,7 @@ class _PaymentPageState extends State<PaymentPage> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        'FREE via ${widget.appliedCoupon?['couponCode'] ?? 'coupon'}',
+                        'FREE via ${_appliedCoupon?['couponCode'] ?? 'coupon'}',
                         style: TextStyle(
                           fontSize: 10,
                           color: Colors.green.shade700,
@@ -922,16 +599,12 @@ class _PaymentPageState extends State<PaymentPage> {
             ],
           ),
           const SizedBox(height: 10),
-
-          // Platform Fee
           _billRow(
             'Platform Fee',
             '₹${_platformFee.toStringAsFixed(0)}',
             labelColor: Colors.grey.shade700,
           ),
           const SizedBox(height: 10),
-
-          // ── Taxes Section (expandable breakdown) ──────────────────────────
           GestureDetector(
             onTap: () =>
                 setState(() => _taxBreakdownExpanded = !_taxBreakdownExpanded),
@@ -967,8 +640,6 @@ class _PaymentPageState extends State<PaymentPage> {
               ],
             ),
           ),
-
-          // ── Expandable tax breakdown ───────────────────────────────────
           AnimatedCrossFade(
             duration: const Duration(milliseconds: 200),
             crossFadeState: _taxBreakdownExpanded
@@ -984,35 +655,26 @@ class _PaymentPageState extends State<PaymentPage> {
               ),
               child: Column(
                 children: [
-                  _taxBreakdownRow(
-                    label: 'GST on Food',
-                    percent: _pricing.foodTaxPercent,
-                    amount: _foodTax,
-                    base: widget.itemsTotal,
-                  ),
+                  _taxRow('GST on Food', _pricing.foodTaxPercent, _foodTax),
                   if (!_isFreeDelivery) ...[
                     const SizedBox(height: 6),
-                    _taxBreakdownRow(
-                      label: 'GST on Delivery',
-                      percent: _pricing.deliveryTaxPercent,
-                      amount: _deliveryTax,
-                      base: _deliveryCharge,
+                    _taxRow(
+                      'GST on Delivery',
+                      _pricing.deliveryTaxPercent,
+                      _deliveryTax,
                     ),
                   ],
                   const SizedBox(height: 6),
-                  _taxBreakdownRow(
-                    label: 'GST on Platform Fee',
-                    percent: _pricing.platformFeeTaxPercent,
-                    amount: _platformFeeTax,
-                    base: _platformFee,
+                  _taxRow(
+                    'GST on Platform Fee',
+                    _pricing.platformFeeTaxPercent,
+                    _platformFeeTax,
                   ),
                 ],
               ),
             ),
             secondChild: const SizedBox.shrink(),
           ),
-
-          // Coupon Discount
           if (hasCouponDiscount) ...[
             const SizedBox(height: 10),
             Row(
@@ -1027,7 +689,7 @@ class _PaymentPageState extends State<PaymentPage> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      widget.appliedCoupon!['couponCode'] ?? 'Coupon',
+                      _appliedCoupon!['couponCode'] ?? 'Coupon',
                       style: TextStyle(
                         fontSize: 13,
                         color: Colors.green.shade700,
@@ -1036,7 +698,7 @@ class _PaymentPageState extends State<PaymentPage> {
                   ],
                 ),
                 Text(
-                  '-₹${widget.couponDiscount.toStringAsFixed(0)}',
+                  '-₹${_couponDiscount.toStringAsFixed(0)}',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -1046,13 +708,10 @@ class _PaymentPageState extends State<PaymentPage> {
               ],
             ),
           ],
-
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Divider(height: 1, color: Colors.grey.shade200),
           ),
-
-          // Grand Total
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -1070,8 +729,6 @@ class _PaymentPageState extends State<PaymentPage> {
               ),
             ],
           ),
-
-          // Savings Strip
           if (totalSavings > 0) ...[
             const SizedBox(height: 10),
             Container(
@@ -1091,7 +748,7 @@ class _PaymentPageState extends State<PaymentPage> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      _isFreeDelivery && widget.couponDiscount == 0
+                      _isFreeDelivery && _couponDiscount == 0
                           ? "You're saving ₹${_pricing.deliveryCharge.toStringAsFixed(0)} on delivery!"
                           : 'Total savings: ₹${totalSavings.toStringAsFixed(0)} on this order',
                       style: TextStyle(
@@ -1110,51 +767,187 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── Tax Breakdown Row ────────────────────────────────────────────────────
-
-  Widget _taxBreakdownRow({
-    required String label,
-    required double percent,
-    required double amount,
-    required double base,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Text(
-            '$label (${percent.toStringAsFixed(0)}%)',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-          ),
-        ),
-        Text(
-          '₹${amount.toStringAsFixed(2)}',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey.shade700,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ─── Payment Method Card ──────────────────────────────────────────────────
-
-  Widget _paymentMethodCard() {
-    return Container(
+  Widget _couponSection() {
+    final hasApplied = _appliedCoupon != null;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
       decoration: BoxDecoration(
         color: kWhite,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kBorderGrey),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+        border: Border.all(
+          color: hasApplied ? Colors.green.shade300 : kBorderGrey,
+          width: hasApplied ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: _showAllCoupons,
+            borderRadius: BorderRadius.vertical(
+              top: const Radius.circular(14),
+              bottom: hasApplied ? Radius.zero : const Radius.circular(14),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: hasApplied
+                            ? [Colors.green.shade400, Colors.green.shade600]
+                            : [Colors.orange.shade300, Colors.orange.shade500],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      hasApplied
+                          ? Icons.check_circle_outline_rounded
+                          : Icons.local_offer_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      hasApplied ? 'Offer Applied!' : 'Apply Offer / Coupon',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: hasApplied
+                            ? Colors.green.shade700
+                            : Colors.black87,
+                      ),
+                    ),
+                  ),
+                  if (!hasApplied)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: kBandiwalaYellow.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            'View all',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.orange.shade700,
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          Icon(
+                            Icons.arrow_forward_ios,
+                            size: 11,
+                            color: Colors.orange.shade700,
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    GestureDetector(
+                      onTap: _removeCoupon,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.close,
+                          size: 16,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
+          if (hasApplied)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(14),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade700,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      _appliedCoupon!['couponCode'] ?? '',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _isFreeDelivery
+                          ? 'Free delivery applied'
+                          : 'You save ₹${_couponDiscount.toInt()} on this order',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.green.shade800,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade600,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      _isFreeDelivery
+                          ? 'FREE\ndelivery'
+                          : '-₹${_couponDiscount.toInt()}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
+    );
+  }
+
+  Widget _paymentMethodCard() {
+    return _card(
       child: Column(
         children: [
           _methodTile(
@@ -1254,8 +1047,6 @@ class _PaymentPageState extends State<PaymentPage> {
       ),
     );
   }
-
-  // ─── Bottom Bar ───────────────────────────────────────────────────────────
 
   Widget _bottomBar() {
     final isCod = _selectedMethod == _PaymentMethod.cod;
@@ -1416,22 +1207,202 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── Bill Row Helper ──────────────────────────────────────────────────────
+  // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  Widget _billRow(String label, String value, {Color? labelColor}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: labelColor ?? Colors.grey.shade700,
-          ),
+  Widget _card({required Widget child, EdgeInsets? padding}) => Container(
+    padding: padding,
+    decoration: BoxDecoration(
+      color: kWhite,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: kBorderGrey),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.03),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
         ),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      ],
+    ),
+    child: child,
+  );
+
+  Widget _billRow(String label, String value, {Color? labelColor}) => Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          color: labelColor ?? Colors.grey.shade700,
+        ),
+      ),
+      Text(
+        value,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      ),
+    ],
+  );
+
+  Widget _taxRow(String label, double percent, double amount) => Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Expanded(
+        child: Text(
+          '$label (${percent.toStringAsFixed(0)}%)',
+          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+        ),
+      ),
+      Text(
+        '₹${amount.toStringAsFixed(2)}',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey.shade700,
+        ),
+      ),
+    ],
+  );
+}
+
+// ─── COD Confirmation Dialog ──────────────────────────────────────────────────
+
+class _CodConfirmDialog extends StatelessWidget {
+  final double grandTotal;
+  const _CodConfirmDialog({required this.grandTotal});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+      titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.money_rounded,
+              color: Colors.green.shade600,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Confirm Cash on Delivery',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Text(
+            'You are placing an order with Cash on Delivery.',
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: kBandiwalaYellow.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kBandiwalaYellow.withOpacity(0.3)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Amount to pay on delivery',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                Text(
+                  '₹${grandTotal.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: kBandiwalaYellow,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline, size: 14, color: Colors.grey.shade500),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Please keep exact change ready. Our delivery partner will collect payment at your doorstep.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+        ],
+      ),
+      actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      actions: [
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(context, false),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(color: Colors.grey.shade300),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kBandiwalaYellow,
+                  foregroundColor: Colors.black87,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'Place Order',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );

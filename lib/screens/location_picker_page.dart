@@ -1,70 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
-import '../models/service_zone.dart';
-
+import '../providers/service_zones_provider.dart';
+import '../providers/user_provider.dart';
+import '../models/app_user.dart';
 // ─── Shared model ─────────────────────────────────────────────────────────────
 
-class SavedLocation {
-  final String address; // Human-readable area name (e.g. "KPHB, Hyderabad")
-  final double latitude; // Full precision e.g. 17.476388123
-  final double longitude; // Full precision e.g. 78.390350456
-  final String? houseNo;
-  final String? phone;
-  final String? label;
-
-  SavedLocation({
-    required this.address,
-    required this.latitude,
-    required this.longitude,
-    this.houseNo,
-    this.phone,
-    this.label,
-  });
-
-  // ✅ lat/lng stored as full-precision doubles — never truncated
-  Map<String, dynamic> toJson() => {
-    'address': address,
-    'latitude': latitude,
-    'longitude': longitude,
-    'houseNo': houseNo,
-    'phone': phone,
-    'label': label,
-  };
-
-  factory SavedLocation.fromJson(Map<String, dynamic> json) => SavedLocation(
-    address: json['address'] ?? '',
-    latitude: (json['latitude'] as num).toDouble(),
-    longitude: (json['longitude'] as num).toDouble(),
-    houseNo: json['houseNo'],
-    phone: json['phone'],
-    label: json['label'],
-  );
-
-  bool isSameLocation(SavedLocation other) {
-    const double threshold = 0.0005;
-    return (latitude - other.latitude).abs() < threshold &&
-        (longitude - other.longitude).abs() < threshold;
-  }
-
-  String get fullDisplay {
-    final parts = <String>[];
-    if (houseNo != null && houseNo!.isNotEmpty) parts.add(houseNo!);
-    if (address.isNotEmpty) parts.add(address);
-    return parts.join(', ');
-  }
-
-  // ✅ Shows area name + precise coordinates
-  String get coordinatesDisplay =>
-      '${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}';
-
-  String get shortLabel => label ?? 'Other';
-}
+// ─── Shared model consolidated into SavedAddress in app_user.dart ────────────────
 
 // ─── Autocomplete model ───────────────────────────────────────────────────────
 
@@ -85,16 +32,24 @@ class _PlaceSuggestion {
 }
 
 // ─── LocationPickerPage ───────────────────────────────────────────────────────
+// Single page for: selecting an address, adding new, editing, deleting.
 
-class LocationPickerPage extends StatefulWidget {
-  final Function(SavedLocation)? onLocationSelected;
-  const LocationPickerPage({super.key, this.onLocationSelected});
+class LocationPickerPage extends ConsumerStatefulWidget {
+  final Function(SavedAddress)? onLocationSelected;
+
+  /// The currently active address — used to highlight the selected tile.
+  final SavedAddress? activeAddress;
+  const LocationPickerPage({
+    super.key,
+    this.onLocationSelected,
+    this.activeAddress,
+  });
 
   @override
-  State<LocationPickerPage> createState() => _LocationPickerPageState();
+  ConsumerState<LocationPickerPage> createState() => _LocationPickerPageState();
 }
 
-class _LocationPickerPageState extends State<LocationPickerPage> {
+class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
   static const Color bandiwalaYellow = Color(0xFFFFC107);
 
   bool _showModeSelection = true;
@@ -109,11 +64,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
-  final TextEditingController _houseNoController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _customLabelController = TextEditingController();
 
-  List<SavedLocation> _savedLocations = [];
-  List<ServiceZone> _serviceZones = [];
+  List<SavedAddress> _savedAddresses = [];
   bool _isFetchingLocation = false;
   String _selectedLabel = 'Home';
   String _fetchedAddress = '';
@@ -141,8 +96,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   @override
   void initState() {
     super.initState();
-    _loadSavedLocations();
-    _loadServiceZones();
+    _syncAddressesFromProvider();
     _searchController.addListener(_onSearchChanged);
     _searchFocusNode.addListener(() {
       if (!_searchFocusNode.hasFocus && mounted) {
@@ -153,6 +107,12 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         });
       }
     });
+
+    // Default phone from user profile
+    final user = ref.read(userProvider).valueOrNull;
+    if (user != null && user.phone.isNotEmpty) {
+      _phoneController.text = user.phone;
+    }
   }
 
   @override
@@ -161,19 +121,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     _httpClient.close();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
-    _houseNoController.dispose();
+    _addressController.dispose();
     _phoneController.dispose();
+    _customLabelController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadServiceZones() async {
-    final zones = await fetchServiceZones();
-    if (mounted) {
-      setState(() {
-        _serviceZones = zones;
-      });
-    }
   }
 
   void _onSearchChanged() {
@@ -445,21 +397,13 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     return '';
   }
 
-  Future<void> _loadSavedLocations() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final list = prefs.getStringList('saved_locations') ?? [];
-      if (mounted) {
-        setState(() {
-          _savedLocations = list
-              .map((j) => SavedLocation.fromJson(jsonDecode(j)))
-              .toList();
-        });
-      }
-    } catch (e) {
-      debugPrint('Load saved locations error: $e');
-    }
+  void _syncAddressesFromProvider() {
+    final addresses = ref.read(userProvider).valueOrNull?.savedAddresses ?? [];
+    _savedAddresses = addresses.map(_toSavedAddress).toList();
   }
+
+  // Convert AppUser's SavedAddress to our model (now the same)
+  SavedAddress _toSavedAddress(SavedAddress a) => a;
 
   bool _isInHyderabad(LatLng pos) =>
       pos.latitude >= _minLat &&
@@ -567,8 +511,17 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       _suggestions = [];
       _showSuggestions = false;
       _searchController.clear();
-      _houseNoController.clear();
-      _phoneController.clear();
+      _addressController.clear();
+
+      // Auto-fill phone from user profile
+      final user = ref.read(userProvider).valueOrNull;
+      if (user != null && user.phone.isNotEmpty) {
+        _phoneController.text = user.phone;
+      } else {
+        _phoneController.clear();
+      }
+
+      _customLabelController.clear();
       _selectedLabel = 'Home';
     });
     Future.delayed(const Duration(milliseconds: 450), () {
@@ -599,8 +552,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     });
   }
 
-  bool _isDuplicate(SavedLocation loc) =>
-      _savedLocations.any((e) => e.isSameLocation(loc));
+  bool _isDuplicate(SavedAddress loc) =>
+      _savedAddresses.any((e) => e.isSameLocation(loc));
 
   Future<void> _saveLocation() async {
     if (_selectedPosition == null) {
@@ -609,28 +562,36 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       );
       return;
     }
-    if (_houseNoController.text.trim().isEmpty) {
+    if (_addressController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter door number or landmark')),
+        const SnackBar(content: Text('Please enter house number or landmark')),
       );
       return;
     }
 
-    // ✅ address = human-readable area name
+    if (_phoneController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a phone number')),
+      );
+      return;
+    }
+
+    // ✅ geolocation = human-readable area name
+    // ✅ address = specific door no / street
     // ✅ latitude/longitude = full precision raw doubles
-    final location = SavedLocation(
-      address: _fetchedAddress.isNotEmpty
+    final location = SavedAddress(
+      geolocation: _fetchedAddress.isNotEmpty
           ? _fetchedAddress
           : _searchController.text.trim().isNotEmpty
           ? _searchController.text.trim()
           : 'Selected Location',
       latitude: _selectedPosition!.latitude, // e.g. 17.476388123456
       longitude: _selectedPosition!.longitude, // e.g. 78.390350456789
-      houseNo: _houseNoController.text.trim(),
-      phone: _phoneController.text.trim().isNotEmpty
-          ? _phoneController.text.trim()
-          : null,
-      label: _selectedLabel,
+      address: _addressController.text.trim(),
+      phone: _phoneController.text.trim(),
+      label: _selectedLabel == 'Other'
+          ? _customLabelController.text.trim()
+          : _selectedLabel,
     );
 
     if (_isDuplicate(location)) {
@@ -675,18 +636,14 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     await _proceedToSave(location);
   }
 
-  Future<void> _proceedToSave(SavedLocation location) async {
-    final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList('saved_locations') ?? [];
-    list.insert(0, jsonEncode(location.toJson()));
-    if (list.length > 20) list.removeLast();
-    await prefs.setStringList('saved_locations', list);
-    if (mounted) setState(() => _savedLocations.insert(0, location));
+  Future<void> _proceedToSave(SavedAddress location) async {
+    await ref.read(userProvider.notifier).addAddress(_toSavedAddress(location));
+    if (mounted) setState(() => _savedAddresses.insert(0, location));
     widget.onLocationSelected?.call(location);
     if (mounted) Navigator.pop(context, location);
   }
 
-  Future<void> _selectSavedLocation(SavedLocation location) async {
+  Future<void> _selectSavedAddress(SavedAddress location) async {
     widget.onLocationSelected?.call(location);
     if (mounted) Navigator.pop(context, location);
   }
@@ -805,7 +762,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                       ),
                     ],
                   ),
-                  if (_savedLocations.isNotEmpty) ...[
+                  if (_savedAddresses.isNotEmpty) ...[
                     const SizedBox(height: 24),
                     const Text(
                       'Saved Addresses',
@@ -816,7 +773,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    ..._savedLocations.map(_buildSavedLocationTile),
+                    ...List.generate(
+                      _savedAddresses.length,
+                      (i) => _buildSavedAddressTile(_savedAddresses[i], i),
+                    ),
                   ],
                 ],
               ),
@@ -881,20 +841,28 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
-  // ✅ Shows area name + lat/lng coordinates in saved tile
-  Widget _buildSavedLocationTile(SavedLocation loc) {
+  Widget _buildSavedAddressTile(SavedAddress loc, int index) {
+    final active = widget.activeAddress;
+    final isSelected =
+        active != null &&
+        (active.latitude - loc.latitude).abs() < 0.0005 &&
+        (active.longitude - loc.longitude).abs() < 0.0005;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isSelected ? bandiwalaYellow.withOpacity(0.07) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: isSelected ? bandiwalaYellow : Colors.grey.shade200,
+          width: isSelected ? 1.5 : 1,
+        ),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => _selectSavedLocation(loc),
+        onTap: () => _selectSavedAddress(loc),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
           child: Row(
             children: [
               Container(
@@ -928,22 +896,42 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                             color: Colors.black87,
                           ),
                         ),
-                        if (loc.houseNo != null && loc.houseNo!.isNotEmpty) ...[
+                        if (loc.address != null && loc.address!.isNotEmpty) ...[
                           const SizedBox(width: 6),
                           Text(
-                            '• ${loc.houseNo}',
+                            '• ${loc.address}',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.grey.shade600,
                             ),
                           ),
                         ],
+                        if (isSelected) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: bandiwalaYellow,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'Selected',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 2),
-                    // ✅ Area name shown here
                     Text(
-                      loc.address,
+                      loc.geolocation,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -951,20 +939,31 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                         color: Colors.grey.shade700,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    // ✅ Precise coordinates shown below area name
-                    Text(
-                      loc.coordinatesDisplay,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey.shade500,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 20),
+              IconButton(
+                icon: Icon(
+                  Icons.edit_outlined,
+                  size: 18,
+                  color: Colors.grey.shade500,
+                ),
+                onPressed: () => _editSavedAddress(index),
+                tooltip: 'Edit',
+                padding: const EdgeInsets.all(6),
+                constraints: const BoxConstraints(),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.delete_outline,
+                  size: 18,
+                  color: Colors.red.shade300,
+                ),
+                onPressed: () => _deleteSavedAddress(index),
+                tooltip: 'Delete',
+                padding: const EdgeInsets.all(6),
+                constraints: const BoxConstraints(),
+              ),
             ],
           ),
         ),
@@ -972,8 +971,227 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
+  Future<void> _deleteSavedAddress(int index) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Address?'),
+        content: const Text('Are you sure you want to delete this address?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await ref.read(userProvider.notifier).deleteAddress(index);
+    if (mounted) setState(() => _savedAddresses.removeAt(index));
+  }
+
+  Future<void> _editSavedAddress(int index) async {
+    final loc = _savedAddresses[index];
+    final addressCtrl = TextEditingController(text: loc.address ?? '');
+    final phoneCtrl = TextEditingController(text: loc.phone);
+    final customLabelCtrl = TextEditingController();
+    String label = loc.label ?? 'Other';
+
+    if (label != 'Home' && label != 'Work') {
+      customLabelCtrl.text = label;
+      label = 'Other';
+    }
+
+    final result = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) => Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const Text(
+                'Edit Address',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                loc.geolocation,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: ['Home', 'Work', 'Other'].map((l) {
+                  final sel = label == l;
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(l),
+                        selected: sel,
+                        onSelected: (_) => setModal(() => label = l),
+                        selectedColor: bandiwalaYellow,
+                        labelStyle: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: sel ? Colors.black87 : Colors.grey.shade700,
+                        ),
+                        backgroundColor: Colors.grey.shade100,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: addressCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Address (House No, Building, Area) *',
+                  prefixIcon: const Icon(Icons.home_outlined),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(
+                      color: bandiwalaYellow,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phoneCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: 'Phone *',
+                  prefixIcon: const Icon(Icons.phone_outlined),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(
+                      color: bandiwalaYellow,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+              if (label == 'Other') ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: customLabelCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Custom Label *',
+                    prefixIcon: const Icon(Icons.label_outline),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                        color: bandiwalaYellow,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (addressCtrl.text.trim().isEmpty) return;
+                    if (phoneCtrl.text.trim().isEmpty) return;
+                    String finalLabel = label;
+                    if (label == 'Other') {
+                      if (customLabelCtrl.text.trim().isEmpty) return;
+                      finalLabel = customLabelCtrl.text.trim();
+                    }
+                    Navigator.pop(ctx, {
+                      'address': addressCtrl.text.trim(),
+                      'phone': phoneCtrl.text.trim(),
+                      'label': finalLabel,
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: bandiwalaYellow,
+                    foregroundColor: Colors.black87,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Save Changes',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (result == null) return;
+
+    final updatedLoc = SavedAddress(
+      geolocation: loc.geolocation,
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      address: result['address'],
+      phone: result['phone']!,
+      label: result['label'],
+    );
+    await ref
+        .read(userProvider.notifier)
+        .updateAddress(index, _toSavedAddress(updatedLoc));
+    if (mounted) {
+      setState(() => _savedAddresses[index] = updatedLoc);
+    }
+  }
+
   Set<Circle> _buildServiceAreaCircles() {
-    return _serviceZones.map((zone) {
+    final zones = ref.watch(serviceZonesProvider).valueOrNull ?? [];
+    return zones.map((zone) {
       return Circle(
         circleId: CircleId(zone.name),
         center: LatLng(zone.lat, zone.lng),
@@ -1064,7 +1282,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                             _showSuggestions = false;
                             _fetchedAddress = '';
                             _searchController.clear();
-                            _houseNoController.clear();
+                            _addressController.clear();
                             _phoneController.clear();
                           });
                         },
@@ -1413,14 +1631,30 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
-                                    child: Text(
-                                      _fetchedAddress,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.grey.shade800,
-                                        fontWeight: FontWeight.w600,
-                                        height: 1.4,
-                                      ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Geolocation',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: bandiwalaYellow,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          _fetchedAddress,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.grey.shade800,
+                                            fontWeight: FontWeight.w600,
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
@@ -1486,13 +1720,47 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                         ],
                       ),
 
+                      if (_selectedLabel == 'Other') ...[
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _customLabelController,
+                          textInputAction: TextInputAction.next,
+                          decoration: InputDecoration(
+                            labelText: 'Custom Label (e.g. Friend\'s House) *',
+                            labelStyle: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 13,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.label_outline,
+                              color: Colors.grey.shade600,
+                              size: 20,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                color: bandiwalaYellow,
+                                width: 2,
+                              ),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+
                       const SizedBox(height: 16),
 
                       TextField(
-                        controller: _houseNoController,
+                        controller: _addressController,
                         textInputAction: TextInputAction.next,
                         decoration: InputDecoration(
-                          labelText: 'Door No / Flat / Landmark *',
+                          labelText: 'Address (House No, Building, Area) *',
                           labelStyle: TextStyle(
                             color: Colors.grey.shade600,
                             fontSize: 13,
@@ -1530,7 +1798,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                           LengthLimitingTextInputFormatter(10),
                         ],
                         decoration: InputDecoration(
-                          labelText: 'Phone (optional)',
+                          labelText: 'Phone *',
                           labelStyle: TextStyle(
                             color: Colors.grey.shade600,
                             fontSize: 13,

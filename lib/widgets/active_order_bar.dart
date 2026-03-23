@@ -1,23 +1,23 @@
 // active_order_bar.dart
 
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/orders_provider.dart';
 
 const _kYellow = Color(0xFFFFC107);
 const _kYellowDark = Color(0xFFE6AC00);
 const _kDark = Color(0xFF1A1A1A);
 
-class ActiveOrderBar extends StatefulWidget {
+class ActiveOrderBar extends ConsumerStatefulWidget {
   final VoidCallback onViewTap;
 
   const ActiveOrderBar({super.key, required this.onViewTap});
 
   @override
-  State<ActiveOrderBar> createState() => _ActiveOrderBarState();
+  ConsumerState<ActiveOrderBar> createState() => _ActiveOrderBarState();
 }
 
-class _ActiveOrderBarState extends State<ActiveOrderBar>
+class _ActiveOrderBarState extends ConsumerState<ActiveOrderBar>
     with SingleTickerProviderStateMixin {
   bool _dismissed = false;
   late AnimationController _animController;
@@ -46,87 +46,52 @@ class _ActiveOrderBarState extends State<ActiveOrderBar>
   Widget build(BuildContext context) {
     if (_dismissed) return const SizedBox.shrink();
 
-    final user = FirebaseAuth.instance.currentUser;
-    final phone = user?.phoneNumber ?? '';
-    if (phone.isEmpty) return const SizedBox.shrink();
+    final activeOrder = ref.watch(activeOrderProvider);
+    if (activeOrder == null) return const SizedBox.shrink();
 
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('orders')
-          .where('customerPhone', isEqualTo: phone)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        final docs = snapshot.data!.docs.toList()
-          ..sort((a, b) {
-            final aT = (a.data() as Map)['timestamp'] as Timestamp?;
-            final bT = (b.data() as Map)['timestamp'] as Timestamp?;
-            if (aT == null || bT == null) return 0;
-            return bT.compareTo(aT);
-          });
-
-        Map<String, dynamic>? activeOrder;
-        for (final doc in docs) {
-          final data = doc.data() as Map<String, dynamic>;
-          final status = (data['status'] ?? '').toString().toLowerCase();
-          if (status != 'completed' && status != 'cancelled') {
-            activeOrder = data;
-            break;
-          }
-        }
-
-        if (activeOrder == null) return const SizedBox.shrink();
-
-        return SlideTransition(
-          position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
-              .animate(
-                CurvedAnimation(
-                  parent: _animController,
-                  curve: Curves.easeOutCubic,
-                ),
-              ),
-          child: _OrderStatusBar(
-            orderData: activeOrder,
-            onViewTap: widget.onViewTap,
-            onDismiss: _dismiss,
+    return SlideTransition(
+      position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+          .animate(
+            CurvedAnimation(
+              parent: _animController,
+              curve: Curves.easeOutCubic,
+            ),
           ),
-        );
-      },
+      child: _OrderStatusBar(
+        orderId: activeOrder.id,
+        status: activeOrder.status,
+        grandTotal: activeOrder.grandTotal,
+        paymentMethod: activeOrder.paymentMethod,
+        onViewTap: widget.onViewTap,
+        onDismiss: _dismiss,
+      ),
     );
   }
 }
 
-// ─── Status Bar Widget ────────────────────────────────────────────────────────
-
 class _OrderStatusBar extends StatelessWidget {
-  final Map<String, dynamic> orderData;
+  final String orderId;
+  final String status;
+  final double grandTotal;
+  final String paymentMethod;
   final VoidCallback onViewTap;
   final VoidCallback onDismiss;
 
   const _OrderStatusBar({
-    required this.orderData,
+    required this.orderId,
+    required this.status,
+    required this.grandTotal,
+    required this.paymentMethod,
     required this.onViewTap,
     required this.onDismiss,
   });
 
   @override
   Widget build(BuildContext context) {
-    final status = (orderData['status'] ?? 'confirmed')
-        .toString()
-        .toLowerCase();
-    final orderId = (orderData['orderId'] ?? '').toString();
     final shortId = orderId.length > 12
         ? orderId.substring(orderId.length - 8)
         : orderId;
-    final grandTotal = orderData['grandTotal'] ?? 0.0;
-    final paymentMethod = (orderData['paymentMethod'] ?? '')
-        .toString()
-        .toLowerCase();
-
-    final config = _statusConfig(status);
+    final config = _statusConfig(status.toLowerCase());
 
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 0, 10, 6),
@@ -139,7 +104,7 @@ class _OrderStatusBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: _kYellow.withOpacity(0.45),
+            color: _kYellow.withValues(alpha: 0.45),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -150,23 +115,19 @@ class _OrderStatusBar extends StatelessWidget {
         child: InkWell(
           onTap: onViewTap,
           borderRadius: BorderRadius.circular(14),
-          splashColor: Colors.black.withOpacity(0.06),
-          highlightColor: Colors.black.withOpacity(0.04),
+          splashColor: Colors.black.withValues(alpha: 0.06),
+          highlightColor: Colors.black.withValues(alpha: 0.04),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
               children: [
-                // ── Pulsing icon ────────────────────────────────────────
                 _PulseIcon(icon: config.icon),
                 const SizedBox(width: 10),
-
-                // ── Text block ──────────────────────────────────────────
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Label + order ID chip
                       Row(
                         children: [
                           Text(
@@ -185,7 +146,7 @@ class _OrderStatusBar extends StatelessWidget {
                               vertical: 1,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.12),
+                              color: Colors.black.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -193,21 +154,20 @@ class _OrderStatusBar extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w700,
-                                color: _kDark.withOpacity(0.85),
+                                color: _kDark.withValues(alpha: 0.85),
                               ),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 2),
-                      // Subtitle + amount + COD chip
                       Row(
                         children: [
                           Text(
                             config.subtitle,
                             style: TextStyle(
                               fontSize: 11,
-                              color: _kDark.withOpacity(0.72),
+                              color: _kDark.withValues(alpha: 0.72),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -216,16 +176,16 @@ class _OrderStatusBar extends StatelessWidget {
                             width: 3,
                             height: 3,
                             decoration: BoxDecoration(
-                              color: _kDark.withOpacity(0.45),
+                              color: _kDark.withValues(alpha: 0.45),
                               shape: BoxShape.circle,
                             ),
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            '₹${(grandTotal as num).toStringAsFixed(0)}',
+                            '₹${grandTotal.toStringAsFixed(0)}',
                             style: TextStyle(
                               fontSize: 11,
-                              color: _kDark.withOpacity(0.85),
+                              color: _kDark.withValues(alpha: 0.85),
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -237,7 +197,7 @@ class _OrderStatusBar extends StatelessWidget {
                                 vertical: 1,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.12),
+                                color: Colors.black.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Text(
@@ -255,8 +215,6 @@ class _OrderStatusBar extends StatelessWidget {
                     ],
                   ),
                 ),
-
-                // ── View button ─────────────────────────────────────────
                 GestureDetector(
                   onTap: onViewTap,
                   child: Container(
@@ -279,21 +237,19 @@ class _OrderStatusBar extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-
-                // ── Dismiss button ──────────────────────────────────────
                 GestureDetector(
                   onTap: onDismiss,
                   child: Container(
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.15),
+                      color: Colors.black.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       Icons.close,
                       size: 13,
-                      color: _kDark.withOpacity(0.8),
+                      color: _kDark.withValues(alpha: 0.8),
                     ),
                   ),
                 ),
@@ -342,8 +298,6 @@ class _OrderStatusBar extends StatelessWidget {
   }
 }
 
-// ─── Status Config ────────────────────────────────────────────────────────────
-
 class _StatusConfig {
   final String label;
   final String subtitle;
@@ -356,11 +310,8 @@ class _StatusConfig {
   });
 }
 
-// ─── Pulsing Icon ─────────────────────────────────────────────────────────────
-
 class _PulseIcon extends StatefulWidget {
   final IconData icon;
-
   const _PulseIcon({required this.icon});
 
   @override
@@ -395,7 +346,6 @@ class _PulseIconState extends State<_PulseIcon>
   Widget build(BuildContext context) {
     return ScaleTransition(
       scale: _scale,
-      // ✅ Icon always dark on yellow background
       child: Icon(widget.icon, size: 22, color: _kDark),
     );
   }

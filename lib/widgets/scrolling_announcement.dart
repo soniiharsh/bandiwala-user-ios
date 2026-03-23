@@ -1,33 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:marquee/marquee.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../providers/announcements_provider.dart';
 
-class ScrollingAnnouncement extends StatelessWidget {
+class ScrollingAnnouncement extends ConsumerWidget {
   const ScrollingAnnouncement({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('announcements')
-          .where('isActive', isEqualTo: true)
-          .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError ||
-            !snapshot.hasData ||
-            snapshot.data!.docs.isEmpty) {
-          return const SizedBox.shrink();
-        }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final announcementsAsync = ref.watch(announcementsProvider);
 
-        final announcements = snapshot.data!.docs
-            .map((doc) => doc.get('text') as String)
-            .where((text) => text.isNotEmpty)
-            .toList();
-
-        if (announcements.isEmpty) {
-          return const SizedBox.shrink();
-        }
+    return announcementsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (announcements) {
+        if (announcements.isEmpty) return const SizedBox.shrink();
 
         final fullText = announcements.join('   ✦   ');
 
@@ -60,7 +48,6 @@ class ScrollingAnnouncement extends StatelessWidget {
           child: Row(
             children: [
               const SizedBox(width: 12),
-              // Fixed Icon
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
@@ -70,13 +57,12 @@ class ScrollingAnnouncement extends StatelessWidget {
                 child: const Icon(
                   Icons.campaign_rounded,
                   size: 16,
-                  color: Color(0xFFD9A608), // Darker gold
+                  color: Color(0xFFD9A608),
                 ),
               ),
               const SizedBox(width: 8),
               const _BlinkingIndicator(),
               const SizedBox(width: 10),
-              // Scrolling Text
               Expanded(
                 child: ClipRRect(
                   borderRadius: const BorderRadius.horizontal(

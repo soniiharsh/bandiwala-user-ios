@@ -1,38 +1,35 @@
+import 'package:BandiWala/models/app_user.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/notification_service.dart';
-import 'splash_screen.dart';
+import '../providers/user_provider.dart';
+import '../providers/cart_provider.dart';
+import '../providers/active_address_provider.dart';
+import '../providers/orders_provider.dart';
+import 'splash_page.dart';
 import 'login_page.dart';
-import 'orders.dart';
-import 'wishlist.dart';
-import 'saved_addresses.dart';
-import 'terms_conditions.dart';
-import 'cancellation_policy.dart';
-import 'refund_policy.dart';
-import 'help_support.dart';
-import 'cart_store.dart';
+import 'orders_page.dart';
+import 'wishlist_page.dart';
+import 'location_picker_page.dart';
+import 'terms_conditions_page.dart';
+import 'cancellation_policy_page.dart';
+import 'refund_policy_page.dart';
+import 'help_support_page.dart';
 
 const Color kBandiwalaYellow = Color(0xFFFFC107);
 
-class SettingsScreen extends StatefulWidget {
-  final String? phoneNumber;
-  const SettingsScreen({super.key, this.phoneNumber});
+class ProfilePage extends ConsumerStatefulWidget {
+  const ProfilePage({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<ProfilePage> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
-  int _totalOrders = 0;
+class _SettingsScreenState extends ConsumerState<ProfilePage> {
   bool _isLoading = true;
   String _displayNumber = '';
   bool _isGuest = false;
-
-  // ✅ NEW: Name fields
-  String _customerName = '';
-  final TextEditingController _nameController = TextEditingController();
   bool _isSavingName = false;
 
   @override
@@ -41,29 +38,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _checkGuestStatus();
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
-  }
-
   Future<void> _checkGuestStatus() async {
-    _isGuest = widget.phoneNumber == 'GUEST';
+    _isGuest = FirebaseAuth.instance.currentUser == null;
 
     if (_isGuest) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _showGuestLoginPrompt();
       });
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _displayNumber = 'Guest';
-        });
-      }
-    } else {
-      await _initializeData();
     }
+    _updateDisplayNumber();
+    if (mounted) setState(() => _isLoading = false);
   }
 
   void _showGuestLoginPrompt() {
@@ -125,48 +109,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _initializeData() async {
-    await Future.wait([_loadOrderCount(), _loadCustomerName()]);
     _updateDisplayNumber();
     if (mounted) setState(() => _isLoading = false);
   }
 
   void _updateDisplayNumber() {
-    final phone =
-        widget.phoneNumber ?? FirebaseAuth.instance.currentUser?.phoneNumber;
+    final phone = FirebaseAuth.instance.currentUser?.phoneNumber;
     _displayNumber = phone?.replaceAll('+91', '') ?? '';
   }
 
-  // ✅ NEW: Load customer name from Firestore
-  Future<void> _loadCustomerName() async {
-    try {
-      final phone =
-          widget.phoneNumber ?? FirebaseAuth.instance.currentUser?.phoneNumber;
-      if (phone == null || phone == 'GUEST') return;
-
-      // Normalize: always remove +91 for document ID
-      final phoneWithoutCode = phone.replaceAll('+91', '');
-      final doc = await FirebaseFirestore.instance
-          .collection('customers')
-          .doc(phoneWithoutCode)
-          .get();
-
-      if (doc.exists) {
-        final name = doc.data()?['name'] as String? ?? '';
-        if (mounted) {
-          setState(() {
-            _customerName = name;
-            _nameController.text = name;
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint('Error loading customer name: $e');
-    }
-  }
-
-  // ✅ NEW: Show editable name dialog
   void _showEditNameDialog() {
-    _nameController.text = _customerName;
+    final currentName = ref.read(userProvider).valueOrNull?.name ?? '';
+    final ctrl = TextEditingController(text: currentName);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -176,7 +130,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
         ),
         content: TextField(
-          controller: _nameController,
+          controller: ctrl,
           autofocus: true,
           textCapitalization: TextCapitalization.words,
           decoration: InputDecoration(
@@ -196,15 +150,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              final newName = _nameController.text.trim();
-              if (newName.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Name cannot be empty')),
-                );
-                return;
-              }
+              final newName = ctrl.text.trim();
+              if (newName.isEmpty) return;
               Navigator.pop(context);
-              await _saveCustomerName(newName);
+              setState(() => _isSavingName = true);
+              try {
+                await ref.read(userProvider.notifier).updateName(newName);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Name saved successfully!'),
+                      backgroundColor: Colors.green.shade600,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  );
+                }
+              } finally {
+                if (mounted) setState(() => _isSavingName = false);
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: kBandiwalaYellow,
@@ -221,60 +187,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
-  }
-
-  // ✅ NEW: Save customer name to Firestore
-  Future<void> _saveCustomerName(String name) async {
-    setState(() => _isSavingName = true);
-    try {
-      final phone =
-          widget.phoneNumber ?? FirebaseAuth.instance.currentUser?.phoneNumber;
-      if (phone == null) return;
-
-      // Normalize: always remove +91 for document ID
-      final phoneWithoutCode = phone.replaceAll('+91', '');
-      await FirebaseFirestore.instance
-          .collection('customers')
-          .doc(phoneWithoutCode)
-          .set({'name': name, 'phone': phone}, SetOptions(merge: true));
-
-      if (mounted) {
-        setState(() {
-          _customerName = name;
-          _isSavingName = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Name saved successfully!'),
-            backgroundColor: Colors.green.shade600,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error saving name: $e');
-      if (mounted) setState(() => _isSavingName = false);
-    }
-  }
-
-  Future<void> _loadOrderCount() async {
-    try {
-      final userPhone =
-          widget.phoneNumber ?? FirebaseAuth.instance.currentUser?.phoneNumber;
-      if (userPhone == null || userPhone == 'GUEST') return;
-
-      final ordersSnapshot = await FirebaseFirestore.instance
-          .collection('orders')
-          .where('customerPhone', isEqualTo: userPhone)
-          .get();
-
-      if (mounted) setState(() => _totalOrders = ordersSnapshot.docs.length);
-    } catch (e) {
-      debugPrint('Error loading order count: $e');
-    }
   }
 
   Future<void> _logout() async {
@@ -308,22 +220,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (confirmed == true) {
       try {
-        // ✅ Clear local session state
-        final prefs = await SharedPreferences.getInstance();
-        final phone = prefs.getString('userPhone');
-
-        // Delete FCM token from Firestore
-        if (phone != null) {
-          await NotificationService().deleteCustomerToken(phone);
-        }
-        await prefs.clear();
-        await cartStore.clear();
-
-        await FirebaseAuth.instance.signOut();
+        await ref.read(userProvider.notifier).logout();
         if (mounted) {
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (_) => const SplashScreen()),
+            MaterialPageRoute(builder: (_) => const SplashPage()),
             (route) => false,
           );
         }
@@ -380,15 +281,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           final phone = user.phoneNumber?.replaceAll('+91', '');
 
           if (phone != null && phone.isNotEmpty) {
-            // Optional: Mark account as deleted in Firestore instead of hard delete
-            // for record keeping, or hard delete if required by privacy laws.
-            await FirebaseFirestore.instance
-                .collection('customers')
-                .doc(phone)
-                .update({
-                  'status': 'deleted',
-                  'deletedAt': FieldValue.serverTimestamp(),
-                });
+            await ref.read(userProvider.notifier).markDeleted();
           }
 
           // Delete user from Firebase Auth
@@ -397,12 +290,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Clear local state
           final prefs = await SharedPreferences.getInstance();
           await prefs.clear();
-          await cartStore.clear();
+          await ref.read(cartProvider.notifier).clear();
 
           if (mounted) {
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (_) => const SplashScreen()),
+              MaterialPageRoute(builder: (_) => const SplashPage()),
               (route) => false,
             );
           }
@@ -503,10 +396,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _showFeatureLockedForGuest();
       return;
     }
-    Navigator.push(
+    final activeAddr = ref.read(activeAddressProvider);
+    Navigator.push<SavedAddress>(
       context,
-      MaterialPageRoute(builder: (_) => const SavedAddressesPage()),
-    );
+      MaterialPageRoute(
+        builder: (_) => LocationPickerPage(activeAddress: activeAddr),
+      ),
+    ).then((result) {
+      if (result != null) {
+        ref.read(activeAddressProvider.notifier).setAddress(result);
+      }
+    });
   }
 
   void _navigateToWishlist() {
@@ -585,7 +485,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Expanded(
                             child: _buildStatCard(
                               'Total Orders',
-                              _totalOrders.toString(),
+                              ref
+                                      .watch(userOrdersProvider)
+                                      .valueOrNull
+                                      ?.length
+                                      .toString() ??
+                                  '—',
                               Icons.shopping_bag_outlined,
                               onTap: _navigateToOrders,
                             ),
@@ -614,8 +519,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // ✅ UPDATED: Greeting shows name + edit button
+  // Greeting shows name + edit button
   Widget _buildGreetingSection() {
+    final customerName = ref.watch(userProvider).valueOrNull?.name ?? '';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -635,7 +541,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         letterSpacing: 0.5,
                       ),
                     ),
-                    if (!_isGuest && _customerName.isNotEmpty) ...[
+                    if (!_isGuest && customerName.isNotEmpty) ...[
                       const TextSpan(
                         text: ', ',
                         style: TextStyle(
@@ -645,7 +551,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                       TextSpan(
-                        text: _customerName,
+                        text: customerName,
                         style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -678,21 +584,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     )
                   : IconButton(
                       icon: Icon(
-                        _customerName.isEmpty
+                        customerName.isEmpty
                             ? Icons.add_circle_outline
                             : Icons.edit_outlined,
                         color: kBandiwalaYellow,
                         size: 26,
                       ),
-                      tooltip: _customerName.isEmpty ? 'Add Name' : 'Edit Name',
+                      tooltip: customerName.isEmpty ? 'Add Name' : 'Edit Name',
                       onPressed: _showEditNameDialog,
                     ),
           ],
         ),
         if (!_isGuest) ...[
           const SizedBox(height: 4),
-          // ✅ Show "Add your name" nudge if name is blank
-          if (_customerName.isEmpty)
+          if (customerName.isEmpty)
             GestureDetector(
               onTap: _showEditNameDialog,
               child: Row(

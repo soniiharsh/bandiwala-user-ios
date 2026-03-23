@@ -1,15 +1,16 @@
-// vendor_items_page.dart
-
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
-import 'orders.dart';
-import 'bottom_navigation.dart';
-import 'cart_screen.dart';
-import 'cart_store.dart';
-import 'home_page.dart'; // WishlistManager + WishlistVendor
+import '../providers/cart_provider.dart';
+import '../providers/vendors_provider.dart';
+import '../providers/items_provider.dart';
+import '../providers/coupons_provider.dart';
+import 'orders_page.dart';
+import '../widgets/bottom_navigation.dart';
+import 'cart_page.dart';
+import '../widgets/vendor_card.dart'; // WishlistManager + WishlistVendor
 
 const _kYellow = Color(0xFFFFC107);
 
@@ -48,7 +49,7 @@ class _VendorItemsPageState extends State<VendorItemsPage> {
         vendorName: widget.vendorName,
         onBackPressed: () => Navigator.of(context).pop(),
       ),
-      CartScreen(onBackToHome: () => setState(() => _currentIndex = 0)),
+      CartPage(onBackToHome: () => setState(() => _currentIndex = 0)),
       const OrdersPage(),
     ];
 
@@ -71,7 +72,7 @@ class _VendorItemsPageState extends State<VendorItemsPage> {
 
 // ─── Main vendor detail tab ───────────────────────────────────────────────────
 
-class _VendorDetailTab extends StatefulWidget {
+class _VendorDetailTab extends ConsumerStatefulWidget {
   final String vendorId;
   final String vendorName;
   final VoidCallback onBackPressed;
@@ -83,35 +84,20 @@ class _VendorDetailTab extends StatefulWidget {
   });
 
   @override
-  State<_VendorDetailTab> createState() => _VendorDetailTabState();
+  ConsumerState<_VendorDetailTab> createState() => _VendorDetailTabState();
 }
 
-class _VendorDetailTabState extends State<_VendorDetailTab> {
-  Map<String, dynamic>? _vendorMeta;
-  List<QueryDocumentSnapshot> _allDocs = [];
-  List<QueryDocumentSnapshot> _filteredDocs = [];
+class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
   String _heroImageUrl = '';
   bool _isWishlisted = false;
-
-  // Real-time vendor availability
-  bool _isVendorOnline = true;
-  StreamSubscription<DocumentSnapshot>? _vendorDocSub;
 
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
   String _activeFilter = 'All';
 
-  List<Map<String, dynamic>> _coupons = [];
-
-  StreamSubscription? _itemsSub;
-  StreamSubscription? _couponsSub;
-
   @override
   void initState() {
     super.initState();
-    _subscribeVendorDoc(); // replaces one-shot _loadVendorMeta
-    _subscribeItems();
-    _subscribeCoupons();
     _checkWishlist();
     _searchCtrl.addListener(_onSearch);
   }
@@ -120,77 +106,7 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
   void dispose() {
     _searchCtrl.removeListener(_onSearch);
     _searchCtrl.dispose();
-    _vendorDocSub?.cancel();
-    _itemsSub?.cancel();
-    _couponsSub?.cancel();
     super.dispose();
-  }
-
-  /// Real-time stream on the vendor doc; updates both metadata AND isAvailable.
-  void _subscribeVendorDoc() {
-    _vendorDocSub = FirebaseFirestore.instance
-        .collection('items')
-        .doc(widget.vendorId)
-        .snapshots()
-        .listen(
-          (doc) {
-            if (!mounted) return;
-            setState(() {
-              _vendorMeta = doc.data();
-              _isVendorOnline = (doc.data()?['isAvailable'] as bool?) ?? true;
-              // Update hero image from meta when not yet set
-              if (_heroImageUrl.isEmpty) {
-                _heroImageUrl = _vendorMeta?['imageUrl'] ?? '';
-              }
-            });
-          },
-          onError: (_) {
-            if (mounted) setState(() {});
-          },
-        );
-  }
-
-  void _subscribeItems() {
-    _itemsSub = FirebaseFirestore.instance
-        .collection('items')
-        .doc(widget.vendorId)
-        .collection('items')
-        .orderBy('createdAt', descending: false)
-        .snapshots()
-        .listen((snap) {
-          if (!mounted) return;
-          setState(() {
-            _allDocs = snap.docs;
-            if (_heroImageUrl.isEmpty && snap.docs.isNotEmpty) {
-              final firstData = snap.docs.first.data();
-              _heroImageUrl = firstData['imageUrl'] ?? '';
-            }
-            _applyFilters();
-          });
-        });
-  }
-
-  void _subscribeCoupons() {
-    _couponsSub = FirebaseFirestore.instance
-        .collection('coupons')
-        .where('isActive', isEqualTo: true)
-        .snapshots()
-        .listen((snap) {
-          if (!mounted) return;
-          final applicable = snap.docs
-              .where((doc) {
-                final d = doc.data();
-                if (d['isWholeApp'] == true) return true;
-                final ids = d['vendorIds'] as List<dynamic>? ?? [];
-                return ids.any(
-                  (id) =>
-                      id.toString().trim() == widget.vendorId.toString().trim(),
-                );
-              })
-              .map((doc) => doc.data())
-              .toList();
-          setState(() => _coupons = applicable);
-        });
   }
 
   Future<void> _checkWishlist() async {
@@ -203,15 +119,16 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
   }
 
   Future<void> _toggleWishlist() async {
+    final vendor = ref.read(vendorStreamProvider(widget.vendorId)).valueOrNull;
     final wv = WishlistVendor(
       vendorId: widget.vendorId,
       name: widget.vendorName,
-      imageUrl: _heroImageUrl,
-      address: _vendorMeta?['address'] ?? '',
-      category: _vendorMeta?['category'] ?? '',
-      rating: (_vendorMeta?['rating'] ?? 4.2).toDouble(),
+      imageUrl: vendor?.imageUrl ?? _heroImageUrl,
+      address: vendor?.address ?? '',
+      category: vendor?.category ?? '',
+      rating: 4.2,
     );
-    await WishlistManager.toggleWishlist(wv);
+    await WishlistManager.toggle(wv);
     await _checkWishlist();
   }
 
@@ -230,79 +147,104 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
   }
 
   void _applyFilters() {
-    List<QueryDocumentSnapshot> result = List.of(_allDocs);
-
-    if (_searchQuery.isNotEmpty) {
-      result = result.where((doc) {
-        final d = doc.data() as Map<String, dynamic>;
-        final name = (d['name'] ?? '').toString().toLowerCase();
-        final cat = (d['category'] ?? '').toString().toLowerCase();
-        final desc = (d['description'] ?? '').toString().toLowerCase();
-        return name.contains(_searchQuery) ||
-            cat.contains(_searchQuery) ||
-            desc.contains(_searchQuery);
-      }).toList();
-    }
-
-    if (_activeFilter == 'Veg') {
-      result = result
-          .where((doc) => (doc.data() as Map<String, dynamic>)['isVeg'] == true)
-          .toList();
-    } else if (_activeFilter == 'Non-veg') {
-      result = result
-          .where(
-            (doc) => (doc.data() as Map<String, dynamic>)['isVeg'] == false,
-          )
-          .toList();
-    }
-
-    _filteredDocs = result;
+    // filtering is now done inline in build using provider data
   }
-
-  String get _rating =>
-      (_vendorMeta?['rating'] ?? 4.2).toDouble().toStringAsFixed(1);
-  String get _ratingCount => ((_vendorMeta?['ratingCount'] ?? 143)).toString();
-  String get _deliveryTime => _vendorMeta?['deliveryTime'] ?? '20-30 mins';
-  String get _address => _vendorMeta?['address'] ?? '';
 
   @override
   Widget build(BuildContext context) {
+    final vendorAsync = ref.watch(vendorStreamProvider(widget.vendorId));
+    final itemsAsync = ref.watch(vendorItemsStreamProvider(widget.vendorId));
+    final couponsAsync = ref.watch(activeCouponsProvider);
+
+    final vendor = vendorAsync.valueOrNull;
+    final isVendorOnline = vendor?.isAvailable ?? true;
+    final allItems = itemsAsync.valueOrNull ?? [];
+
+    // Show error if items stream failed (e.g. missing Firestore index)
+    if (itemsAsync.hasError) {
+      debugPrint('vendorItemsStreamProvider error: ${itemsAsync.error}');
+    }
+
+    // Seed hero image from vendor or first item
+    if (_heroImageUrl.isEmpty) {
+      if (vendor?.imageUrl.isNotEmpty == true) {
+        _heroImageUrl = vendor!.imageUrl;
+      } else if (allItems.isNotEmpty && allItems.first.imageUrl.isNotEmpty) {
+        _heroImageUrl = allItems.first.imageUrl;
+      }
+    }
+
+    // Apply search + filter
+    var filtered = allItems;
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((item) {
+        return item.name.toLowerCase().contains(_searchQuery) ||
+            item.category.toLowerCase().contains(_searchQuery) ||
+            item.description.toLowerCase().contains(_searchQuery);
+      }).toList();
+    }
+    if (_activeFilter == 'Veg') {
+      filtered = filtered.where((item) => item.isVeg).toList();
+    } else if (_activeFilter == 'Non-veg') {
+      filtered = filtered.where((item) => !item.isVeg).toList();
+    }
+
+    // Coupons applicable to this vendor (all coupons are now app-wide)
+    final coupons =
+        couponsAsync.valueOrNull?.map((c) => c.toMap()).toList() ?? [];
+
+    final rating = '4.2';
+    final deliveryTime = '20-30 mins';
+    final address = vendor?.address ?? '';
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       body: CustomScrollView(
         slivers: [
-          // ── Hero + overlapping vendor card combined ───────────────────
-          SliverToBoxAdapter(child: _buildHeroWithOverlappingCard()),
-
-          // ── Coupons carousel ─────────────────────────────────────────
-          if (_coupons.isNotEmpty)
+          SliverToBoxAdapter(
+            child: _buildHeroWithOverlappingCard(
+              vendor: vendor,
+              isVendorOnline: isVendorOnline,
+              rating: rating,
+              deliveryTime: deliveryTime,
+              address: address,
+            ),
+          ),
+          if (coupons.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                child: VendorCouponsCarousel(coupons: _coupons),
+                child: VendorCouponsCarousel(coupons: coupons),
               ),
             ),
-
-          // ── Search bar ───────────────────────────────────────────────
           SliverToBoxAdapter(child: _buildSearchBar()),
-
-          // ── Filter chips (Veg + Non-veg only) ───────────────────────
           SliverToBoxAdapter(child: _buildFilterChips()),
-
-          // ── Items grid ───────────────────────────────────────────────
-          _buildItemsGrid(),
-
-          // Bottom padding for FAB
+          _buildItemsGrid(
+            allItems: allItems,
+            filtered: filtered,
+            isVendorOnline: isVendorOnline,
+            isLoading: itemsAsync.isLoading,
+            hasError: itemsAsync.hasError,
+          ),
           const SliverToBoxAdapter(child: SizedBox(height: 80)),
         ],
       ),
-      floatingActionButton: _buildMenuFAB(),
+      floatingActionButton: _buildMenuFAB(
+        allItems: allItems,
+        isVendorOnline: isVendorOnline,
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
   // ── Hero image + vendor card (overlap via Stack, no negative margin) ──────
-  Widget _buildHeroWithOverlappingCard() {
+  Widget _buildHeroWithOverlappingCard({
+    required dynamic vendor,
+    required bool isVendorOnline,
+    required String rating,
+    required String deliveryTime,
+    required String address,
+  }) {
     const double cardOverlap = 28.0;
 
     return Stack(
@@ -386,14 +328,24 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
           bottom: 0,
           left: 12,
           right: 12,
-          child: _buildVendorInfoCard(),
+          child: _buildVendorInfoCard(
+            isVendorOnline: isVendorOnline,
+            rating: rating,
+            deliveryTime: deliveryTime,
+            address: address,
+          ),
         ),
       ],
     );
   }
 
   // ── Vendor info card — NO inline coupon ──────────────────────────────────
-  Widget _buildVendorInfoCard() {
+  Widget _buildVendorInfoCard({
+    required bool isVendorOnline,
+    required String rating,
+    required String deliveryTime,
+    required String address,
+  }) {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       decoration: BoxDecoration(
@@ -427,7 +379,7 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
               Icon(Icons.star_rounded, size: 18, color: Colors.green.shade600),
               const SizedBox(width: 4),
               Text(
-                '$_rating ($_ratingCount Reviews)',
+                '$rating Reviews',
                 style: GoogleFonts.poppins(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -448,7 +400,7 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  _deliveryTime,
+                  deliveryTime,
                   style: GoogleFonts.poppins(
                     fontSize: 13,
                     color: Colors.grey.shade700,
@@ -460,10 +412,10 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
               ),
             ],
           ),
-          if (_address.isNotEmpty) ...[
+          if (address.isNotEmpty) ...[
             const SizedBox(height: 5),
             Text(
-              _address,
+              address,
               style: GoogleFonts.poppins(
                 fontSize: 13,
                 color: Colors.grey.shade600,
@@ -571,8 +523,14 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
   }
 
   // ── Items grid ────────────────────────────────────────────────────────────
-  Widget _buildItemsGrid() {
-    if (_allDocs.isEmpty) {
+  Widget _buildItemsGrid({
+    required List<dynamic> allItems,
+    required List<dynamic> filtered,
+    required bool isVendorOnline,
+    required bool isLoading,
+    bool hasError = false,
+  }) {
+    if (isLoading) {
       return const SliverToBoxAdapter(
         child: SizedBox(
           height: 200,
@@ -580,7 +538,34 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
         ),
       );
     }
-    if (_filteredDocs.isEmpty) {
+    if (hasError) {
+      return SliverToBoxAdapter(
+        child: SizedBox(
+          height: 200,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.wifi_off_rounded,
+                  size: 48,
+                  color: Colors.grey.shade300,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Could not load items',
+                  style: GoogleFonts.poppins(
+                    color: Colors.grey.shade500,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    if (allItems.isEmpty) {
       return SliverToBoxAdapter(
         child: SizedBox(
           height: 200,
@@ -615,35 +600,38 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
           crossAxisCount: 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 0.68,
+          mainAxisExtent: 270,
         ),
         delegate: SliverChildBuilderDelegate((context, index) {
-          final doc = _filteredDocs[index];
-          final d = doc.data() as Map<String, dynamic>;
+          final item = filtered[index];
           return _ItemCard(
             vendorId: widget.vendorId,
             vendorName: widget.vendorName,
-            itemId: doc.id,
-            name: d['name'] ?? 'Item',
-            imageUrl: d['imageUrl'] ?? '',
-            category: d['category'] ?? '',
-            description: d['description'] ?? '',
-            isAvailable: d['isAvailable'] ?? true,
-            isVendorOnline: _isVendorOnline, // ← real-time vendor gate
-            isVeg: d['isVeg'] ?? true,
-            price: (d['price'] ?? 0).toDouble(),
-            rating: (d['rating'] ?? 4.2).toDouble(),
-            ratingCount: (d['ratingCount'] ?? 0).toInt(),
+            itemId: item.id,
+            name: item.name,
+            imageUrl: item.imageUrl,
+            category: item.category,
+            description: item.description,
+            isAvailable: item.isAvailable,
+            isVendorOnline: isVendorOnline,
+            isVeg: item.isVeg,
+            price: item.price,
+            rating: 4.2,
+            ratingCount: 0,
           );
-        }, childCount: _filteredDocs.length),
+        }, childCount: filtered.length),
       ),
     );
   }
 
   // ── Menu FAB ──────────────────────────────────────────────────────────────
-  Widget _buildMenuFAB() {
+  Widget _buildMenuFAB({
+    required List<dynamic> allItems,
+    required bool isVendorOnline,
+  }) {
     return FloatingActionButton.extended(
-      onPressed: _showMenuSheet,
+      onPressed: () =>
+          _showMenuSheet(allItems: allItems, isVendorOnline: isVendorOnline),
       backgroundColor: Colors.black87,
       icon: const Icon(
         Icons.restaurant_menu_rounded,
@@ -662,7 +650,11 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
     );
   }
 
-  void _showMenuSheet() {
+  void _showMenuSheet({
+    required List<dynamic> allItems,
+    required bool isVendorOnline,
+  }) {
+    // Convert Item models to QueryDocumentSnapshot-compatible maps for _MenuSheet
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -670,8 +662,8 @@ class _VendorDetailTabState extends State<_VendorDetailTab> {
       builder: (_) => _MenuSheet(
         vendorId: widget.vendorId,
         vendorName: widget.vendorName,
-        allDocs: _allDocs,
-        isVendorOnline: _isVendorOnline, // ← pass real-time status
+        items: allItems,
+        isVendorOnline: isVendorOnline,
       ),
     );
   }
@@ -1079,13 +1071,13 @@ class _ItemCard extends StatelessWidget {
 class _MenuSheet extends StatelessWidget {
   final String vendorId;
   final String vendorName;
-  final List<QueryDocumentSnapshot> allDocs;
-  final bool isVendorOnline; // ← NEW
+  final List<dynamic> items;
+  final bool isVendorOnline;
 
   const _MenuSheet({
     required this.vendorId,
     required this.vendorName,
-    required this.allDocs,
+    required this.items,
     this.isVendorOnline = true,
   });
 
@@ -1125,7 +1117,7 @@ class _MenuSheet extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    '${allDocs.length} items',
+                    '${items.length} items',
                     style: GoogleFonts.poppins(
                       fontSize: 13,
                       color: Colors.grey.shade500,
@@ -1142,12 +1134,12 @@ class _MenuSheet extends StatelessWidget {
                   horizontal: 16,
                   vertical: 8,
                 ),
-                itemCount: allDocs.length,
+                itemCount: items.length,
                 separatorBuilder: (_, __) =>
                     const Divider(height: 1, indent: 70),
                 itemBuilder: (ctx, i) {
-                  final d = allDocs[i].data() as Map<String, dynamic>;
-                  final isVeg = d['isVeg'] ?? true;
+                  final item = items[i];
+                  final isVeg = item.isVeg as bool;
                   final dotColor = isVeg
                       ? Colors.green.shade600
                       : Colors.red.shade600;
@@ -1158,9 +1150,9 @@ class _MenuSheet extends StatelessWidget {
                       child: SizedBox(
                         width: 56,
                         height: 56,
-                        child: (d['imageUrl'] ?? '').isNotEmpty
+                        child: (item.imageUrl ?? '').isNotEmpty
                             ? CachedNetworkImage(
-                                imageUrl: d['imageUrl'],
+                                imageUrl: item.imageUrl,
                                 fit: BoxFit.cover,
                                 errorWidget: (_, __, ___) => Container(
                                   color: Colors.grey.shade200,
@@ -1196,7 +1188,7 @@ class _MenuSheet extends StatelessWidget {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            d['name'] ?? 'Item',
+                            item.name ?? 'Item',
                             style: GoogleFonts.poppins(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -1208,7 +1200,7 @@ class _MenuSheet extends StatelessWidget {
                       ],
                     ),
                     subtitle: Text(
-                      '₹ ${(d['price'] ?? 0).toInt()}',
+                      '₹ ${(item.price ?? 0).toInt()}',
                       style: GoogleFonts.poppins(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -1220,11 +1212,11 @@ class _MenuSheet extends StatelessWidget {
                       child: _ItemCounter(
                         vendorId: vendorId,
                         vendorName: vendorName,
-                        itemId: allDocs[i].id,
-                        itemName: d['name'] ?? '',
-                        price: (d['price'] ?? 0).toDouble(),
-                        isAvailable: d['isAvailable'] ?? true,
-                        isVendorOnline: isVendorOnline, // ← gate
+                        itemId: item.id,
+                        itemName: item.name ?? '',
+                        price: (item.price ?? 0).toDouble(),
+                        isAvailable: item.isAvailable ?? true,
+                        isVendorOnline: isVendorOnline,
                       ),
                     ),
                     onTap: () {
@@ -1236,17 +1228,17 @@ class _MenuSheet extends StatelessWidget {
                         builder: (_) => ProductDetailOverlay(
                           vendorId: vendorId,
                           vendorName: vendorName,
-                          itemId: allDocs[i].id,
-                          name: d['name'] ?? 'Item',
-                          imageUrl: d['imageUrl'] ?? '',
-                          category: d['category'] ?? '',
-                          description: d['description'] ?? '',
-                          isVeg: d['isVeg'] ?? true,
-                          price: (d['price'] ?? 0).toDouble(),
-                          rating: (d['rating'] ?? 4.2).toDouble(),
-                          ratingCount: (d['ratingCount'] ?? 0).toInt(),
-                          isAvailable: d['isAvailable'] ?? true,
-                          isVendorOnline: isVendorOnline, // ← gate
+                          itemId: item.id,
+                          name: item.name ?? 'Item',
+                          imageUrl: item.imageUrl ?? '',
+                          category: item.category ?? '',
+                          description: item.description ?? '',
+                          isVeg: item.isVeg ?? true,
+                          price: (item.price ?? 0).toDouble(),
+                          rating: 4.2,
+                          ratingCount: 0,
+                          isAvailable: item.isAvailable ?? true,
+                          isVendorOnline: isVendorOnline,
                         ),
                       );
                     },
@@ -1268,7 +1260,7 @@ class _MenuSheet extends StatelessWidget {
 //  • Add button + counter pinned to bottom
 //  • Sheet height = exactly content height (no extra space, no scroll needed)
 
-class ProductDetailOverlay extends StatefulWidget {
+class ProductDetailOverlay extends ConsumerStatefulWidget {
   final String vendorId;
   final String vendorName;
   final String itemId;
@@ -1301,10 +1293,11 @@ class ProductDetailOverlay extends StatefulWidget {
   });
 
   @override
-  State<ProductDetailOverlay> createState() => _ProductDetailOverlayState();
+  ConsumerState<ProductDetailOverlay> createState() =>
+      _ProductDetailOverlayState();
 }
 
-class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
+class _ProductDetailOverlayState extends ConsumerState<ProductDetailOverlay> {
   int quantity = 1;
 
   // Image visible height above the white card
@@ -1317,22 +1310,12 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
   @override
   void initState() {
     super.initState();
-    cartStore.addListener(_onCartChanged);
     _syncQuantity();
   }
 
-  @override
-  void dispose() {
-    cartStore.removeListener(_onCartChanged);
-    super.dispose();
-  }
-
-  void _onCartChanged() {
-    if (mounted) _syncQuantity();
-  }
-
   void _syncQuantity() {
-    final vc = cartStore.cartByVendor[widget.vendorId];
+    final cart = ref.read(cartProvider);
+    final vc = cart.cartByVendor[widget.vendorId];
     if (vc != null) {
       final item = vc.items.firstWhere(
         (i) => i.id == widget.itemId,
@@ -1346,23 +1329,27 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
 
   void _increment() {
     setState(() => quantity++);
-    cartStore.addItem(
-      vendorId: widget.vendorId,
-      vendorName: widget.vendorName,
-      itemId: widget.itemId,
-      itemName: widget.name,
-      price: widget.price,
-    );
+    ref
+        .read(cartProvider.notifier)
+        .addItem(
+          vendorId: widget.vendorId,
+          vendorName: widget.vendorName,
+          itemId: widget.itemId,
+          itemName: widget.name,
+          price: widget.price,
+        );
   }
 
   void _decrement() {
     if (quantity > 1) {
       setState(() => quantity--);
-      cartStore.updateQuantity(
-        vendorId: widget.vendorId,
-        itemId: widget.itemId,
-        delta: -1,
-      );
+      ref
+          .read(cartProvider.notifier)
+          .updateQuantity(
+            vendorId: widget.vendorId,
+            itemId: widget.itemId,
+            delta: -1,
+          );
     }
   }
 
@@ -1526,7 +1513,8 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
             child: ElevatedButton(
               onPressed: canAdd
                   ? () {
-                      final vc = cartStore.cartByVendor[widget.vendorId];
+                      final cart = ref.read(cartProvider);
+                      final vc = cart.cartByVendor[widget.vendorId];
                       final already =
                           vc?.items
                               .firstWhere(
@@ -1541,13 +1529,15 @@ class _ProductDetailOverlayState extends State<ProductDetailOverlay> {
                               .quantity ??
                           0;
                       if (already == 0) {
-                        cartStore.addItem(
-                          vendorId: widget.vendorId,
-                          vendorName: widget.vendorName,
-                          itemId: widget.itemId,
-                          itemName: widget.name,
-                          price: widget.price,
-                        );
+                        ref
+                            .read(cartProvider.notifier)
+                            .addItem(
+                              vendorId: widget.vendorId,
+                              vendorName: widget.vendorName,
+                              itemId: widget.itemId,
+                              itemName: widget.name,
+                              price: widget.price,
+                            );
                       }
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -1735,14 +1725,14 @@ class _StepBtn extends StatelessWidget {
 
 // ─── Item counter (ADD button / stepper on card) ──────────────────────────────
 
-class _ItemCounter extends StatefulWidget {
+class _ItemCounter extends ConsumerWidget {
   final String vendorId;
   final String vendorName;
   final String itemId;
   final String itemName;
   final double price;
   final bool isAvailable;
-  final bool isVendorOnline; // ← NEW
+  final bool isVendorOnline;
 
   const _ItemCounter({
     required this.vendorId,
@@ -1755,55 +1745,34 @@ class _ItemCounter extends StatefulWidget {
   });
 
   @override
-  State<_ItemCounter> createState() => _ItemCounterState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cart = ref.watch(cartProvider);
+    final vc = cart.cartByVendor[vendorId];
+    final q =
+        vc?.items
+            .firstWhere(
+              (i) => i.id == itemId,
+              orElse: () => CartItem(id: '', name: '', price: 0, quantity: 0),
+            )
+            .quantity ??
+        0;
 
-class _ItemCounterState extends State<_ItemCounter> {
-  @override
-  void initState() {
-    super.initState();
-    cartStore.addListener(_onChange);
-  }
+    void add() => ref
+        .read(cartProvider.notifier)
+        .addItem(
+          vendorId: vendorId,
+          vendorName: vendorName,
+          itemId: itemId,
+          itemName: itemName,
+          price: price,
+        );
 
-  @override
-  void dispose() {
-    cartStore.removeListener(_onChange);
-    super.dispose();
-  }
+    void change(int d) => ref
+        .read(cartProvider.notifier)
+        .updateQuantity(vendorId: vendorId, itemId: itemId, delta: d);
 
-  void _onChange() {
-    if (mounted) setState(() {});
-  }
-
-  int get _qty {
-    final vc = cartStore.cartByVendor[widget.vendorId];
-    if (vc == null) return 0;
-    return vc.items
-        .firstWhere(
-          (i) => i.id == widget.itemId,
-          orElse: () => CartItem(id: '', name: '', price: 0, quantity: 0),
-        )
-        .quantity;
-  }
-
-  void _add() => cartStore.addItem(
-    vendorId: widget.vendorId,
-    vendorName: widget.vendorName,
-    itemId: widget.itemId,
-    itemName: widget.itemName,
-    price: widget.price,
-  );
-
-  void _change(int d) => cartStore.updateQuantity(
-    vendorId: widget.vendorId,
-    itemId: widget.itemId,
-    delta: d,
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    // Hard-block when vendor is offline, regardless of item.isAvailable
-    if (!widget.isVendorOnline) {
+    // Hard-block when vendor is offline
+    if (!isVendorOnline) {
       return SizedBox(
         width: double.infinity,
         height: 32,
@@ -1827,7 +1796,7 @@ class _ItemCounterState extends State<_ItemCounter> {
         ),
       );
     }
-    if (!widget.isAvailable) {
+    if (!isAvailable) {
       return SizedBox(
         width: double.infinity,
         height: 32,
@@ -1850,14 +1819,12 @@ class _ItemCounterState extends State<_ItemCounter> {
       );
     }
 
-    final q = _qty;
-
     if (q == 0) {
       return SizedBox(
         width: double.infinity,
         height: 34,
         child: OutlinedButton(
-          onPressed: _add,
+          onPressed: add,
           style: OutlinedButton.styleFrom(
             backgroundColor: Colors.white,
             side: const BorderSide(color: Colors.black87, width: 1.2),
@@ -1878,7 +1845,6 @@ class _ItemCounterState extends State<_ItemCounter> {
       );
     }
 
-    // ✅ Fixed counter: buttons are fixed size, number is flexible center
     return SizedBox(
       width: double.infinity,
       height: 34,
@@ -1892,9 +1858,8 @@ class _ItemCounterState extends State<_ItemCounter> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── Minus button ─────────────────────────────────────
             GestureDetector(
-              onTap: () => _change(-1),
+              onTap: () => change(-1),
               behavior: HitTestBehavior.opaque,
               child: Container(
                 width: 34,
@@ -1906,8 +1871,6 @@ class _ItemCounterState extends State<_ItemCounter> {
                 ),
               ),
             ),
-
-            // ── Quantity number — takes remaining space, never overflows ──
             Expanded(
               child: Center(
                 child: FittedBox(
@@ -1922,10 +1885,8 @@ class _ItemCounterState extends State<_ItemCounter> {
                 ),
               ),
             ),
-
-            // ── Plus button ──────────────────────────────────────
             GestureDetector(
-              onTap: () => _change(1),
+              onTap: () => change(1),
               behavior: HitTestBehavior.opaque,
               child: Container(
                 width: 34,
@@ -1938,8 +1899,9 @@ class _ItemCounterState extends State<_ItemCounter> {
       ),
     );
   }
-}
 
+  // placeholder — replaced belowtate();
+}
 // ─── Coupons carousel ─────────────────────────────────────────────────────────
 
 class VendorCouponsCarousel extends StatefulWidget {
@@ -2019,11 +1981,13 @@ class CouponCard extends StatelessWidget {
 
     String label;
     if (type == 'discount') {
-      label = 'Flat ${(couponData['discountAmount'] ?? 0).toInt()}% off';
+      label = 'Flat ${(couponData['discount'] ?? 0).toInt()}% off';
     } else if (type == 'free_delivery') {
       label = 'Free Delivery';
+    } else if (type == 'flat_off') {
+      label = '₹${(couponData['discount'] ?? 0).toInt()} off';
     } else {
-      label = couponData['freebieName'] ?? 'Free Item';
+      label = 'Offer';
     }
 
     return Container(

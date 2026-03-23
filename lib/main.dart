@@ -3,24 +3,20 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-
-import 'firebase_options.dart';
-import 'screens/cart_store.dart';
-import 'screens/splash_screen.dart';
-import 'screens/update_required_screen.dart';
-import 'services/notification_service.dart';
-import 'services/version_checker.dart';
-import 'services/analytics_service.dart';
 import 'package:flutter/foundation.dart';
+import 'firebase_options.dart';
+import 'screens/splash_page.dart';
+import 'screens/update_required_page.dart';
+import 'services/notification_service.dart';
+import 'services/analytics_service.dart';
 
-String APP_VERSION = '1.0.0'; // Fallback version
+String appVersion = '1.0.0';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ Set white background for app startup
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.white,
@@ -32,11 +28,18 @@ Future<void> main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Optimize Firestore: enable local persistence and unlimited cache
+  // Disable offline persistence so failures are visible when there's no internet
   FirebaseFirestore.instance.settings = const Settings(
-    persistenceEnabled: true,
-    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    persistenceEnabled: false,
   );
+
+  if (kDebugMode) {
+    FirebaseFirestore.instance.useFirestoreEmulator(
+      'localhost',
+      8085,
+      automaticHostMapping: false,
+    );
+  }
 
   try {
     await FirebaseAppCheck.instance.activate(
@@ -47,42 +50,16 @@ Future<void> main() async {
           ? AppleProvider.debug
           : AppleProvider.deviceCheck,
     );
+  } catch (_) {}
 
-    if (kDebugMode) {
-      print('🧪 App Check running with DEBUG provider');
-      print('Register the debug token in Firebase Console → App Check');
-    } else {
-      print('🔒 App Check running with Play Integrity');
-    }
-  } catch (e, stack) {
-    if (kDebugMode) {
-      print('❌ App Check initialization failed');
-      print(e);
-      print(stack);
-    }
-  }
+  // Non-blocking — resolve in background
+  PackageInfo.fromPlatform().then((info) => appVersion = info.version);
 
-  await cartStore.loadFromDisk();
+  // Fire and forget — no await
+  NotificationService().initialize();
+  AnalyticsService.logAppOpen();
 
-  // Initialize notifications and subscribe to admin topic
-  await NotificationService().initialize();
-
-  // Get app version from pubspec.yaml
-  try {
-    final packageInfo = await PackageInfo.fromPlatform();
-    APP_VERSION = packageInfo.version;
-    if (kDebugMode) {
-      print('📱 App Version: $APP_VERSION (Build ${packageInfo.buildNumber})');
-    }
-  } catch (e) {
-    if (kDebugMode) {
-      print('⚠️ Failed to get app version: $e');
-    }
-  }
-
-  await AnalyticsService.logAppOpen();
-
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -111,6 +88,8 @@ class MyApp extends StatelessWidget {
   }
 }
 
+// ── Version check runs in background, doesn't block app startup ───────────────
+
 class VersionCheckWrapper extends StatefulWidget {
   const VersionCheckWrapper({super.key});
 
@@ -119,59 +98,61 @@ class VersionCheckWrapper extends StatefulWidget {
 }
 
 class _VersionCheckWrapperState extends State<VersionCheckWrapper> {
-  bool _isChecking = true;
   bool _updateRequired = false;
   String _minimumVersion = '';
 
   @override
   void initState() {
     super.initState();
-    _checkVersion();
+    _checkVersionInBackground();
   }
 
-  Future<void> _checkVersion() async {
+  Future<void> _checkVersionInBackground() async {
     try {
-      final result = await VersionChecker.checkAppVersion(APP_VERSION);
+      // Resolve actual app version first
+      final packageInfo = await PackageInfo.fromPlatform();
+      final currentVersion = packageInfo.version;
 
-      if (mounted) {
+      final snap = await FirebaseFirestore.instance
+          .collection('latest-version')
+          .limit(1)
+          .get();
+      if (snap.docs.isEmpty) return;
+
+      final minVersion =
+          snap.docs.first.data()['minimum-version'] as String? ?? '0.0.0';
+      final isOutdated = _isOlderVersion(currentVersion, minVersion);
+
+      if (mounted && isOutdated) {
         setState(() {
-          _updateRequired = result.updateRequired;
-          _minimumVersion = result.minimumVersion;
-          _isChecking = false;
+          _updateRequired = true;
+          _minimumVersion = minVersion;
         });
       }
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Version check error: $e');
-      }
-      if (mounted) {
-        setState(() {
-          _isChecking = false;
-        });
-      }
+    } catch (_) {}
+  }
+
+  /// Returns true if [current] is older than [minimum].
+  bool _isOlderVersion(String current, String minimum) {
+    final c = current.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+    final m = minimum.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+    for (var i = 0; i < 3; i++) {
+      final cv = i < c.length ? c[i] : 0;
+      final mv = i < m.length ? m[i] : 0;
+      if (cv < mv) return true;
+      if (cv > mv) return false;
     }
+    return false;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isChecking) {
-      return const Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFC107)),
-          ),
-        ),
-      );
-    }
-
     if (_updateRequired) {
-      return UpdateRequiredScreen(
-        currentVersion: APP_VERSION,
+      return UpdateRequiredPage(
+        currentVersion: appVersion,
         minimumVersion: _minimumVersion,
       );
     }
-
-    return const SplashScreen();
+    return const SplashPage();
   }
 }
