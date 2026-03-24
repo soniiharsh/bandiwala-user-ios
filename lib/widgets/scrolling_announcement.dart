@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:marquee/marquee.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/announcements_provider.dart';
+import '../core/theme/theme.dart';
 
 class ScrollingAnnouncement extends ConsumerWidget {
   const ScrollingAnnouncement({super.key});
@@ -26,15 +27,15 @@ class ScrollingAnnouncement extends ConsumerWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                const Color(0xFFFFC107).withOpacity(0.12),
-                const Color(0xFFFFC107).withOpacity(0.05),
+                AppColors.primary.withValues(alpha: 0.12),
+                AppColors.primary.withValues(alpha: 0.05),
               ],
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
             ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: const Color(0xFFFFC107).withOpacity(0.3),
+              color: AppColors.primary.withValues(alpha: 0.3),
               width: 1,
             ),
             boxShadow: [
@@ -51,7 +52,7 @@ class ScrollingAnnouncement extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFC107).withOpacity(0.2),
+                  color: AppColors.primary.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(

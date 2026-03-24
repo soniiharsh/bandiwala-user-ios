@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'otp_page.dart';
 import 'nav_page.dart';
 import '../services/analytics_service.dart';
+import '../core/theme/theme.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -13,7 +13,7 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  static const Color _yellow = Color(0xFFFFC107);
+  static const Color _yellow = AppColors.primary;
 
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
@@ -22,11 +22,6 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
-    if (kDebugMode) {
-      FirebaseAuth.instance.setSettings(
-        appVerificationDisabledForTesting: true,
-      );
-    }
   }
 
   @override

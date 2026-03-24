@@ -4,9 +4,10 @@ import 'dart:async';
 import 'dart:math';
 import 'orders_page.dart';
 import '../services/analytics_service.dart';
+import '../core/theme/theme.dart';
 
-const kBandiwalaYellow = Color(0xFFFFC107);
-const kWhite = Color(0xFFFFFFFF);
+const kBandiwalaYellow = AppColors.primary;
+const kWhite = AppColors.white;
 
 class PaymentSuccessPage extends StatefulWidget {
   final String paymentId;

@@ -4,8 +4,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
 import '../models/promotion.dart';
 import '../providers/promotions_provider.dart';
+import '../core/theme/theme.dart';
 
-const kBandiwalaYellow = Color(0xFFFFC107);
+const kBandiwalaYellow = AppColors.primary;
 
 // ─── PromotionalBanner ────────────────────────────────────────────────────────
 

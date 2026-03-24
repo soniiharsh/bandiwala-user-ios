@@ -16,8 +16,9 @@ import 'terms_conditions_page.dart';
 import 'cancellation_policy_page.dart';
 import 'refund_policy_page.dart';
 import 'help_support_page.dart';
+import '../core/theme/theme.dart';
 
-const Color kBandiwalaYellow = Color(0xFFFFC107);
+const Color kBandiwalaYellow = AppColors.primary;
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});

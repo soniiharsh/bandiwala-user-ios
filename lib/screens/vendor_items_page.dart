@@ -11,8 +11,9 @@ import 'orders_page.dart';
 import '../widgets/bottom_navigation.dart';
 import 'cart_page.dart';
 import '../widgets/vendor_card.dart'; // WishlistManager + WishlistVendor
+import '../core/theme/theme.dart';
 
-const _kYellow = Color(0xFFFFC107);
+const _kYellow = AppColors.primary;
 
 // ─── Entry widget (keeps bottom nav) ─────────────────────────────────────────
 

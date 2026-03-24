@@ -1,21 +1,24 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-class AppUser {
-  final String uid;
-  final String name;
-  final String phone;
-  final String? fcmToken;
-  final List<SavedAddress> savedAddresses;
-  final DateTime? createdAt;
+part 'app_user.freezed.dart';
+part 'app_user.g.dart';
 
-  const AppUser({
-    required this.uid,
-    required this.name,
-    required this.phone,
-    this.fcmToken,
-    this.savedAddresses = const [],
-    this.createdAt,
-  });
+@freezed
+class AppUser with _$AppUser {
+  const AppUser._();
+
+  const factory AppUser({
+    required String uid,
+    required String name,
+    required String phone,
+    String? fcmToken,
+    @Default([]) List<SavedAddress> savedAddresses,
+    DateTime? createdAt,
+  }) = _AppUser;
+
+  factory AppUser.fromJson(Map<String, dynamic> json) =>
+      _$AppUserFromJson(json);
 
   factory AppUser.fromDoc(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
@@ -30,61 +33,41 @@ class AppUser {
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
     );
   }
-
-  AppUser copyWith({
-    String? name,
-    String? fcmToken,
-    List<SavedAddress>? savedAddresses,
-  }) {
-    return AppUser(
-      uid: uid,
-      name: name ?? this.name,
-      phone: phone,
-      fcmToken: fcmToken ?? this.fcmToken,
-      savedAddresses: savedAddresses ?? this.savedAddresses,
-      createdAt: createdAt,
-    );
-  }
 }
 
-class SavedAddress {
-  final String geolocation; // Human-readable area name (was address)
-  final double latitude;
-  final double longitude;
-  final String? address; // Specific house no / street (was houseNo)
-  final String phone;
-  final String? label;
+@freezed
+class SavedAddress with _$SavedAddress {
+  const SavedAddress._();
 
-  const SavedAddress({
-    required this.geolocation,
-    required this.latitude,
-    required this.longitude,
-    required this.phone,
-    this.address,
-    this.label,
-  });
-
-  factory SavedAddress.fromMap(Map<String, dynamic> m) => SavedAddress(
-    geolocation: m['geolocation'] ?? m['address'] ?? '',
-    latitude: (m['latitude'] as num).toDouble(),
-    longitude: (m['longitude'] as num).toDouble(),
-    phone: m['phone'] ?? '',
-    address: m['address'] ?? m['houseNo'],
-    label: m['label'],
-  );
-
-  Map<String, dynamic> toMap() => {
-    'geolocation': geolocation,
-    'latitude': latitude,
-    'longitude': longitude,
-    'address': address ?? '',
-    'phone': phone,
-    'label': label ?? 'Other',
-  };
+  const factory SavedAddress({
+    required String geolocation,
+    required double latitude,
+    required double longitude,
+    required String phone,
+    String? address,
+    String? label,
+  }) = _SavedAddress;
 
   factory SavedAddress.fromJson(Map<String, dynamic> json) =>
-      SavedAddress.fromMap(json);
-  Map<String, dynamic> toJson() => toMap();
+      _$SavedAddressFromJson(json);
+
+  factory SavedAddress.fromMap(Map<String, dynamic> m) => SavedAddress(
+        geolocation: m['geolocation'] ?? m['address'] ?? '',
+        latitude: (m['latitude'] as num).toDouble(),
+        longitude: (m['longitude'] as num).toDouble(),
+        phone: m['phone'] ?? '',
+        address: m['address'] ?? m['houseNo'],
+        label: m['label'],
+      );
+
+  Map<String, dynamic> toMap() => {
+        'geolocation': geolocation,
+        'latitude': latitude,
+        'longitude': longitude,
+        'address': address ?? '',
+        'phone': phone,
+        'label': label ?? 'Other',
+      };
 
   String get fullDisplay {
     final parts = <String>[];
@@ -104,7 +87,5 @@ class SavedAddress {
 
   String get shortLabel => label ?? 'Other';
 
-  /// Convert to the format used by the top bar / picker if different.
-  /// Now that they are consolidated, this might be redundant.
-  Map<String, dynamic> toLocationJson() => toJson();
+  Map<String, dynamic> toLocationJson() => toMap();
 }

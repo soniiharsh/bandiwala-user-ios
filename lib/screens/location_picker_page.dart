@@ -9,6 +9,7 @@ import 'dart:async';
 import '../providers/service_zones_provider.dart';
 import '../providers/user_provider.dart';
 import '../models/app_user.dart';
+import '../core/theme/theme.dart';
 // ─── Shared model ─────────────────────────────────────────────────────────────
 
 // ─── Shared model consolidated into SavedAddress in app_user.dart ────────────────
@@ -50,7 +51,7 @@ class LocationPickerPage extends ConsumerStatefulWidget {
 }
 
 class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
-  static const Color bandiwalaYellow = Color(0xFFFFC107);
+  static const Color bandiwalaYellow = AppColors.primary;
 
   bool _showModeSelection = true;
   bool _isCurrentLocationMode = false;

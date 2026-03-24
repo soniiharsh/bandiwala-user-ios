@@ -4,9 +4,10 @@ import '../providers/user_provider.dart';
 import '../models/app_user.dart';
 import 'location_picker_page.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../core/theme/theme.dart';
 
-const kBandiwalaYellow = Color(0xFFFFC107);
-const kWhite = Color(0xFFFFFFFF);
+const kBandiwalaYellow = AppColors.primary;
+const kWhite = AppColors.white;
 const kBorderGrey = Color(0xFFE5E7EB);
 const kTextGrey = Color(0xFF6B7280);
 const kLightGrey = Color(0xFFF9FAFB);

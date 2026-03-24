@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/coupons_provider.dart';
 import '../models/coupon.dart';
+import '../core/theme/theme.dart';
 
-const kBandiwalaYellow = Color(0xFFFFC107);
+const kBandiwalaYellow = AppColors.primary;
 
 class CouponsPage extends ConsumerWidget {
   final double cartAmount;

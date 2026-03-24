@@ -1,20 +1,22 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-class ServiceZone {
-  final String id;
-  final String name;
-  final double lat;
-  final double lng;
-  final double radiusMeters;
+part 'service_zone.freezed.dart';
+part 'service_zone.g.dart';
 
-  const ServiceZone({
-    required this.id,
-    required this.name,
-    required this.lat,
-    required this.lng,
-    required this.radiusMeters,
-  });
+@freezed
+class ServiceZone with _$ServiceZone {
+  const factory ServiceZone({
+    required String id,
+    required String name,
+    required double lat,
+    required double lng,
+    required double radiusMeters,
+  }) = _ServiceZone;
+
+  factory ServiceZone.fromJson(Map<String, dynamic> json) =>
+      _$ServiceZoneFromJson(json);
 
   factory ServiceZone.fromDoc(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
@@ -32,8 +34,7 @@ double haversineDistance(double lat1, double lon1, double lat2, double lon2) {
   const R = 6371000.0;
   final dLat = _rad(lat2 - lat1);
   final dLon = _rad(lon2 - lon1);
-  final a =
-      sin(dLat / 2) * sin(dLat / 2) +
+  final a = sin(dLat / 2) * sin(dLat / 2) +
       cos(_rad(lat1)) * cos(_rad(lat2)) * sin(dLon / 2) * sin(dLon / 2);
   return R * 2 * atan2(sqrt(a), sqrt(1 - a));
 }

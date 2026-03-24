@@ -3,8 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/orders_provider.dart';
+import '../core/theme/theme.dart';
 
-const _kYellow = Color(0xFFFFC107);
+const _kYellow = AppColors.primary;
 const _kYellowDark = Color(0xFFE6AC00);
 const _kDark = Color(0xFF1A1A1A);
 

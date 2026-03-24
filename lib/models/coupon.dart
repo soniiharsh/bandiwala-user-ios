@@ -1,33 +1,29 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-class Coupon {
-  final String id;
-  final String couponCode;
-  final String couponName;
-  final String couponType; // "discount" | "free_delivery" | "flat_off"
-  final String description;
-  final double minAmount;
-  final int maxDiscountableAmount;
-  final double discount;
-  final int maxUsage;
-  final int currentUsage;
-  final bool isActive;
-  final DateTime createdAt;
+part 'coupon.freezed.dart';
+part 'coupon.g.dart';
 
-  const Coupon({
-    required this.id,
-    required this.couponCode,
-    required this.couponName,
-    required this.couponType,
-    required this.description,
-    required this.minAmount,
-    required this.maxDiscountableAmount,
-    required this.discount,
-    required this.maxUsage,
-    required this.currentUsage,
-    required this.isActive,
-    required this.createdAt,
-  });
+@freezed
+class Coupon with _$Coupon {
+  const Coupon._();
+
+  const factory Coupon({
+    required String id,
+    required String couponCode,
+    required String couponName,
+    required String couponType, // "discount" | "free_delivery" | "flat_off"
+    required String description,
+    required double minAmount,
+    required int maxDiscountableAmount,
+    required double discount,
+    required int maxUsage,
+    required int currentUsage,
+    required bool isActive,
+    required DateTime createdAt,
+  }) = _Coupon;
+
+  factory Coupon.fromJson(Map<String, dynamic> json) => _$CouponFromJson(json);
 
   factory Coupon.fromDoc(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
@@ -54,17 +50,17 @@ class Coupon {
   bool get isValid => isActive && !isUsageLimitReached;
 
   Map<String, dynamic> toMap() => {
-    'id': id,
-    'couponCode': couponCode,
-    'couponName': couponName,
-    'couponType': couponType,
-    'description': description,
-    'minAmount': minAmount,
-    'maxDiscountableAmount': maxDiscountableAmount,
-    'discount': discount,
-    'maxUsage': maxUsage,
-    'currentUsage': currentUsage,
-    'isActive': isActive,
-    'createdAt': Timestamp.fromDate(createdAt),
-  };
+        'id': id,
+        'couponCode': couponCode,
+        'couponName': couponName,
+        'couponType': couponType,
+        'description': description,
+        'minAmount': minAmount,
+        'maxDiscountableAmount': maxDiscountableAmount,
+        'discount': discount,
+        'maxUsage': maxUsage,
+        'currentUsage': currentUsage,
+        'isActive': isActive,
+        'createdAt': Timestamp.fromDate(createdAt),
+      };
 }

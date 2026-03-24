@@ -6,8 +6,9 @@ final foodCategoriesProvider = FutureProvider<List<FoodCategory>>((ref) async {
   final snap = await FirebaseFirestore.instance
       .collection('food_categories')
       .where('isActive', isEqualTo: true)
-      .orderBy('order')
       .get(const GetOptions(source: Source.serverAndCache));
 
-  return snap.docs.map(FoodCategory.fromDoc).toList();
+  final categories = snap.docs.map(FoodCategory.fromDoc).toList();
+  categories.sort((a, b) => a.order.compareTo(b.order));
+  return categories;
 });

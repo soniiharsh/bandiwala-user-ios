@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/cart_provider.dart';
+import '../core/theme/theme.dart';
 
 class BandiwalaBottomNavigation extends ConsumerWidget {
   final int currentIndex;
@@ -12,7 +13,7 @@ class BandiwalaBottomNavigation extends ConsumerWidget {
     required this.onItemSelected,
   });
 
-  static const Color bandiwalaYellow = Color(0xFFFFC107);
+  static const Color bandiwalaYellow = AppColors.primary;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -64,9 +65,9 @@ class _CartIcon extends StatelessWidget {
             child: Container(
               padding: EdgeInsets.all(count > 9 ? 4 : 5),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFC107),
+                color: AppColors.primary,
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 1.5),
+                border: Border.all(color: AppColors.white, width: 1.5),
               ),
               constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
               child: Center(

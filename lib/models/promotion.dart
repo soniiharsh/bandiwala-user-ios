@@ -1,17 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-class Promotion {
-  final String id;
-  final String imageUrl;
-  final int order;
-  final bool isActive;
+part 'promotion.freezed.dart';
+part 'promotion.g.dart';
 
-  const Promotion({
-    required this.id,
-    required this.imageUrl,
-    required this.order,
-    required this.isActive,
-  });
+@freezed
+class Promotion with _$Promotion {
+  const factory Promotion({
+    required String id,
+    required String imageUrl,
+    required int order,
+    required bool isActive,
+  }) = _Promotion;
+
+  factory Promotion.fromJson(Map<String, dynamic> json) =>
+      _$PromotionFromJson(json);
 
   factory Promotion.fromDoc(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;

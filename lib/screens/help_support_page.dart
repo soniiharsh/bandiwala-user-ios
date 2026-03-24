@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'orders_page.dart'; // ← adjust import path as needed
+import '../core/theme/theme.dart';
 
-const kBandiwalaYellow = Color(0xFFFFC107);
+const kBandiwalaYellow = AppColors.primary;
 
 class HelpSupportPage extends StatefulWidget {
   const HelpSupportPage({super.key});

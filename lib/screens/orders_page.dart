@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../models/order.dart';
 import '../providers/orders_provider.dart';
+import '../core/theme/theme.dart';
 
-const kBandiwalaYellow = Color(0xFFFFC107);
-const kWhite = Color(0xFFFFFFFF);
+const kBandiwalaYellow = AppColors.primary;
+const kWhite = AppColors.white;
 const kBorderGrey = Color(0xFFE5E7EB);
 const kTextGrey = Color(0xFF6B7280);
 const kLightGrey = Color(0xFFF9FAFB);

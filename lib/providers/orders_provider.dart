@@ -9,11 +9,11 @@ Future<String> placeOrder(AppOrder order) async {
   final data = {
     'userId': order.userId,
     'customerPhone': order.customerPhone,
-    'deliveryAddress': order.deliveryAddress.toMap(),
+    'deliveryAddress': order.deliveryAddress.toJson(),
     'itemsByVendor': order.itemsByVendor.map(
       (vendorId, vo) => MapEntry(vendorId, {
         'vendorName': vo.vendorName,
-        'items': vo.items.map((itemId, item) => MapEntry(itemId, item.toMap())),
+        'items': vo.items.map((itemId, item) => MapEntry(itemId, item.toJson())),
         'status': vo.status,
         'statusUpdatedAt': FieldValue.serverTimestamp(),
       }),
@@ -37,7 +37,7 @@ Future<String> placeOrder(AppOrder order) async {
     'statusUpdatedAt': FieldValue.serverTimestamp(),
   };
 
-  final ref = await FirebaseFirestore.instance.collection('orders').add(data);
+  final ref = await FirebaseFirestore.instance.collection('orders1').add(data);
   return ref.id;
 }
 
@@ -48,7 +48,7 @@ final userOrdersProvider = StreamProvider<List<AppOrder>>((ref) {
   if (user == null) return Stream.value([]);
 
   return FirebaseFirestore.instance
-      .collection('orders')
+      .collection('orders1')
       .where('userId', isEqualTo: user.uid)
       .snapshots()
       .map((snap) {

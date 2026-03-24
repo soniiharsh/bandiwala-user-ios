@@ -13,8 +13,9 @@ import '../providers/vendors_provider.dart';
 import '../providers/items_provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../core/theme/theme.dart';
 
-const Color _kYellow = Color(0xFFFFC107);
+const Color _kYellow = AppColors.primary;
 
 // ─── Search result model ──────────────────────────────────────────────────────
 

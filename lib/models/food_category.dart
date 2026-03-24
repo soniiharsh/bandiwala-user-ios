@@ -1,21 +1,22 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 
-class FoodCategory {
-  final String id;
-  final String name;
-  final String imageUrl;
-  final bool isActive;
-  final int order;
-  final DateTime? createdAt;
+part 'food_category.freezed.dart';
+part 'food_category.g.dart';
 
-  const FoodCategory({
-    required this.id,
-    required this.name,
-    this.imageUrl = '',
-    this.isActive = true,
-    this.order = 0,
-    this.createdAt,
-  });
+@freezed
+class FoodCategory with _$FoodCategory {
+  const factory FoodCategory({
+    required String id,
+    required String name,
+    @Default('') String imageUrl,
+    @Default(true) bool isActive,
+    @Default(0) int order,
+    DateTime? createdAt,
+  }) = _FoodCategory;
+
+  factory FoodCategory.fromJson(Map<String, dynamic> json) =>
+      _$FoodCategoryFromJson(json);
 
   factory FoodCategory.fromDoc(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;

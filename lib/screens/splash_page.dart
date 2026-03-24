@@ -4,6 +4,7 @@ import '../providers/user_provider.dart';
 import '../providers/active_address_provider.dart';
 import 'nav_page.dart';
 import 'login_page.dart';
+import '../core/theme/theme.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
   const SplashPage({super.key});
@@ -30,7 +31,7 @@ class _SplashScreenState extends ConsumerState<SplashPage> {
         backgroundColor: Colors.white,
         body: Center(
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFC107)),
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
           ),
         ),
       ),

@@ -6,7 +6,7 @@ import '../models/item.dart';
 // Every other provider derives from this — no extra Firestore listeners.
 final allItemsStreamProvider = StreamProvider<List<Item>>((ref) {
   return FirebaseFirestore.instance
-      .collection('items')
+      .collection('items1')
       .snapshots()
       .map((snap) => snap.docs.map(Item.fromDoc).toList());
 });

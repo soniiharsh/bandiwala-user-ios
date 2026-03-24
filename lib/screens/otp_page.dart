@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/user_provider.dart';
 import '../services/analytics_service.dart';
 import 'nav_page.dart';
+import '../core/theme/theme.dart';
 
 class OtpPage extends ConsumerStatefulWidget {
   final String phoneNumber;
@@ -22,7 +23,7 @@ class OtpPage extends ConsumerStatefulWidget {
 }
 
 class _OtpPageState extends ConsumerState<OtpPage> {
-  static const Color _yellow = Color(0xFFFFC107);
+  static const Color _yellow = AppColors.primary;
 
   final _otpController = TextEditingController();
   bool _isLoading = false;

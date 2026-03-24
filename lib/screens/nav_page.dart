@@ -13,6 +13,7 @@ import 'location_picker_page.dart';
 import '../widgets/active_order_bar.dart';
 import '../providers/user_provider.dart';
 import '../providers/active_address_provider.dart';
+import '../core/theme/theme.dart';
 
 class NavPage extends ConsumerStatefulWidget {
   const NavPage({super.key});
@@ -31,13 +32,37 @@ class _NavPageState extends ConsumerState<NavPage> {
     return authAsync.when(
       loading: () => const Scaffold(
         body: Center(
-          child: CircularProgressIndicator(color: Color(0xFFFFC107)),
+          child: CircularProgressIndicator(color: AppColors.primary),
         ),
       ),
       error: (_, __) =>
           const Scaffold(body: Center(child: Text('Something went wrong'))),
       data: (appUser) {
-        if (appUser == null) return const SizedBox.shrink();
+        // Guest (not signed in) — skip address guard, show home directly
+        if (appUser == null) {
+          final pages = <Widget>[
+            const HomePage(),
+            CartPage(onBackToHome: () => setState(() => _currentIndex = 0)),
+            const OrdersPage(),
+          ];
+
+          return PopScope(
+            canPop: _currentIndex == 0,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!didPop && _currentIndex != 0) {
+                setState(() => _currentIndex = 0);
+              }
+            },
+            child: Scaffold(
+              backgroundColor: Colors.white,
+              body: IndexedStack(index: _currentIndex, children: pages),
+              bottomNavigationBar: BandiwalaBottomNavigation(
+                currentIndex: _currentIndex,
+                onItemSelected: (i) => setState(() => _currentIndex = i),
+              ),
+            ),
+          );
+        }
 
         // No addresses yet — block everything until one is added
         if (appUser.savedAddresses.isEmpty) {
@@ -102,13 +127,13 @@ class _ForceAddAddressScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFC107).withValues(alpha: 0.12),
+                    color: AppColors.primary.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
                     Icons.add_location_alt_outlined,
                     size: 64,
-                    color: Color(0xFFFFC107),
+                    color: AppColors.primary,
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -147,8 +172,8 @@ class _ForceAddAddressScreen extends StatelessWidget {
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFFC107),
-                      foregroundColor: Colors.black87,
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.textPrimary,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),

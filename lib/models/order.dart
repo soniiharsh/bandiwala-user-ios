@@ -1,18 +1,23 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import '../models/app_user.dart';
 
-class OrderDeliveryAddress {
-  final String address;
-  final String geolocation;
-  final double latitude;
-  final double longitude;
+part 'order.freezed.dart';
+part 'order.g.dart';
 
-  const OrderDeliveryAddress({
-    required this.address,
-    required this.geolocation,
-    required this.latitude,
-    required this.longitude,
-  });
+@freezed
+class OrderDeliveryAddress with _$OrderDeliveryAddress {
+  const OrderDeliveryAddress._();
+
+  const factory OrderDeliveryAddress({
+    required String address,
+    required String geolocation,
+    required double latitude,
+    required double longitude,
+  }) = _OrderDeliveryAddress;
+
+  factory OrderDeliveryAddress.fromJson(Map<String, dynamic> json) =>
+      _$OrderDeliveryAddressFromJson(json);
 
   factory OrderDeliveryAddress.fromSavedAddress(SavedAddress s) =>
       OrderDeliveryAddress(
@@ -29,51 +34,41 @@ class OrderDeliveryAddress {
         latitude: (m['latitude'] as num? ?? 0).toDouble(),
         longitude: (m['longitude'] as num? ?? 0).toDouble(),
       );
-
-  Map<String, dynamic> toMap() => {
-    'address': address,
-    'geolocation': geolocation,
-    'latitude': latitude,
-    'longitude': longitude,
-  };
 }
 
-class OrderItem {
-  final String name;
-  final double price;
-  final int quantity;
+@freezed
+class OrderItem with _$OrderItem {
+  const OrderItem._();
 
-  const OrderItem({
-    required this.name,
-    required this.price,
-    required this.quantity,
-  });
+  const factory OrderItem({
+    required String name,
+    required double price,
+    required int quantity,
+  }) = _OrderItem;
+
+  factory OrderItem.fromJson(Map<String, dynamic> json) =>
+      _$OrderItemFromJson(json);
 
   factory OrderItem.fromMap(Map<String, dynamic> m) => OrderItem(
-    name: m['name'] ?? '',
-    price: (m['price'] as num? ?? 0).toDouble(),
-    quantity: (m['quantity'] as num? ?? 1).toInt(),
-  );
-
-  Map<String, dynamic> toMap() => {
-    'name': name,
-    'price': price,
-    'quantity': quantity,
-  };
+        name: m['name'] ?? '',
+        price: (m['price'] as num? ?? 0).toDouble(),
+        quantity: (m['quantity'] as num? ?? 1).toInt(),
+      );
 }
 
-class VendorOrder {
-  final String vendorName;
-  final Map<String, OrderItem> items;
-  final String status;
-  final DateTime? statusUpdatedAt;
+@freezed
+class VendorOrder with _$VendorOrder {
+  const VendorOrder._();
 
-  const VendorOrder({
-    required this.vendorName,
-    required this.items,
-    this.status = 'pending',
-    this.statusUpdatedAt,
-  });
+  const factory VendorOrder({
+    required String vendorName,
+    required Map<String, OrderItem> items,
+    @Default('pending') String status,
+    DateTime? statusUpdatedAt,
+  }) = _VendorOrder;
+
+  factory VendorOrder.fromJson(Map<String, dynamic> json) =>
+      _$VendorOrderFromJson(json);
 
   factory VendorOrder.fromMap(Map<String, dynamic> m) {
     final rawItems = m['items'];
@@ -81,12 +76,10 @@ class VendorOrder {
 
     if (rawItems is Map) {
       rawItems.forEach((key, value) {
-        items[key.toString()] = OrderItem.fromMap(
-          Map<String, dynamic>.from(value as Map),
-        );
+        items[key.toString()] =
+            OrderItem.fromMap(Map<String, dynamic>.from(value as Map));
       });
     } else if (rawItems is List) {
-      // legacy list format — use itemId or index as key
       for (int i = 0; i < rawItems.length; i++) {
         final item = Map<String, dynamic>.from(rawItems[i] as Map);
         final key = (item['itemId'] ?? item['id'] ?? i.toString()).toString();
@@ -103,109 +96,61 @@ class VendorOrder {
   }
 
   Map<String, dynamic> toMap() => {
-    'vendorName': vendorName,
-    'items': items.map((k, v) => MapEntry(k, v.toMap())),
-    'status': status,
-    'statusUpdatedAt': statusUpdatedAt != null
-        ? Timestamp.fromDate(statusUpdatedAt!)
-        : FieldValue.serverTimestamp(),
-  };
+        'vendorName': vendorName,
+        'items': items.map((k, v) => MapEntry(k, v.toJson())),
+        'status': status,
+        'statusUpdatedAt': statusUpdatedAt != null
+            ? Timestamp.fromDate(statusUpdatedAt!)
+            : FieldValue.serverTimestamp(),
+      };
 }
 
-class AppOrder {
-  final String id;
-  final String userId;
-  final String customerPhone;
-  final OrderDeliveryAddress deliveryAddress;
-  final Map<String, VendorOrder> itemsByVendor;
-  final List<String> vendorIds;
-  final String paymentMethod;
-  final String paymentId;
-  final double deliveryFee;
-  final double platformFee;
-  final double foodTax;
-  final double deliveryTax;
-  final bool platformTax;
-  final bool couponApplied;
-  final String couponCode;
-  final String couponType;
-  final double couponDiscount;
-  final double couponMaxDiscountableAmount;
-  final double grandTotal;
-  final String status;
-  final DateTime? statusUpdatedAt;
-  final DateTime? createdAt;
+@freezed
+class AppOrder with _$AppOrder {
+  const AppOrder._();
 
-  const AppOrder({
-    required this.id,
-    required this.userId,
-    required this.customerPhone,
-    required this.deliveryAddress,
-    required this.itemsByVendor,
-    required this.vendorIds,
-    required this.paymentMethod,
-    required this.paymentId,
-    required this.deliveryFee,
-    required this.platformFee,
-    required this.foodTax,
-    required this.deliveryTax,
-    required this.platformTax,
-    this.couponApplied = false,
-    this.couponCode = '',
-    this.couponType = '',
-    this.couponDiscount = 0,
-    this.couponMaxDiscountableAmount = 0,
-    required this.grandTotal,
-    required this.status,
-    this.statusUpdatedAt,
-    this.createdAt,
-  });
+  const factory AppOrder({
+    required String id,
+    required String userId,
+    required String customerPhone,
+    required OrderDeliveryAddress deliveryAddress,
+    required Map<String, VendorOrder> itemsByVendor,
+    required List<String> vendorIds,
+    required String paymentMethod,
+    required String paymentId,
+    required double deliveryFee,
+    required double platformFee,
+    required double foodTax,
+    required double deliveryTax,
+    required bool platformTax,
+    @Default(false) bool couponApplied,
+    @Default('') String couponCode,
+    @Default('') String couponType,
+    @Default(0) double couponDiscount,
+    @Default(0) double couponMaxDiscountableAmount,
+    required double grandTotal,
+    required String status,
+    DateTime? statusUpdatedAt,
+    DateTime? createdAt,
+  }) = _AppOrder;
 
-  // Convenience getter for items total (base price before fees/taxes)
+  factory AppOrder.fromJson(Map<String, dynamic> json) =>
+      _$AppOrderFromJson(json);
+
   double get itemsTotal => itemsByVendor.values.fold(0.0, (acc, vo) {
-    return acc + vo.items.values.fold(0.0, (s, i) => s + i.price * i.quantity);
-  });
-
-  AppOrder copyWith({
-    String? paymentId,
-    String? paymentMethod,
-    String? status,
-  }) => AppOrder(
-    id: id,
-    userId: userId,
-    customerPhone: customerPhone,
-    deliveryAddress: deliveryAddress,
-    itemsByVendor: itemsByVendor,
-    vendorIds: vendorIds,
-    paymentMethod: paymentMethod ?? this.paymentMethod,
-    paymentId: paymentId ?? this.paymentId,
-    deliveryFee: deliveryFee,
-    platformFee: platformFee,
-    foodTax: foodTax,
-    deliveryTax: deliveryTax,
-    platformTax: platformTax,
-    couponApplied: couponApplied,
-    couponCode: couponCode,
-    couponType: couponType,
-    couponDiscount: couponDiscount,
-    couponMaxDiscountableAmount: couponMaxDiscountableAmount,
-    grandTotal: grandTotal,
-    status: status ?? this.status,
-    statusUpdatedAt: statusUpdatedAt,
-    createdAt: createdAt,
-  );
+        return acc +
+            vo.items.values.fold(0.0, (s, i) => s + i.price * i.quantity);
+      });
 
   factory AppOrder.fromDoc(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
 
-    // itemsByVendor: support map (new) and array (legacy)
     final Map<String, VendorOrder> itemsByVendor = {};
     final ibv = d['itemsByVendor'];
     if (ibv is Map) {
       ibv.forEach((key, value) {
-        itemsByVendor[key.toString()] = VendorOrder.fromMap(
-          Map<String, dynamic>.from(value as Map),
-        );
+        itemsByVendor[key.toString()] =
+            VendorOrder.fromMap(Map<String, dynamic>.from(value as Map));
       });
     } else if (ibv is List) {
       for (final entry in ibv) {
@@ -230,8 +175,8 @@ class AppOrder {
       vendorIds: List<String>.from(d['vendorIds'] ?? []),
       paymentMethod: d['paymentMethod'] ?? '',
       paymentId: d['paymentId'] ?? '',
-      deliveryFee: (d['deliveryFee'] ?? d['deliveryCharge'] as num? ?? 0)
-          .toDouble(),
+      deliveryFee:
+          (d['deliveryFee'] ?? d['deliveryCharge'] as num? ?? 0).toDouble(),
       platformFee: (d['platformFee'] as num? ?? 0).toDouble(),
       foodTax: (d['foodTax'] ?? d['foodTaxAmount'] as num? ?? 0).toDouble(),
       deliveryTax: (d['deliveryTax'] as num? ?? 0).toDouble(),
@@ -245,8 +190,9 @@ class AppOrder {
       grandTotal: (d['grandTotal'] as num? ?? 0).toDouble(),
       status: d['status'] ?? 'unknown',
       statusUpdatedAt: (d['statusUpdatedAt'] as Timestamp?)?.toDate(),
-      createdAt: (d['createdAt'] as Timestamp? ?? d['timestamp'] as Timestamp?)
-          ?.toDate(),
+      createdAt:
+          (d['createdAt'] as Timestamp? ?? d['timestamp'] as Timestamp?)
+              ?.toDate(),
     );
   }
 }

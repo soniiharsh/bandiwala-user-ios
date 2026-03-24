@@ -71,6 +71,7 @@ class _FoodCategoryCarouselState extends State<FoodCategoryCarousel>
         });
       }
     } catch (e) {
+      debugPrint('FoodCategoryCarousel error: $e');
       if (mounted) {
         setState(() {
           _categories = [

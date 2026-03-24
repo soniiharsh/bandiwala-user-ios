@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'vendor_items_page.dart';
 import '../widgets/vendor_card.dart'; // WishlistManager + WishlistVendor
+import '../core/theme/theme.dart';
 
-const _kBandiwalaYellow = Color(0xFFFFC107);
-const _kWhite = Color(0xFFFFFFFF);
+const _kBandiwalaYellow = AppColors.primary;
+const _kWhite = AppColors.white;
 const _kBorderGrey = Color(0xFFE5E7EB);
 const _kLightGrey = Color(0xFFF9FAFB);
 

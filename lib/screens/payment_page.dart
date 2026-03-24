@@ -9,9 +9,10 @@ import '../models/app_user.dart';
 import '../services/payment_service.dart';
 import 'payment_success_page.dart';
 import 'coupons_page.dart';
+import '../core/theme/theme.dart';
 
-const kBandiwalaYellow = Color(0xFFFFC107);
-const kWhite = Color(0xFFFFFFFF);
+const kBandiwalaYellow = AppColors.primary;
+const kWhite = AppColors.white;
 const kBorderGrey = Color(0xFFE5E7EB);
 const kTextGrey = Color(0xFF6B7280);
 const kBgGrey = Color(0xFFF9FAFB);

@@ -11,6 +11,7 @@ import '../providers/items_provider.dart';
 import '../providers/vendors_provider.dart';
 import '../widgets/vendor_card.dart';
 import '../widgets/vendors_list.dart';
+import '../core/theme/theme.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -55,7 +56,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             children: [
               Icon(
                 Icons.waving_hand_outlined,
-                color: Color(0xFFFFC107),
+                color: AppColors.primary,
                 size: 26,
               ),
               SizedBox(width: 10),
@@ -78,7 +79,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(
-                  color: Color(0xFFFFC107),
+                  color: AppColors.primary,
                   width: 2,
                 ),
               ),
@@ -93,8 +94,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                 await ref.read(userProvider.notifier).updateName(name);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFC107),
-                foregroundColor: Colors.black87,
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.textPrimary,
               ),
               child: const Text(
                 'Save',
@@ -184,10 +185,10 @@ class _HomeContent extends ConsumerWidget {
                 label: Text(selectedCategory),
                 deleteIcon: const Icon(Icons.close, size: 16),
                 onDeleted: onCategoryClear,
-                backgroundColor: const Color(0xFFFFC107),
+                backgroundColor: AppColors.primary,
                 labelStyle: const TextStyle(
                   fontWeight: FontWeight.w700,
-                  color: Colors.black87,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],
@@ -231,7 +232,7 @@ class _CategoryResults extends StatelessWidget {
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(vertical: 40),
         child: Center(
-          child: CircularProgressIndicator(color: Color(0xFFFFC107)),
+          child: CircularProgressIndicator(color: AppColors.primary),
         ),
       ),
       error: (_, __) => const Center(child: Text('Failed to load items')),

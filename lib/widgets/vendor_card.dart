@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../screens/vendor_items_page.dart';
+import '../core/theme/theme.dart';
 
 // ─── Wishlist ─────────────────────────────────────────────────────────────────
 
@@ -99,7 +100,7 @@ class VendorCard extends StatefulWidget {
 }
 
 class _VendorCardState extends State<VendorCard> {
-  static const Color _yellow = Color(0xFFFFC107);
+  static const Color _yellow = AppColors.primary;
   bool _inWishlist = false;
 
   @override

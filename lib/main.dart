@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -11,46 +12,40 @@ import 'screens/splash_page.dart';
 import 'screens/update_required_page.dart';
 import 'services/notification_service.dart';
 import 'services/analytics_service.dart';
+import 'core/theme/theme.dart';
 
 String appVersion = '1.0.0';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.white,
-      statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: Colors.white,
-      systemNavigationBarIconBrightness: Brightness.dark,
-    ),
-  );
+  SystemChrome.setSystemUIOverlayStyle(AppTheme.systemUiStyle);
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Disable reCAPTCHA / app verification in debug builds — must be set
+  // before App Check activates so it isn't overridden.
+  if (kDebugMode) {
+    await FirebaseAuth.instance.setSettings(
+      appVerificationDisabledForTesting: true,
+    );
+  }
 
   // Disable offline persistence so failures are visible when there's no internet
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: false,
   );
 
-  if (kDebugMode) {
-    FirebaseFirestore.instance.useFirestoreEmulator(
-      'localhost',
-      8085,
-      automaticHostMapping: false,
-    );
+  // Skip App Check entirely in debug — it blocks phone auth even with
+  // appVerificationDisabledForTesting set.
+  if (!kDebugMode) {
+    try {
+      await FirebaseAppCheck.instance.activate(
+        providerAndroid: AndroidPlayIntegrityProvider(),
+        providerApple: AppleDeviceCheckProvider(),
+      );
+    } catch (_) {}
   }
-
-  try {
-    await FirebaseAppCheck.instance.activate(
-      androidProvider: kDebugMode
-          ? AndroidProvider.debug
-          : AndroidProvider.playIntegrity,
-      appleProvider: kDebugMode
-          ? AppleProvider.debug
-          : AppleProvider.deviceCheck,
-    );
-  } catch (_) {}
 
   // Non-blocking — resolve in background
   PackageInfo.fromPlatform().then((info) => appVersion = info.version);
@@ -68,18 +63,10 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.white,
-        statusBarIconBrightness: Brightness.dark,
-        systemNavigationBarColor: Colors.white,
-        systemNavigationBarIconBrightness: Brightness.dark,
-      ),
+      value: AppTheme.systemUiStyle,
       child: MaterialApp(
         title: 'Bandiwala',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFFFC107)),
-          scaffoldBackgroundColor: Colors.white,
-        ),
+        theme: AppTheme.light,
         debugShowCheckedModeBanner: false,
         navigatorObservers: [AnalyticsService.observer],
         home: const VersionCheckWrapper(),

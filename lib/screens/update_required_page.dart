@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../core/theme/theme.dart';
 
-const kBandiwalaYellow = Color(0xFFFFC107);
+const kBandiwalaYellow = AppColors.primary;
 
 class UpdateRequiredPage extends StatelessWidget {
   final String currentVersion;

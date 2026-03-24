@@ -12,8 +12,9 @@ import 'location_picker_page.dart';
 import 'payment_page.dart';
 import 'login_page.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../core/theme/theme.dart';
 
-const kBandiwalaYellow = Color(0xFFFFC107);
+const kBandiwalaYellow = AppColors.primary;
 
 // ─── CartPage ─────────────────────────────────────────────────────────────────
 
