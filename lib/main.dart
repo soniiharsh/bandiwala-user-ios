@@ -19,8 +19,6 @@ String appVersion = '1.0.0';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  SystemChrome.setSystemUIOverlayStyle(AppTheme.systemUiStyle);
-
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Disable reCAPTCHA / app verification in debug builds — must be set
@@ -57,16 +55,25 @@ Future<void> main() async {
   runApp(const ProviderScope(child: MyApp()));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+    final brightness = switch (themeMode) {
+      ThemeMode.dark  => Brightness.dark,
+      ThemeMode.light => Brightness.light,
+      _               => MediaQuery.platformBrightnessOf(context),
+    };
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: AppTheme.systemUiStyle,
+      value: AppTheme.systemUiStyle(brightness),
       child: MaterialApp(
         title: 'Bandiwala',
         theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: themeMode,
         debugShowCheckedModeBanner: false,
         navigatorObservers: [AnalyticsService.observer],
         home: const VersionCheckWrapper(),

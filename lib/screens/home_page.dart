@@ -95,7 +95,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.textPrimary,
+                foregroundColor: AppColors.onPrimary,
               ),
               child: const Text(
                 'Save',
@@ -188,7 +188,7 @@ class _HomeContent extends ConsumerWidget {
                 backgroundColor: AppColors.primary,
                 labelStyle: const TextStyle(
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: AppColors.onPrimary,
                 ),
               ),
             ],

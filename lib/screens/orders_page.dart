@@ -6,7 +6,7 @@ import '../providers/orders_provider.dart';
 import '../core/theme/theme.dart';
 
 const kBandiwalaYellow = AppColors.primary;
-const kWhite = AppColors.white;
+const kWhite = Colors.white;
 const kBorderGrey = Color(0xFFE5E7EB);
 const kTextGrey = Color(0xFF6B7280);
 const kLightGrey = Color(0xFFF9FAFB);

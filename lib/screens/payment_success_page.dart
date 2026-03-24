@@ -7,7 +7,7 @@ import '../services/analytics_service.dart';
 import '../core/theme/theme.dart';
 
 const kBandiwalaYellow = AppColors.primary;
-const kWhite = AppColors.white;
+const kWhite = Colors.white;
 
 class PaymentSuccessPage extends StatefulWidget {
   final String paymentId;

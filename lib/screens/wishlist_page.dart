@@ -7,7 +7,7 @@ import '../widgets/vendor_card.dart'; // WishlistManager + WishlistVendor
 import '../core/theme/theme.dart';
 
 const _kBandiwalaYellow = AppColors.primary;
-const _kWhite = AppColors.white;
+const _kWhite = Colors.white;
 const _kBorderGrey = Color(0xFFE5E7EB);
 const _kLightGrey = Color(0xFFF9FAFB);
 
