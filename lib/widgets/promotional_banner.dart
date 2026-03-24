@@ -5,6 +5,7 @@ import 'dart:async';
 import '../models/promotion.dart';
 import '../providers/promotions_provider.dart';
 import '../core/theme/theme.dart';
+import 'skeletons.dart';
 
 const kBandiwalaYellow = AppColors.primary;
 
@@ -53,14 +54,7 @@ class _PromotionalBannerState extends ConsumerState<PromotionalBanner>
     final promotionsAsync = ref.watch(promotionsProvider);
 
     return promotionsAsync.when(
-      loading: () => Container(
-        height: 180,
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade200,
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
+      loading: () => const PromotionalBannerSkeleton(),
       error: (_, __) => const SizedBox.shrink(),
       data: (promotions) {
         if (promotions.isEmpty) return const SizedBox.shrink();
@@ -130,12 +124,6 @@ class _PromotionalImageCard extends StatelessWidget {
                 maxHeightDiskCache: 400,
                 placeholder: (_, __) => Container(
                   color: Colors.grey.shade200,
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      color: kBandiwalaYellow,
-                      strokeWidth: 2.5,
-                    ),
-                  ),
                 ),
                 errorWidget: (_, __, ___) => Container(
                   color: Colors.grey.shade200,

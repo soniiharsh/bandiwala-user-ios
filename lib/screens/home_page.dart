@@ -12,6 +12,7 @@ import '../providers/vendors_provider.dart';
 import '../widgets/vendor_card.dart';
 import '../widgets/vendors_list.dart';
 import '../core/theme/theme.dart';
+import '../widgets/skeletons.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -230,10 +231,8 @@ class _CategoryResults extends StatelessWidget {
 
     return itemsAsync.when(
       loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 40),
-        child: Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: VendorsListSkeleton(),
       ),
       error: (_, __) => const Center(child: Text('Failed to load items')),
       data: (items) {

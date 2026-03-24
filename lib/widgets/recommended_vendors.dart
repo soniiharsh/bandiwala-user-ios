@@ -5,7 +5,8 @@ import '../models/vendor.dart';
 import '../screens/vendor_items_page.dart';
 import '../providers/vendors_provider.dart';
 import '../widgets/vendor_card.dart' show WishlistManager, WishlistVendor;
-import 'promotional_banner.dart' show kBandiwalaYellow;
+import '../core/navigation/app_page_route.dart';
+import 'skeletons.dart';
 
 // ─── RecommendedVendorsStrip ──────────────────────────────────────────────────
 
@@ -87,7 +88,7 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
   void _openVendor(BuildContext context, Vendor vendor) {
     if (!vendor.isAvailable) return;
     Navigator.of(context).push(
-      MaterialPageRoute(
+      AppPageRoute(
         builder: (_) =>
             VendorItemsPage(vendorId: vendor.id, vendorName: vendor.name),
       ),
@@ -124,7 +125,7 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
             builder: (context, ref, _) {
               final vendorsAsync = ref.watch(vendorsStreamProvider);
               return vendorsAsync.when(
-                loading: _buildShimmer,
+                loading: () => const RecommendedVendorsSkeleton(),
                 error: (_, __) =>
                     const Center(child: Text('Error loading vendors')),
                 data: (allVendors) {
@@ -233,62 +234,6 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
       ),
     );
   }
-
-  Widget _buildShimmer() {
-    return ListView.builder(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: 4,
-      itemBuilder: (_, __) => Container(
-        width: 175,
-        margin: const EdgeInsets.only(right: 12),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade200,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 115,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(14),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    height: 12,
-                    width: 120,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    height: 10,
-                    width: 80,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 // ─── _VendorMiniCard ──────────────────────────────────────────────────────────
@@ -351,16 +296,6 @@ class _VendorMiniCard extends StatelessWidget {
                                   width: 175,
                                   height: 115,
                                   color: Colors.grey.shade200,
-                                  child: const Center(
-                                    child: SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: kBandiwalaYellow,
-                                      ),
-                                    ),
-                                  ),
                                 ),
                                 errorWidget: (_, __, ___) => Container(
                                   width: 175,

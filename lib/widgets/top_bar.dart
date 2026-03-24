@@ -14,6 +14,8 @@ import '../providers/items_provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../core/theme/theme.dart';
+import '../core/navigation/app_page_route.dart';
+import 'skeletons.dart';
 
 const Color _kYellow = AppColors.primary;
 
@@ -286,7 +288,8 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
   Future<void> _showLocationPicker() async {
     final result = await Navigator.push<SavedAddress>(
       context,
-      MaterialPageRoute(
+      AppPageRoute(
+        type: PageTransitionType.slideUp,
         builder: (_) => LocationPickerPage(
           activeAddress: _activeAddress,
           onLocationSelected: _onAddressSelected,
@@ -618,7 +621,7 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
               InkWell(
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const ProfilePage()),
+                  AppPageRoute(builder: (_) => const ProfilePage()),
                 ),
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
@@ -726,10 +729,24 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
 
   Widget _buildResultsPanel() {
     if (_isLoadingSearch) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: Center(
-          child: CircularProgressIndicator(color: _kYellow, strokeWidth: 3),
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: SkeletonShimmer(
+          child: Column(
+            children: List.generate(
+              3,
+              (_) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Container(
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       );
     }
@@ -1032,7 +1049,7 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
 
   void _openVendor(_VendorResult vendor) {
     Navigator.of(context).push(
-      MaterialPageRoute(
+      AppPageRoute(
         builder: (_) => VendorItemsPage(
           vendorId: vendor.vendorId,
           vendorName: vendor.vendorName,
@@ -1075,14 +1092,7 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
       memCacheWidth: 200,
       memCacheHeight: 200,
       placeholder: (_, __) => Container(
-        color: Colors.grey.shade100,
-        child: const Center(
-          child: SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2, color: _kYellow),
-          ),
-        ),
+        color: Colors.grey.shade200,
       ),
       errorWidget: (_, __, ___) => Container(
         color: Colors.grey.shade200,

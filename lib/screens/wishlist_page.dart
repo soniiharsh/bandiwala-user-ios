@@ -5,6 +5,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'vendor_items_page.dart';
 import '../widgets/vendor_card.dart'; // WishlistManager + WishlistVendor
 import '../core/theme/theme.dart';
+import '../core/navigation/app_page_route.dart';
+import '../widgets/skeletons.dart';
 
 const _kBandiwalaYellow = AppColors.primary;
 const _kWhite = Colors.white;
@@ -145,12 +147,7 @@ class _WishlistPageState extends State<WishlistPage> with RouteAware {
         ],
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: _kBandiwalaYellow,
-                strokeWidth: 3,
-              ),
-            )
+          ? const WishlistPageSkeleton()
           : _wishlist.isEmpty
           ? _buildEmptyState()
           : RefreshIndicator(
@@ -240,7 +237,7 @@ class _WishlistVendorCard extends StatelessWidget {
       child: InkWell(
         onTap: () => Navigator.push(
           context,
-          MaterialPageRoute(
+          AppPageRoute(
             builder: (_) => VendorItemsPage(
               vendorId: vendor.vendorId,
               vendorName: vendor.name,
@@ -268,16 +265,6 @@ class _WishlistVendorCard extends StatelessWidget {
                           maxHeightDiskCache: 180,
                           placeholder: (_, __) => Container(
                             color: Colors.grey.shade200,
-                            child: const Center(
-                              child: SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: _kBandiwalaYellow,
-                                ),
-                              ),
-                            ),
                           ),
                           errorWidget: (_, __, ___) => Container(
                             color: Colors.grey.shade200,

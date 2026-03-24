@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/coupons_provider.dart';
 import '../models/coupon.dart';
 import '../core/theme/theme.dart';
+import '../widgets/skeletons.dart';
 
 const kBandiwalaYellow = AppColors.primary;
 
@@ -35,12 +36,7 @@ class CouponsPage extends ConsumerWidget {
         centerTitle: false,
       ),
       body: couponsAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(
-            color: kBandiwalaYellow,
-            strokeWidth: 3,
-          ),
-        ),
+        loading: () => const CouponsListSkeleton(),
         error: (error, __) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

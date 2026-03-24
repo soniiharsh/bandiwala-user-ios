@@ -5,6 +5,8 @@ import '../models/app_user.dart';
 import 'location_picker_page.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../core/theme/theme.dart';
+import '../widgets/skeletons.dart';
+import '../core/navigation/app_page_route.dart';
 
 const kBandiwalaYellow = AppColors.primary;
 const kWhite = Colors.white;
@@ -95,7 +97,8 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
   Future<void> _editLocation(int index, SavedAddress location) async {
     final result = await Navigator.push<SavedAddress>(
       context,
-      MaterialPageRoute(
+      AppPageRoute(
+        type: PageTransitionType.slideUp,
         builder: (context) => LocationPickerEditMode(
           existingLocation: location,
           locationIndex: index,
@@ -177,12 +180,7 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
         ),
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: kBandiwalaYellow,
-                strokeWidth: 3,
-              ),
-            )
+          ? const SavedAddressesSkeleton()
           : savedLocations.isEmpty
           ? _buildEmptyState()
           : ListView.builder(
@@ -196,7 +194,10 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
         onPressed: () async {
           await Navigator.push<SavedAddress>(
             context,
-            MaterialPageRoute(builder: (context) => const LocationPickerPage()),
+            AppPageRoute(
+              type: PageTransitionType.slideUp,
+              builder: (context) => const LocationPickerPage(),
+            ),
           );
           // No need to setState — userProvider stream updates automatically
         },
@@ -252,7 +253,8 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
             onPressed: () async {
               await Navigator.push<SavedAddress>(
                 context,
-                MaterialPageRoute(
+                AppPageRoute(
+                  type: PageTransitionType.slideUp,
                   builder: (context) => const LocationPickerPage(),
                 ),
               );

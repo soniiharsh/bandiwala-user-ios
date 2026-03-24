@@ -17,6 +17,8 @@ import 'cancellation_policy_page.dart';
 import 'refund_policy_page.dart';
 import 'help_support_page.dart';
 import '../core/theme/theme.dart';
+import '../widgets/skeletons.dart';
+import '../core/navigation/app_page_route.dart';
 
 const Color kBandiwalaYellow = AppColors.primary;
 
@@ -87,7 +89,10 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
               Navigator.pop(context);
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (_) => const LoginPage()),
+                AppPageRoute(
+                  type: PageTransitionType.scale,
+                  builder: (_) => const LoginPage(),
+                ),
                 (route) => false,
               );
             },
@@ -225,7 +230,10 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
         if (mounted) {
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (_) => const SplashPage()),
+            AppPageRoute(
+              type: PageTransitionType.scale,
+              builder: (_) => const SplashPage(),
+            ),
             (route) => false,
           );
         }
@@ -296,7 +304,10 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
           if (mounted) {
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (_) => const SplashPage()),
+              AppPageRoute(
+                type: PageTransitionType.scale,
+                builder: (_) => const SplashPage(),
+              ),
               (route) => false,
             );
           }
@@ -360,7 +371,10 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
               Navigator.pop(context);
               Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(builder: (_) => const LoginPage()),
+                AppPageRoute(
+                  type: PageTransitionType.scale,
+                  builder: (_) => const LoginPage(),
+                ),
                 (route) => false,
               );
             },
@@ -388,7 +402,7 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
     }
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const OrdersPage()),
+      AppPageRoute(builder: (_) => const OrdersPage()),
     );
   }
 
@@ -400,7 +414,8 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
     final activeAddr = ref.read(activeAddressProvider);
     Navigator.push<SavedAddress>(
       context,
-      MaterialPageRoute(
+      AppPageRoute(
+        type: PageTransitionType.slideUp,
         builder: (_) => LocationPickerPage(activeAddress: activeAddr),
       ),
     ).then((result) {
@@ -417,28 +432,28 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
     }
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const WishlistPage()),
+      AppPageRoute(builder: (_) => const WishlistPage()),
     );
   }
 
   void _navigateToTermsConditions() => Navigator.push(
     context,
-    MaterialPageRoute(builder: (_) => const TermsConditionsPage()),
+    AppPageRoute(builder: (_) => const TermsConditionsPage()),
   );
 
   void _navigateToCancellationPolicy() => Navigator.push(
     context,
-    MaterialPageRoute(builder: (_) => const CancellationPolicyPage()),
+    AppPageRoute(builder: (_) => const CancellationPolicyPage()),
   );
 
   void _navigateToRefundPolicy() => Navigator.push(
     context,
-    MaterialPageRoute(builder: (_) => const RefundPolicyPage()),
+    AppPageRoute(builder: (_) => const RefundPolicyPage()),
   );
 
   void _navigateToHelpSupport() => Navigator.push(
     context,
-    MaterialPageRoute(builder: (_) => const HelpSupportPage()),
+    AppPageRoute(builder: (_) => const HelpSupportPage()),
   );
 
   @override
@@ -460,11 +475,7 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
         centerTitle: false,
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(kBandiwalaYellow),
-              ),
-            )
+          ? const ProfilePageSkeleton()
           : RefreshIndicator(
               onRefresh: _initializeData,
               color: kBandiwalaYellow,
@@ -872,7 +883,10 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
           onPressed: _isGuest
               ? () => Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                  AppPageRoute(
+                    type: PageTransitionType.scale,
+                    builder: (_) => const LoginPage(),
+                  ),
                   (route) => false,
                 )
               : _logout,

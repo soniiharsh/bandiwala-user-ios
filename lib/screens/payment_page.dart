@@ -10,6 +10,7 @@ import '../services/payment_service.dart';
 import 'payment_success_page.dart';
 import 'coupons_page.dart';
 import '../core/theme/theme.dart';
+import '../core/navigation/app_page_route.dart';
 
 const kBandiwalaYellow = AppColors.primary;
 const kWhite = Colors.white;
@@ -192,7 +193,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       setState(() => _isProcessing = false);
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
+        AppPageRoute(
+          type: PageTransitionType.scale,
           builder: (_) => PaymentSuccessPage(
             paymentId: orderId,
             amount: _grandTotal,
@@ -238,7 +240,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     final cart = ref.read(cartProvider);
     final selected = await Navigator.push<Map<String, dynamic>>(
       context,
-      MaterialPageRoute(
+      AppPageRoute(
+        type: PageTransitionType.slideUp,
         builder: (_) => CouponsPage(cartAmount: cart.grandTotal),
       ),
     );

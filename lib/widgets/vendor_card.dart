@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../screens/vendor_items_page.dart';
 import '../core/theme/theme.dart';
+import '../core/navigation/app_page_route.dart';
 
 // ─── Wishlist ─────────────────────────────────────────────────────────────────
 
@@ -150,7 +151,7 @@ class _VendorCardState extends State<VendorCard> {
             onTap: widget.isAvailable
                 ? () => Navigator.push(
                     context,
-                    MaterialPageRoute(
+                    AppPageRoute(
                       builder: (_) => VendorItemsPage(
                         vendorId: widget.vendorId,
                         vendorName: widget.name,
@@ -178,13 +179,7 @@ class _VendorCardState extends State<VendorCard> {
                             fit: BoxFit.cover,
                             memCacheHeight: 400,
                             placeholder: (_, __) => Container(
-                              color: Colors.grey.shade100,
-                              child: const Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: _yellow,
-                                ),
-                              ),
+                              color: Colors.grey.shade200,
                             ),
                             errorWidget: (_, __, ___) => Container(
                               color: Colors.grey.shade200,

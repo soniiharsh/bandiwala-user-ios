@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'orders_page.dart'; // ← adjust import path as needed
 import '../core/theme/theme.dart';
+import '../core/navigation/app_page_route.dart';
 
 const kBandiwalaYellow = AppColors.primary;
 
@@ -42,7 +43,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
   void _goToOrders() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const OrdersPage()),
+      AppPageRoute(builder: (_) => const OrdersPage()),
     );
   }
 

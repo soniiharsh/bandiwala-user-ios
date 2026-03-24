@@ -4,6 +4,7 @@ import 'otp_page.dart';
 import 'nav_page.dart';
 import '../services/analytics_service.dart';
 import '../core/theme/theme.dart';
+import '../core/navigation/app_page_route.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -62,7 +63,10 @@ class _LoginPageState extends State<LoginPage> {
           if (mounted) {
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (_) => const NavPage()),
+              AppPageRoute(
+                type: PageTransitionType.scale,
+                builder: (_) => const NavPage(),
+              ),
               (r) => false,
             );
           }
@@ -78,7 +82,7 @@ class _LoginPageState extends State<LoginPage> {
             setState(() => _isLoading = false);
             Navigator.push(
               context,
-              MaterialPageRoute(
+              AppPageRoute(
                 builder: (_) =>
                     OtpPage(phoneNumber: phone, verificationId: verificationId),
               ),
@@ -99,7 +103,10 @@ class _LoginPageState extends State<LoginPage> {
     AnalyticsService.logLogin(loginMethod: 'guest');
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const NavPage()),
+      AppPageRoute(
+        type: PageTransitionType.scale,
+        builder: (_) => const NavPage(),
+      ),
     );
   }
 

@@ -7,6 +7,7 @@ import '../providers/user_provider.dart';
 import '../services/analytics_service.dart';
 import 'nav_page.dart';
 import '../core/theme/theme.dart';
+import '../core/navigation/app_page_route.dart';
 
 class OtpPage extends ConsumerStatefulWidget {
   final String phoneNumber;
@@ -68,7 +69,10 @@ class _OtpPageState extends ConsumerState<OtpPage> {
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const NavPage()),
+          AppPageRoute(
+            type: PageTransitionType.scale,
+            builder: (_) => const NavPage(),
+          ),
           (r) => false,
         );
       }

@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:math';
 import '../providers/food_categories_provider.dart';
 import 'promotional_banner.dart' show kBandiwalaYellow;
+import 'skeletons.dart';
 
 // ─── FoodCategoryCarousel ─────────────────────────────────────────────────────
 
@@ -127,7 +128,7 @@ class _FoodCategoryCarouselState extends State<FoodCategoryCarousel>
         SizedBox(
           height: 110,
           child: _isLoading
-              ? _buildShimmer()
+              ? const CategoryCarouselSkeleton()
               : _categories.isEmpty
               ? Center(
                   child: Text(
@@ -153,39 +154,6 @@ class _FoodCategoryCarouselState extends State<FoodCategoryCarousel>
     );
   }
 
-  Widget _buildShimmer() {
-    return ListView.builder(
-      scrollDirection: Axis.horizontal,
-      padding: EdgeInsets.zero,
-      itemCount: 6,
-      itemBuilder: (_, __) => Container(
-        width: 72,
-        margin: const EdgeInsets.symmetric(horizontal: 3),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.grey.shade200,
-              ),
-            ),
-            const SizedBox(height: 7),
-            Container(
-              height: 10,
-              width: 48,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 // ─── Internal model ───────────────────────────────────────────────────────────
@@ -259,16 +227,6 @@ class _CategoryCard extends StatelessWidget {
                       maxHeightDiskCache: 128,
                       placeholder: (_, __) => Container(
                         color: Colors.grey.shade200,
-                        child: const Center(
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: kBandiwalaYellow,
-                            ),
-                          ),
-                        ),
                       ),
                       errorWidget: (_, __, ___) => const Icon(
                         Icons.restaurant,

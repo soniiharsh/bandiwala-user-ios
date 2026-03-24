@@ -12,6 +12,7 @@ import '../widgets/bottom_navigation.dart';
 import 'cart_page.dart';
 import '../widgets/vendor_card.dart'; // WishlistManager + WishlistVendor
 import '../core/theme/theme.dart';
+import '../widgets/skeletons.dart';
 
 const _kYellow = AppColors.primary;
 
@@ -533,9 +534,9 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
   }) {
     if (isLoading) {
       return const SliverToBoxAdapter(
-        child: SizedBox(
-          height: 200,
-          child: Center(child: CircularProgressIndicator(color: _kYellow)),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: VendorItemsSkeleton(),
         ),
       );
     }

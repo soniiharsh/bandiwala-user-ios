@@ -5,6 +5,7 @@ import 'dart:math';
 import 'orders_page.dart';
 import '../services/analytics_service.dart';
 import '../core/theme/theme.dart';
+import '../core/navigation/app_page_route.dart';
 
 const kBandiwalaYellow = AppColors.primary;
 const kWhite = Colors.white;
@@ -81,7 +82,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
           Navigator.of(context).popUntil((route) => route.isFirst);
           Navigator.of(
             context,
-          ).push(MaterialPageRoute(builder: (_) => const OrdersPage()));
+          ).push(AppPageRoute(builder: (_) => const OrdersPage()));
         }
       }
     });
@@ -262,7 +263,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                             context,
                           ).popUntil((route) => route.isFirst);
                           Navigator.of(context).push(
-                            MaterialPageRoute(
+                            AppPageRoute(
                               builder: (_) => const OrdersPage(),
                             ),
                           );

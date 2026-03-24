@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/order.dart';
 import '../providers/orders_provider.dart';
 import '../core/theme/theme.dart';
+import '../widgets/skeletons.dart';
 
 const kBandiwalaYellow = AppColors.primary;
 const kWhite = Colors.white;
@@ -38,7 +39,7 @@ class OrdersPage extends ConsumerWidget {
         ),
       ),
       body: ordersAsync.when(
-        loading: () => _buildSkeletonList(),
+        loading: () => const OrdersListSkeleton(),
         error: (_, __) => _buildEmptyState(
           'Something went wrong\nPlease try again',
           Icons.error_outline,
@@ -61,14 +62,6 @@ class OrdersPage extends ConsumerWidget {
           );
         },
       ),
-    );
-  }
-
-  Widget _buildSkeletonList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: 4,
-      itemBuilder: (_, __) => _OrderSkeleton(),
     );
   }
 
@@ -96,35 +89,6 @@ class OrdersPage extends ConsumerWidget {
             textAlign: TextAlign.center,
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _OrderSkeleton extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      height: 140,
-      decoration: BoxDecoration(
-        color: kWhite,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kBorderGrey),
-      ),
-      child: const _ShimmerBox(),
-    );
-  }
-}
-
-class _ShimmerBox extends StatelessWidget {
-  const _ShimmerBox();
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(12),
       ),
     );
   }

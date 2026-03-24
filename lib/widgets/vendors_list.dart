@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/vendors_provider.dart';
 import 'vendor_card.dart';
+import 'skeletons.dart';
 
 class VendorsList extends ConsumerWidget {
   final String? matchedZone;
@@ -12,7 +13,7 @@ class VendorsList extends ConsumerWidget {
     final vendorsAsync = ref.watch(vendorsStreamProvider);
 
     return vendorsAsync.when(
-      loading: _skeleton,
+      loading: () => const VendorsListSkeleton(),
       error: (_, __) => const Center(child: Text('Something went wrong')),
       data: (vendors) {
         final filtered = matchedZone == null
@@ -76,21 +77,4 @@ class VendorsList extends ConsumerWidget {
     );
   }
 
-  Widget _skeleton() {
-    return Column(
-      children: List.generate(
-        3,
-        (_) => Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Container(
-            height: 220,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

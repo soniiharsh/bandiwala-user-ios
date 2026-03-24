@@ -13,6 +13,8 @@ import 'payment_page.dart';
 import 'login_page.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../core/theme/theme.dart';
+import '../widgets/skeletons.dart';
+import '../core/navigation/app_page_route.dart';
 
 const kBandiwalaYellow = AppColors.primary;
 
@@ -41,7 +43,8 @@ class _CartPageState extends ConsumerState<CartPage> {
   Future<void> _pickDeliveryLocation() async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(
+      AppPageRoute(
+        type: PageTransitionType.slideUp,
         builder: (_) => LocationPickerPage(activeAddress: _selectedAddress),
       ),
     );
@@ -98,7 +101,7 @@ class _CartPageState extends ConsumerState<CartPage> {
     }
     Navigator.push(
       context,
-      MaterialPageRoute(
+      AppPageRoute(
         builder: (_) => PaymentPage(
           itemsTotal: ref.read(cartProvider).grandTotal,
           deliveryLocation: _selectedAddress,
@@ -186,9 +189,7 @@ class _CartPageState extends ConsumerState<CartPage> {
 
     // Auth gate — show login screen if not authenticated
     return authState.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: kBandiwalaYellow)),
-      ),
+      loading: () => const CartLoadingSkeleton(),
       error: (_, __) => _buildLoginGate(),
       data: (user) {
         if (user == null) return _buildLoginGate();
@@ -255,7 +256,8 @@ class _CartPageState extends ConsumerState<CartPage> {
                           onPressed: () {
                             Navigator.pushAndRemoveUntil(
                               context,
-                              MaterialPageRoute(
+                              AppPageRoute(
+                                type: PageTransitionType.scale,
                                 builder: (_) => const LoginPage(),
                               ),
                               (route) => false,
@@ -933,17 +935,7 @@ class SuggestionCard extends ConsumerWidget {
                         placeholder: (_, __) => Container(
                           width: 140,
                           height: 95,
-                          color: Colors.grey.shade100,
-                          child: const Center(
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: kBandiwalaYellow,
-                              ),
-                            ),
-                          ),
+                          color: Colors.grey.shade200,
                         ),
                         errorWidget: (_, __, ___) => Container(
                           width: 140,

@@ -14,6 +14,8 @@ import '../widgets/active_order_bar.dart';
 import '../providers/user_provider.dart';
 import '../providers/active_address_provider.dart';
 import '../core/theme/theme.dart';
+import '../core/navigation/app_page_route.dart';
+import '../widgets/skeletons.dart';
 
 class NavPage extends ConsumerStatefulWidget {
   const NavPage({super.key});
@@ -30,11 +32,7 @@ class _NavPageState extends ConsumerState<NavPage> {
     final authAsync = ref.watch(userProvider);
 
     return authAsync.when(
-      loading: () => const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
-      ),
+      loading: () => const AppBootSkeleton(),
       error: (_, __) =>
           const Scaffold(body: Center(child: Text('Something went wrong'))),
       data: (appUser) {
@@ -160,7 +158,8 @@ class _ForceAddAddressScreen extends StatelessWidget {
                     onPressed: () async {
                       final result = await Navigator.push<SavedAddress>(
                         context,
-                        MaterialPageRoute(
+                        AppPageRoute(
+                          type: PageTransitionType.slideUp,
                           builder: (_) => const LocationPickerPage(),
                         ),
                       );
