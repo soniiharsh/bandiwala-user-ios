@@ -602,7 +602,7 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
           crossAxisCount: 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          mainAxisExtent: 270,
+          childAspectRatio: 0.72,
         ),
         delegate: SliverChildBuilderDelegate((context, index) {
           final item = filtered[index];
@@ -867,28 +867,30 @@ class _ItemCard extends StatelessWidget {
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(16),
                         ),
-                        child: SizedBox(
-                          height: 130,
-                          width: double.infinity,
-                          child: imageUrl.isNotEmpty
-                              ? CachedNetworkImage(
-                                  imageUrl: imageUrl,
-                                  fit: BoxFit.cover,
-                                  placeholder: (_, __) =>
-                                      Container(color: Colors.grey.shade200),
-                                  errorWidget: (_, __, ___) => Container(
+                        child: AspectRatio(
+                          aspectRatio: 1.4,
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: imageUrl.isNotEmpty
+                                ? CachedNetworkImage(
+                                    imageUrl: imageUrl,
+                                    fit: BoxFit.cover,
+                                    placeholder: (_, __) =>
+                                        Container(color: Colors.grey.shade200),
+                                    errorWidget: (_, __, ___) => Container(
+                                      color: Colors.grey.shade200,
+                                      child: const Center(
+                                        child: Icon(Icons.restaurant),
+                                      ),
+                                    ),
+                                  )
+                                : Container(
                                     color: Colors.grey.shade200,
                                     child: const Center(
                                       child: Icon(Icons.restaurant),
                                     ),
                                   ),
-                                )
-                              : Container(
-                                  color: Colors.grey.shade200,
-                                  child: const Center(
-                                    child: Icon(Icons.restaurant),
-                                  ),
-                                ),
+                          ),
                         ),
                       ),
                       // Rating badge on image
@@ -934,6 +936,7 @@ class _ItemCard extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           // Dot + category
                           Row(
@@ -974,7 +977,6 @@ class _ItemCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 4),
                           // Name
                           Text(
                             name,
@@ -986,8 +988,7 @@ class _ItemCard extends StatelessWidget {
                               color: Colors.black87,
                             ),
                           ),
-                          if (description.isNotEmpty) ...[
-                            const SizedBox(height: 2),
+                          if (description.isNotEmpty)
                             Text(
                               description,
                               maxLines: 1,
@@ -997,8 +998,6 @@ class _ItemCard extends StatelessWidget {
                                 color: Colors.grey.shade500,
                               ),
                             ),
-                          ],
-                          const SizedBox(height: 5),
                           // Price
                           Text(
                             '₹ ${price.toStringAsFixed(0)}',
@@ -1008,7 +1007,6 @@ class _ItemCard extends StatelessWidget {
                               color: Colors.black87,
                             ),
                           ),
-                          const Spacer(),
                           // ADD / counter
                           _ItemCounter(
                             vendorId: vendorId,
@@ -1017,7 +1015,7 @@ class _ItemCard extends StatelessWidget {
                             itemName: name,
                             price: price,
                             isAvailable: isAvailable,
-                            isVendorOnline: isVendorOnline, // ← gate
+                            isVendorOnline: isVendorOnline,
                           ),
                         ],
                       ),

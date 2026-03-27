@@ -841,7 +841,7 @@ class YouMayLikeSection extends ConsumerWidget {
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 175,
+          height: 185,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -918,6 +918,7 @@ class SuggestionCard extends ConsumerWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Stack(
             children: [
@@ -929,24 +930,24 @@ class SuggestionCard extends ConsumerWidget {
                     ? CachedNetworkImage(
                         imageUrl: imageUrl,
                         width: 140,
-                        height: 95,
+                        height: 90,
                         fit: BoxFit.cover,
                         memCacheWidth: 300,
                         placeholder: (_, __) => Container(
                           width: 140,
-                          height: 95,
+                          height: 90,
                           color: Colors.grey.shade200,
                         ),
                         errorWidget: (_, __, ___) => Container(
                           width: 140,
-                          height: 95,
+                          height: 90,
                           color: Colors.grey.shade200,
                           child: const Icon(Icons.restaurant, size: 28),
                         ),
                       )
                     : Container(
                         width: 140,
-                        height: 95,
+                        height: 90,
                         color: Colors.grey.shade200,
                         child: const Icon(Icons.restaurant, size: 28),
                       ),

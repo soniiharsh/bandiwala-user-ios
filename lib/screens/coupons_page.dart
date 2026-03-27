@@ -166,8 +166,9 @@ class CouponsPage extends ConsumerWidget {
                       isApplicable: isApplicable,
                       remainingAmount: remaining,
                       onApply: () {
-                        if (isApplicable)
+                        if (isApplicable) {
                           Navigator.pop(context, coupon.toMap());
+                        }
                       },
                     );
                   },

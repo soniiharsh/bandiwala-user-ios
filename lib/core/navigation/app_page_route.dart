@@ -21,8 +21,9 @@ class AppPageRoute<T> extends PageRouteBuilder<T> {
     super.settings,
     super.fullscreenDialog,
   }) : super(
-          transitionDuration: const Duration(milliseconds: 520),
-          reverseTransitionDuration: const Duration(milliseconds: 420),
+          opaque: true,
+          transitionDuration: const Duration(milliseconds: 400),
+          reverseTransitionDuration: const Duration(milliseconds: 350),
           pageBuilder: (context, animation, secondaryAnimation) =>
               builder(context),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -51,7 +52,8 @@ class AppPageRoute<T> extends PageRouteBuilder<T> {
     }
   }
 
-  /// Slide from right + outgoing page nudges left (iOS-like feel).
+  /// Slide from right — only the incoming page animates; the page below stays
+  /// fixed so no black gap is ever revealed behind it.
   static Widget _slideRightTransition(
     Animation<double> animation,
     Animation<double> secondaryAnimation,
@@ -64,17 +66,9 @@ class AppPageRoute<T> extends PageRouteBuilder<T> {
       end: Offset.zero,
     ).chain(CurveTween(curve: curve));
 
-    final outTween = Tween<Offset>(
-      begin: Offset.zero,
-      end: const Offset(-0.25, 0.0),
-    ).chain(CurveTween(curve: curve));
-
     return SlideTransition(
-      position: outTween.animate(secondaryAnimation),
-      child: SlideTransition(
-        position: inTween.animate(animation),
-        child: child,
-      ),
+      position: inTween.animate(animation),
+      child: child,
     );
   }
 

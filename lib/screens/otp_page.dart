@@ -90,7 +90,7 @@ class _OtpPageState extends ConsumerState<OtpPage> {
   }
 
   Future<void> _upsertUser(User user) async {
-    final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+    final docRef = FirebaseFirestore.instance.collection('users1').doc(user.uid);
     final doc = await docRef.get();
     if (!doc.exists) {
       await docRef.set({
