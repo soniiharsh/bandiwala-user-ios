@@ -6,15 +6,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/user_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/active_address_provider.dart';
-import '../providers/orders_provider.dart';
 import 'splash_page.dart';
 import 'login_page.dart';
 import 'orders_page.dart';
 import 'wishlist_page.dart';
 import 'location_picker_page.dart';
 import 'terms_conditions_page.dart';
-import 'cancellation_policy_page.dart';
-import 'refund_policy_page.dart';
 import 'help_support_page.dart';
 import '../core/theme/theme.dart';
 import '../widgets/skeletons.dart';
@@ -33,7 +30,6 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
   bool _isLoading = true;
   String _displayNumber = '';
   bool _isGuest = false;
-  bool _isSavingName = false;
 
   @override
   void initState() {
@@ -159,8 +155,7 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
               final newName = ctrl.text.trim();
               if (newName.isEmpty) return;
               Navigator.pop(context);
-              setState(() => _isSavingName = true);
-              try {
+               try {
                 await ref.read(userProvider.notifier).updateName(newName);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -174,8 +169,8 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
                     ),
                   );
                 }
-              } finally {
-                if (mounted) setState(() => _isSavingName = false);
+              } catch (e) {
+                debugPrint('Error updating name: $e');
               }
             },
             style: ElevatedButton.styleFrom(
@@ -441,16 +436,6 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
     AppPageRoute(builder: (_) => const TermsConditionsPage()),
   );
 
-  void _navigateToCancellationPolicy() => Navigator.push(
-    context,
-    AppPageRoute(builder: (_) => const CancellationPolicyPage()),
-  );
-
-  void _navigateToRefundPolicy() => Navigator.push(
-    context,
-    AppPageRoute(builder: (_) => const RefundPolicyPage()),
-  );
-
   void _navigateToHelpSupport() => Navigator.push(
     context,
     AppPageRoute(builder: (_) => const HelpSupportPage()),
@@ -459,17 +444,44 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final user = ref.watch(userProvider).valueOrNull;
+    final customerName = user?.name ?? 'Set Name';
+
     return Scaffold(
+      backgroundColor: cs.surfaceContainerLowest,
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leadingWidth: 70,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 20, top: 8, bottom: 8),
+          child: Container(
+            decoration: BoxDecoration(
+              color: cs.surface,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              icon: Icon(Icons.arrow_back_ios_new, color: cs.onSurface, size: 18),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+        ),
         title: Text(
-          'Account',
+          'My Account',
           style: TextStyle(
-            fontWeight: FontWeight.bold,
             color: cs.onSurface,
+            fontWeight: FontWeight.bold,
             fontSize: 22,
           ),
         ),
-        centerTitle: false,
       ),
       body: _isLoading
           ? const ProfilePageSkeleton()
@@ -481,375 +493,207 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: _buildGreetingSection(),
-                    ),
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _buildStatCard(
-                              'Total Orders',
-                              ref
-                                      .watch(userOrdersProvider)
-                                      .valueOrNull
-                                      ?.length
-                                      .toString() ??
-                                  '—',
-                              Icons.shopping_bag_outlined,
-                              onTap: _navigateToOrders,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildStatCard(
-                              'Wallet',
-                              '₹0',
-                              Icons.account_balance_wallet_outlined,
-                              onTap: null,
-                            ),
-                          ),
-                        ],
+                    _buildSectionTitle('Account'),
+                    _buildCardContainer([
+                      _buildAccountRow(
+                        icon: Icons.edit_outlined,
+                        label: 'Name',
+                        value: _isGuest ? 'Guest' : customerName,
+                        onTap: _isGuest ? null : _showEditNameDialog,
                       ),
-                    ),
-                    const SizedBox(height: 22),
-                    _buildMenuSection(),
-                    const SizedBox(height: 16),
-                    _buildLogoutButton(),
-                    const SizedBox(height: 22),
-                  ],
-                ),
-              ),
-            ),
-    );
-  }
+                      _buildDivider(),
+                      _buildAccountRow(
+                        icon: Icons.email_outlined,
+                        label: 'Email',
+                        value: '—', // AppUser doesn't have email in this version
+                      ),
+                      _buildDivider(),
+                      _buildAccountRow(
+                        icon: Icons.phone_outlined,
+                        label: 'Mobile',
+                        value: _isGuest ? '—' : _displayNumber,
+                      ),
+                    ]),
+                    
+                    _buildSectionTitle('Food Orders'),
+                    _buildCardContainer([
+                      _buildMenuRow(
+                        icon: Icons.receipt_long_outlined,
+                        title: 'Your Orders',
+                        onTap: _navigateToOrders,
+                      ),
+                      _buildDivider(),
+                      _buildMenuRow(
+                        icon: Icons.favorite_border,
+                        title: 'Favourite orders',
+                        onTap: _navigateToWishlist,
+                      ),
+                      _buildDivider(),
+                      _buildMenuRow(
+                        icon: Icons.location_on_outlined,
+                        title: 'Address book',
+                        onTap: _navigateToSavedAddresses,
+                      ),
+                      _buildDivider(),
+                      _buildMenuRow(
+                        icon: Icons.help_outline,
+                        title: 'Online ordering help',
+                        onTap: _navigateToHelpSupport,
+                      ),
+                    ]),
 
-  // Greeting shows name + edit button
-  Widget _buildGreetingSection() {
-    final customerName = ref.watch(userProvider).valueOrNull?.name ?? '';
-    final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: RichText(
-                text: TextSpan(
-                  children: [
-                    TextSpan(
-                      text: 'Hello',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: cs.primary,
-                        letterSpacing: 0.5,
+                    _buildSectionTitle('More'),
+                    _buildCardContainer([
+                      _buildThemeRow(),
+                      _buildDivider(),
+                      _buildMenuRow(
+                        icon: Icons.translate,
+                        title: 'Choose language',
+                        onTap: () {}, // Placeholder
                       ),
-                    ),
-                    if (!_isGuest && customerName.isNotEmpty) ...[
-                      TextSpan(
-                        text: ', ',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: cs.primary,
-                        ),
+                      _buildDivider(),
+                      _buildMenuRow(
+                        icon: Icons.info_outline,
+                        title: 'About',
+                        onTap: _navigateToTermsConditions,
                       ),
-                      TextSpan(
-                        text: customerName,
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: cs.onSurface,
-                        ),
+                      _buildDivider(),
+                      _buildMenuRow(
+                        icon: Icons.feedback_outlined,
+                        title: 'Send feedback',
+                        onTap: () {}, // Placeholder
                       ),
-                    ] else if (_isGuest) ...[
-                      TextSpan(
-                        text: ' Guest',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: cs.primary,
+                    ]),
+
+                    const SizedBox(height: 32),
+                    _buildLogoutButton(),
+                    if (!_isGuest) ...[
+                      const SizedBox(height: 12),
+                      Center(
+                        child: TextButton(
+                          onPressed: _deleteAccount,
+                          child: const Text(
+                            'Delete Account',
+                            style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w500),
+                          ),
                         ),
                       ),
                     ],
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
             ),
-            if (!_isGuest)
-              _isSavingName
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: cs.primary,
-                      ),
-                    )
-                  : IconButton(
-                      icon: Icon(
-                        customerName.isEmpty
-                            ? Icons.add_circle_outline
-                            : Icons.edit_outlined,
-                        color: cs.primary,
-                        size: 26,
-                      ),
-                      tooltip: customerName.isEmpty ? 'Add Name' : 'Edit Name',
-                      onPressed: _showEditNameDialog,
-                    ),
-          ],
-        ),
-        if (!_isGuest) ...[
-          const SizedBox(height: 4),
-          if (customerName.isEmpty)
-            GestureDetector(
-              onTap: _showEditNameDialog,
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, size: 14, color: cs.primary),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Tap to add your name',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: cs.primary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            Text(
-              _displayNumber.isNotEmpty ? _displayNumber : '',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: cs.onSurface,
-              ),
-            ),
-        ],
-      ],
     );
   }
 
-  Widget _buildStatCard(
-    String title,
-    String value,
-    IconData icon, {
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 20, top: 24, bottom: 12),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardContainer(List<Widget> children) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildAccountRow({
+    required IconData icon,
+    required String label,
+    required String value,
     VoidCallback? onTap,
   }) {
     final cs = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: cs.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: cs.outlineVariant, width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: cs.shadow.withValues(alpha: 0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: cs.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: cs.outlineVariant, width: 1),
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 28, color: cs.onSurface),
+              child: Icon(icon, size: 20, color: cs.onSurfaceVariant),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(width: 16),
             Text(
-              value,
+              label,
               style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
                 color: cs.onSurface,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 13,
-                color: cs.onSurfaceVariant,
-                fontWeight: FontWeight.w500,
+            const Spacer(),
+            Expanded(
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: cs.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.end,
+                overflow: TextOverflow.ellipsis,
               ),
-              textAlign: TextAlign.center,
             ),
+            if (onTap != null) ...[
+              const SizedBox(width: 4),
+              Icon(Icons.edit, size: 14, color: cs.primary.withValues(alpha: 0.5)),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMenuSection() {
-    final cs = Theme.of(context).colorScheme;
-    final themeMode = ref.watch(themeModeProvider);
-    final isDark = themeMode == ThemeMode.dark ||
-        (themeMode == ThemeMode.system &&
-            MediaQuery.platformBrightnessOf(context) == Brightness.dark);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: cs.outlineVariant, width: 1.5),
-            ),
-            child: Column(
-              children: [
-                _buildMenuItem(
-                  icon: Icons.location_on_outlined,
-                  title: 'Saved Addresses',
-                  onTap: _navigateToSavedAddresses,
-                ),
-                _buildDivider(),
-                _buildMenuItem(
-                  icon: Icons.favorite_outline,
-                  title: 'Wishlist',
-                  onTap: _navigateToWishlist,
-                ),
-                _buildDivider(),
-                _buildMenuItem(
-                  icon: Icons.receipt_long_outlined,
-                  title: 'Your Orders',
-                  onTap: _navigateToOrders,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Appearance section with dark mode toggle
-          Container(
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: cs.outlineVariant, width: 1.5),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              child: Row(
-                children: [
-                  Icon(
-                    isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
-                    size: 22,
-                    color: cs.onSurface,
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      'Dark Mode',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                  ),
-                  Switch(
-                    value: isDark,
-                    onChanged: (_) =>
-                        ref.read(themeModeProvider.notifier).toggle(),
-                    activeColor: cs.primary,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: cs.outlineVariant, width: 1.5),
-            ),
-            child: Column(
-              children: [
-                _buildMenuItem(
-                  icon: Icons.description_outlined,
-                  title: 'Terms & Conditions',
-                  onTap: _navigateToTermsConditions,
-                ),
-                _buildDivider(),
-                _buildMenuItem(
-                  icon: Icons.cancel_outlined,
-                  title: 'Cancellation Policy',
-                  onTap: _navigateToCancellationPolicy,
-                ),
-                _buildDivider(),
-                _buildMenuItem(
-                  icon: Icons.receipt_long_outlined,
-                  title: 'Refund Policy',
-                  onTap: _navigateToRefundPolicy,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: cs.outlineVariant, width: 1.5),
-            ),
-            child: _buildHelpSupportItem(),
-          ),
-          if (!_isGuest) ...[
-            const SizedBox(height: 16),
-            Container(
-              decoration: BoxDecoration(
-                color: cs.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: cs.outlineVariant, width: 1.5),
-              ),
-              child: _buildMenuItem(
-                icon: Icons.delete_forever_outlined,
-                title: 'Delete Account',
-                onTap: _deleteAccount,
-                isDestructive: true,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMenuItem({
+  Widget _buildMenuRow({
     required IconData icon,
     required String title,
     required VoidCallback onTap,
-    bool isDestructive = false,
   }) {
     final cs = Theme.of(context).colorScheme;
-    final color = isDestructive ? cs.error : cs.onSurface;
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: color),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 20, color: cs.onSurfaceVariant),
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: Text(
@@ -857,51 +701,57 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
-                  color: color,
+                  color: cs.onSurface,
                 ),
               ),
             ),
-            Icon(Icons.chevron_right, color: cs.onSurfaceVariant, size: 24),
+            Icon(Icons.chevron_right, color: cs.outline, size: 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHelpSupportItem() {
+  Widget _buildThemeRow() {
     final cs = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: _navigateToHelpSupport,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            Icon(Icons.headset_mic_outlined, size: 22, color: cs.onSurface),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Help & Support',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Get assistance anytime',
-                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-                  ),
-                ],
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = themeMode == ThemeMode.dark ||
+        (themeMode == ThemeMode.system &&
+            MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+              size: 20,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              'Dark Mode',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: cs.onSurface,
               ),
             ),
-            Icon(Icons.chevron_right, color: cs.onSurfaceVariant, size: 24),
-          ],
-        ),
+          ),
+          Switch(
+            value: isDark,
+            onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
+            activeColor: AppColors.primary,
+          ),
+        ],
       ),
     );
   }
@@ -910,48 +760,46 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
     return Divider(
       height: 1,
       thickness: 1,
-      color: Theme.of(context).colorScheme.outlineVariant,
-      indent: 20,
-      endIndent: 20,
+      color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+      indent: 16,
+      endIndent: 16,
     );
   }
 
   Widget _buildLogoutButton() {
-    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: SizedBox(
         width: double.infinity,
         height: 54,
-        child: OutlinedButton.icon(
+        child: ElevatedButton.icon(
           onPressed: _isGuest
               ? () => Navigator.pushAndRemoveUntil(
-                  context,
-                  AppPageRoute(
-                    type: PageTransitionType.scale,
-                    builder: (_) => const LoginPage(),
-                  ),
-                  (route) => false,
-                )
+                    context,
+                    AppPageRoute(
+                      type: PageTransitionType.scale,
+                      builder: (_) => const LoginPage(),
+                    ),
+                    (route) => false,
+                  )
               : _logout,
           icon: Icon(
             _isGuest ? Icons.login : Icons.logout,
-            color: _isGuest ? cs.primary : cs.error,
+            color: Colors.black87,
             size: 20,
           ),
           label: Text(
             _isGuest ? 'Login' : 'Logout',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: _isGuest ? cs.primary : cs.error,
+              color: Colors.black87,
             ),
           ),
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(
-              color: _isGuest ? cs.primary : cs.error,
-              width: 2,
-            ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: kBandiwalaYellow,
+            elevation: 2,
+            shadowColor: kBandiwalaYellow.withValues(alpha: 0.3),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
