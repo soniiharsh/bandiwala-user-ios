@@ -11,6 +11,7 @@ import '../widgets/skeletons.dart';
 import '../models/app_user.dart';
 import 'location_picker_page.dart';
 import '../core/theme/theme.dart';
+import 'orders_page.dart';
 
 class NavPage extends ConsumerStatefulWidget {
   const NavPage({super.key});
@@ -44,7 +45,9 @@ class _NavPageState extends ConsumerState<NavPage> {
               children: [
                 ActiveOrderBar(
                   onViewTap: () {
-                     // Potential direct navigation to orders
+                    Navigator.of(context).push(
+                      AppPageRoute(builder: (_) => const OrdersPage()),
+                    );
                   },
                 ),
                 CartBar(

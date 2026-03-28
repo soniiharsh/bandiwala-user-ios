@@ -97,12 +97,11 @@ class _SplashScreenState extends ConsumerState<SplashPage> {
         _maybeNavigate();
       }
     });
-
     final isInitialized = _controller.value.isInitialized;
 
     return Scaffold(
-      // Initial screen must be white as requested
-      backgroundColor: isInitialized && !_videoFinished ? AppColors.primary : Colors.white,
+      // Initial screen is white, becomes yellow once video starts, and STAYS yellow after video ends
+      backgroundColor: isInitialized ? AppColors.primary : Colors.white,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -114,6 +113,14 @@ class _SplashScreenState extends ConsumerState<SplashPage> {
                 width: _controller.value.size.width,
                 height: _controller.value.size.height,
                 child: VideoPlayer(_controller),
+              ),
+            ),
+          // Show static image once video is finished (Phase 4)
+          if (_videoFinished)
+            Positioned.fill(
+              child: Image.asset(
+                'assets/images/splash.png',
+                fit: BoxFit.cover,
               ),
             ),
         ],

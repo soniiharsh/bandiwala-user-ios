@@ -10,6 +10,7 @@ import '../core/theme/theme.dart';
 import '../widgets/cart_bar.dart';
 import '../widgets/active_order_bar.dart';
 import 'cart_page.dart';
+import 'orders_page.dart';
 import '../widgets/vendor_card.dart'; // WishlistManager + WishlistVendor
 import '../widgets/skeletons.dart';
 import '../core/navigation/app_page_route.dart';
@@ -191,7 +192,9 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ActiveOrderBar(onViewTap: () {
-               // Navigation handled elsewhere or direct transition
+              Navigator.of(context).push(
+                AppPageRoute(builder: (_) => const OrdersPage()),
+              );
             }),
             CartBar(
               onTap: () {

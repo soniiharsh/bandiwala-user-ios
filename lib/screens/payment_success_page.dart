@@ -153,12 +153,12 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                       ),
                       child: Column(
                         children: [
-                          const Text(
+                          Text(
                             'Payment Successful!',
                             style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -167,7 +167,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                             'Your order is on the way 🎉',
                             style: TextStyle(
                               fontSize: 16,
-                              color: Colors.black54,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.w600,
                             ),
                             textAlign: TextAlign.center,
@@ -208,7 +208,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                           '"$_randomQuote"',
                           style: TextStyle(
                             fontSize: 15,
-                            color: Colors.black87,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontWeight: FontWeight.w500,
                             height: 1.4,
                           ),
@@ -237,7 +237,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                       'Redirecting to order in $_countdownSeconds',
                       style: TextStyle(
                         fontSize: 15,
-                        color: Colors.black54,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

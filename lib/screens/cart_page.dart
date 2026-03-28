@@ -199,6 +199,7 @@ class _CartPageState extends ConsumerState<CartPage> {
   }
 
   Widget _buildLoginGate() {
+    final theme = Theme.of(context);
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -228,14 +229,15 @@ class _CartPageState extends ConsumerState<CartPage> {
                       Icon(
                         Icons.lock_outline,
                         size: 80,
-                        color: Colors.grey.shade300,
+                        color: theme.colorScheme.outlineVariant,
                       ),
                       const SizedBox(height: 24),
-                      const Text(
+                      Text(
                         'Login to continue',
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -244,7 +246,7 @@ class _CartPageState extends ConsumerState<CartPage> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey.shade600,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                       const SizedBox(height: 32),
@@ -324,9 +326,9 @@ class _CartPageState extends ConsumerState<CartPage> {
     final hasVendorOffline = cart.cartByVendor.keys.any(
       (id) => vendorOnlineStatus[id] == false,
     );
-
     final vendorIds = cart.cartByVendor.keys.toList();
 
+    final theme = Theme.of(context);
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -353,14 +355,15 @@ class _CartPageState extends ConsumerState<CartPage> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: kBandiwalaYellow.withValues(alpha: 0.2),
+                        color: kBandiwalaYellow.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         '${cart.totalItemCount} items',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -435,13 +438,16 @@ class _CartPageState extends ConsumerState<CartPage> {
     final bool disableCheckout =
         _selectedAddress == null || hasVendorOffline || hasUnavailableItems;
 
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: theme.colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: (isDark ? Colors.white : Colors.black).withOpacity(0.08),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -455,20 +461,21 @@ class _CartPageState extends ConsumerState<CartPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Items Total',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '₹${cart.grandTotal.toStringAsFixed(0)}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ],
@@ -509,7 +516,7 @@ class _CartPageState extends ConsumerState<CartPage> {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: Colors.deepOrange.shade800,
+                          color: isDark ? Colors.orange.shade300 : Colors.deepOrange.shade800,
                         ),
                       ),
                     ),
@@ -528,24 +535,25 @@ class _CartPageState extends ConsumerState<CartPage> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: isDark ? Colors.red.withOpacity(0.15) : Colors.red.shade50,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade200),
+                  border: Border.all(color: isDark ? Colors.red.shade800 : Colors.red.shade200),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       Icons.error_outline,
-                      color: Colors.red.shade700,
+                      color: isDark ? Colors.red.shade400 : Colors.red.shade700,
                       size: 16,
                     ),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Some items are currently unavailable',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -560,7 +568,7 @@ class _CartPageState extends ConsumerState<CartPage> {
                         'View',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.red.shade800,
+                          color: isDark ? Colors.red.shade300 : Colors.red.shade800,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -579,7 +587,7 @@ class _CartPageState extends ConsumerState<CartPage> {
               onPressed: disableCheckout ? null : _handlePlaceOrder,
               style: ElevatedButton.styleFrom(
                 backgroundColor: disableCheckout
-                    ? Colors.grey.shade300
+                    ? (isDark ? Colors.grey.shade800 : Colors.grey.shade300)
                     : kBandiwalaYellow,
                 foregroundColor: Colors.black,
                 elevation: 0,
@@ -616,21 +624,24 @@ class _CartPageState extends ConsumerState<CartPage> {
           Icon(
             Icons.shopping_cart_outlined,
             size: 100,
-            color: Colors.grey.shade300,
+            color: Theme.of(context).colorScheme.outlineVariant,
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'Your cart is empty',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Add items from nearby vendors',
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+            style: TextStyle(
+              fontSize: 14, 
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -652,14 +663,18 @@ class AddressSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final hasAddress = selectedAddress != null;
 
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: hasAddress ? Colors.green.shade300 : Theme.of(context).colorScheme.outlineVariant,
+          color: hasAddress 
+              ? (isDark ? Colors.green.shade700 : Colors.green.shade300) 
+              : theme.colorScheme.outlineVariant,
           width: 1.5,
         ),
       ),
@@ -676,13 +691,13 @@ class AddressSection extends StatelessWidget {
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: hasAddress
-                        ? Colors.green.shade50
-                        : Colors.grey.shade100,
+                        ? (isDark ? Colors.green.withOpacity(0.15) : Colors.green.shade50)
+                        : (isDark ? theme.colorScheme.surfaceVariant : Colors.grey.shade100),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     hasAddress ? Icons.location_on : Icons.add_location_alt,
-                    color: hasAddress ? Colors.green : Colors.grey.shade700,
+                    color: hasAddress ? Colors.green : theme.colorScheme.onSurfaceVariant,
                     size: 22,
                   ),
                 ),
@@ -696,9 +711,10 @@ class AddressSection extends StatelessWidget {
                           Flexible(
                             child: Text(
                               hasAddress ? 'Delivery Address' : 'Add Address',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
+                                color: theme.colorScheme.onSurface,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -711,7 +727,7 @@ class AddressSection extends StatelessWidget {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.red.shade50,
+                                color: isDark ? Colors.red.withOpacity(0.15) : Colors.red.shade50,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
@@ -719,7 +735,7 @@ class AddressSection extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.red.shade700,
+                                  color: isDark ? Colors.red.shade300 : Colors.red.shade700,
                                 ),
                               ),
                             ),
@@ -733,14 +749,15 @@ class AddressSection extends StatelessWidget {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: kBandiwalaYellow.withValues(alpha: 0.15),
+                                  color: kBandiwalaYellow.withOpacity(0.15),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
                                   selectedAddress!.label!.toUpperCase(),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w700,
+                                    color: theme.colorScheme.onSurface,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -757,8 +774,8 @@ class AddressSection extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 13,
                           color: hasAddress
-                              ? Colors.black87
-                              : Colors.grey.shade600,
+                              ? theme.colorScheme.onSurface
+                              : theme.colorScheme.onSurfaceVariant,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -772,7 +789,7 @@ class AddressSection extends StatelessWidget {
                             selectedAddress!.address!,
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.grey.shade600,
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -784,7 +801,7 @@ class AddressSection extends StatelessWidget {
                 Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
-                  color: Colors.grey.shade600,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ],
             ),
@@ -828,26 +845,30 @@ class YouMayLikeSection extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: Theme.of(context).colorScheme.surfaceVariant,
                   borderRadius: BorderRadius.circular(7),
                 ),
                 child: Icon(
                   Icons.grid_view_rounded,
                   size: 16,
-                  color: Colors.grey.shade700,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Complete your meal with',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  fontSize: 15, 
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 185,
+          height: 220,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -908,15 +929,18 @@ class SuggestionCard extends ConsumerWidget {
     final vendorId = item['vendorId'] ?? '';
     final vendorName = item['vendorName'] ?? 'Restaurant';
 
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       width: 140,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant, width: 1),
+        border: Border.all(color: theme.colorScheme.outlineVariant, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: (isDark ? Colors.white : Colors.black).withOpacity(0.03),
             blurRadius: 3,
             offset: const Offset(0, 1),
           ),
@@ -936,26 +960,26 @@ class SuggestionCard extends ConsumerWidget {
                     ? CachedNetworkImage(
                         imageUrl: imageUrl,
                         width: 140,
-                        height: 90,
+                        height: 110,
                         fit: BoxFit.cover,
                         memCacheWidth: 300,
                         placeholder: (_, __) => Container(
                           width: 140,
-                          height: 90,
-                          color: Colors.grey.shade200,
+                          height: 110,
+                          color: theme.colorScheme.surfaceVariant,
                         ),
                         errorWidget: (_, __, ___) => Container(
                           width: 140,
-                          height: 90,
-                          color: Colors.grey.shade200,
-                          child: const Icon(Icons.restaurant, size: 28),
+                          height: 110,
+                          color: theme.colorScheme.surfaceVariant,
+                          child: Icon(Icons.restaurant, size: 28, color: theme.colorScheme.onSurfaceVariant),
                         ),
                       )
                     : Container(
                         width: 140,
-                        height: 90,
-                        color: Colors.grey.shade200,
-                        child: const Icon(Icons.restaurant, size: 28),
+                        height: 110,
+                        color: theme.colorScheme.surfaceVariant,
+                        child: Icon(Icons.restaurant, size: 28, color: theme.colorScheme.onSurfaceVariant),
                       ),
               ),
               Positioned(
@@ -997,11 +1021,11 @@ class SuggestionCard extends ConsumerWidget {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark ? Colors.white.withOpacity(0.9) : Colors.white,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.12),
+                        color: (isDark ? Colors.white : Colors.black).withOpacity(0.12),
                         blurRadius: 5,
                         offset: const Offset(0, 1),
                       ),
@@ -1095,15 +1119,18 @@ class VendorCartSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: (isDark ? Colors.white : Colors.black).withOpacity(0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1148,7 +1175,7 @@ class VendorCartSection extends ConsumerWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.deepOrange.shade50,
+                      color: isDark ? Colors.deepOrange.withOpacity(0.15) : Colors.deepOrange.shade50,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -1156,7 +1183,7 @@ class VendorCartSection extends ConsumerWidget {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: Colors.deepOrange.shade700,
+                        color: isDark ? Colors.deepOrange.shade300 : Colors.deepOrange.shade700,
                       ),
                     ),
                   ),
@@ -1185,8 +1212,8 @@ class VendorCartSection extends ConsumerWidget {
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: isDisabled
-                                ? Colors.grey.shade400
-                                : Colors.black87,
+                                ? theme.colorScheme.onSurface.withOpacity(0.3)
+                                : theme.colorScheme.onSurface,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1197,8 +1224,8 @@ class VendorCartSection extends ConsumerWidget {
                           style: TextStyle(
                             fontSize: 13,
                             color: isDisabled
-                                ? Colors.grey.shade400
-                                : Colors.black54,
+                                ? theme.colorScheme.onSurface.withOpacity(0.3)
+                                : theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                         if (!isAvailable && isVendorOnline)
@@ -1208,7 +1235,7 @@ class VendorCartSection extends ConsumerWidget {
                               'Currently unavailable',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.red.shade600,
+                                color: isDark ? Colors.red.shade400 : Colors.red.shade600,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -1220,8 +1247,8 @@ class VendorCartSection extends ConsumerWidget {
                   Container(
                     decoration: BoxDecoration(
                       color: isDisabled
-                          ? Colors.grey.shade100
-                          : const Color(0xFFFFF3CD),
+                          ? (isDark ? theme.colorScheme.surfaceVariant : Colors.grey.shade100)
+                          : (isDark ? const Color(0xFF423B22) : const Color(0xFFFFF3CD)),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -1238,8 +1265,8 @@ class VendorCartSection extends ConsumerWidget {
                               Icons.remove,
                               size: 16,
                               color: isDisabled
-                                  ? Colors.grey.shade400
-                                  : Colors.black87,
+                                  ? theme.colorScheme.onSurface.withOpacity(0.3)
+                                  : (isDark ? kBandiwalaYellow : Colors.black87),
                             ),
                           ),
                         ),
@@ -1249,8 +1276,8 @@ class VendorCartSection extends ConsumerWidget {
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: isDisabled
-                                ? Colors.grey.shade400
-                                : Colors.black87,
+                                ? theme.colorScheme.onSurface.withOpacity(0.3)
+                                : (isDark ? Colors.white : Colors.black87),
                           ),
                         ),
                         GestureDetector(
@@ -1264,8 +1291,8 @@ class VendorCartSection extends ConsumerWidget {
                               Icons.add,
                               size: 16,
                               color: isDisabled
-                                  ? Colors.grey.shade400
-                                  : Colors.black87,
+                                  ? theme.colorScheme.onSurface.withOpacity(0.3)
+                                  : (isDark ? kBandiwalaYellow : Colors.black87),
                             ),
                           ),
                         ),
@@ -1287,15 +1314,16 @@ class VendorCartSection extends ConsumerWidget {
                   'Subtotal',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.grey.shade600,
+                    color: theme.colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 Text(
                   '₹${vendorTotal.toStringAsFixed(0)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
               ],

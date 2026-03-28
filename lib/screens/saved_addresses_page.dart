@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/theme/map_style.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/user_provider.dart';
 import '../models/app_user.dart';
@@ -9,10 +10,6 @@ import '../widgets/skeletons.dart';
 import '../core/navigation/app_page_route.dart';
 
 const kBandiwalaYellow = AppColors.primary;
-const kWhite = Colors.white;
-const kBorderGrey = Color(0xFFE5E7EB);
-const kTextGrey = Color(0xFF6B7280);
-const kLightGrey = Color(0xFFF9FAFB);
 
 class SavedAddressesPage extends ConsumerStatefulWidget {
   const SavedAddressesPage({super.key});
@@ -160,23 +157,26 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
         ref.watch(userProvider).valueOrNull?.savedAddresses ?? [];
     final savedLocations = savedAddresses.map(_toSavedAddress).toList();
 
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: kLightGrey,
+      backgroundColor: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF9FAFB),
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Saved Addresses',
           style: TextStyle(
-            color: Colors.black87,
+            color: isDark ? Colors.white : Colors.black87,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: kWhite,
-        foregroundColor: Colors.black87,
+        backgroundColor: theme.cardColor,
+        foregroundColor: isDark ? Colors.white : Colors.black87,
         elevation: 0,
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1.0),
-          child: Divider(height: 1, thickness: 1, color: kBorderGrey),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1.0),
+          child: Divider(height: 1, thickness: 1, color: theme.dividerColor),
         ),
       ),
       body: _isLoading
@@ -230,12 +230,12 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'No Saved Addresses',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
@@ -282,15 +282,18 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
   }
 
   Widget _buildAddressCard(SavedAddress location, int index) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: kWhite,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kBorderGrey, width: 1),
+        border: Border.all(color: theme.dividerColor, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: (isDark ? Colors.white : Colors.black).withOpacity(0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -321,14 +324,14 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        location.label ?? 'Other',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                        Text(
+                          location.label ?? 'Other',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
                         ),
-                      ),
                       if (location.phone.isNotEmpty)
                         Text(
                           location.phone,
@@ -355,7 +358,7 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
               ],
             ),
             const SizedBox(height: 12),
-            const Divider(height: 1, thickness: 1, color: kBorderGrey),
+            Divider(height: 1, thickness: 1, color: theme.dividerColor),
             const SizedBox(height: 12),
 
             // House number/Landmark
@@ -373,10 +376,10 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
                     Expanded(
                       child: Text(
                         location.address!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -409,19 +412,22 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
 
             // Coordinates (optional, for debugging)
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.map_outlined, size: 14, color: Colors.grey.shade500),
-                const SizedBox(width: 6),
-                Text(
-                  '${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey.shade500,
-                    fontStyle: FontStyle.italic,
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  Icon(Icons.map_outlined, size: 14, color: Colors.grey.shade500),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade500,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
@@ -536,18 +542,21 @@ class _LocationPickerEditModeState extends ConsumerState<LocationPickerEditMode>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Edit Address',
           style: TextStyle(
-            color: Colors.black87,
+            color: isDark ? Colors.white : Colors.black87,
             fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: kWhite,
-        foregroundColor: Colors.black87,
+        backgroundColor: theme.cardColor,
+        foregroundColor: isDark ? Colors.white : Colors.black87,
         elevation: 0.5,
       ),
       body: Stack(
@@ -560,6 +569,9 @@ class _LocationPickerEditModeState extends ConsumerState<LocationPickerEditMode>
             ),
             onMapCreated: (controller) {
               _mapController = controller;
+              if (isDark) {
+                _mapController?.setMapStyle(MapStyles.darkStyle);
+              }
               _mapController?.moveCamera(
                 CameraUpdate.newLatLngZoom(_selectedPosition, 16.0),
               );
@@ -589,13 +601,13 @@ class _LocationPickerEditModeState extends ConsumerState<LocationPickerEditMode>
             maxChildSize: 0.75,
             builder: (context, scrollController) => Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: theme.cardColor,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(24),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
                     blurRadius: 20,
                     offset: const Offset(0, -5),
                   ),
@@ -616,9 +628,13 @@ class _LocationPickerEditModeState extends ConsumerState<LocationPickerEditMode>
                       ),
                     ),
                   ),
-                  const Text(
+                  Text(
                     'Update Address Details',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 18, 
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Row(

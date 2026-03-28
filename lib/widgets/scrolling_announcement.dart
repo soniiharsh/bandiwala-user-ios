@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:marquee/marquee.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../providers/announcements_provider.dart';
 import '../core/theme/theme.dart';
 
@@ -69,24 +68,25 @@ class ScrollingAnnouncement extends ConsumerWidget {
                   borderRadius: const BorderRadius.horizontal(
                     right: Radius.circular(20),
                   ),
-                  child: Marquee(
-                    text: '$fullText    ',
-                    style: GoogleFonts.outfit(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                      color: Theme.of(context).colorScheme.onSurface,
-                      letterSpacing: 0.2,
+                  child: RepaintBoundary(
+                    child: Marquee(
+                      text: '$fullText    ',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        letterSpacing: 0.2,
+                      ),
+                      scrollAxis: Axis.horizontal,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      blankSpace: 80.0,
+                      velocity: 30.0,
+                      pauseAfterRound: Duration(seconds: 1),
+                      startPadding: 5.0,
+                      accelerationDuration: Duration(seconds: 1),
+                      accelerationCurve: Curves.linear,
+                      decelerationDuration: Duration(milliseconds: 500),
+                      decelerationCurve: Curves.easeOut,
                     ),
-                    scrollAxis: Axis.horizontal,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    blankSpace: 80.0,
-                    velocity: 35.0,
-                    pauseAfterRound: const Duration(seconds: 1),
-                    startPadding: 5.0,
-                    accelerationDuration: const Duration(seconds: 1),
-                    accelerationCurve: Curves.linear,
-                    decelerationDuration: const Duration(milliseconds: 500),
-                    decelerationCurve: Curves.easeOut,
                   ),
                 ),
               ),
@@ -124,28 +124,29 @@ class _BlinkingIndicatorState extends State<_BlinkingIndicator>
     _controller.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _controller.drive(
-        CurveTween(
-          curve: Curves.easeInOut,
-        ).chain(Tween<double>(begin: 0.3, end: 1.0)),
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.red.shade600,
-          borderRadius: BorderRadius.circular(4),
+    return RepaintBoundary(
+      child: FadeTransition(
+        opacity: _controller.drive(
+          CurveTween(
+            curve: Curves.easeInOut,
+          ).chain(Tween<double>(begin: 0.3, end: 1.0)),
         ),
-        child: const Text(
-          'LIVE',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 8,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 0.5,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.red.shade600,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: const Text(
+            'LIVE',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 8,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.5,
+            ),
           ),
         ),
       ),

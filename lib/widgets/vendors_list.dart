@@ -60,14 +60,9 @@ class VendorsList extends ConsumerWidget {
             return a.isAvailable ? -1 : 1;
           });
 
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: sorted.length,
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          itemBuilder: (context, index) {
-            final v = sorted[index];
-            return VendorCard(
+        return Column(
+          children: sorted.map((v) => RepaintBoundary(
+            child: VendorCard(
               vendorId: v.id,
               name: v.name,
               imageUrl: v.imageUrl,
@@ -75,8 +70,8 @@ class VendorsList extends ConsumerWidget {
               category: v.category,
               rating: v.rating,
               isAvailable: v.isAvailable,
-            );
-          },
+            ),
+          )).toList(),
         );
       },
     );

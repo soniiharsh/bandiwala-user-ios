@@ -34,8 +34,10 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   void _onScroll() {
-    final hidden = _scrollController.offset > 10;
-    if (hidden != _marqueeHidden) setState(() => _marqueeHidden = hidden);
+    final hidden = _scrollController.offset > 8;
+    if (hidden != _marqueeHidden) {
+      setState(() => _marqueeHidden = hidden);
+    }
   }
 
   @override
@@ -139,8 +141,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ref.read(activeAddressProvider.notifier).setAddress(loc),
           ),
           AnimatedSize(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
             child: SizedBox(
               height: _marqueeHidden ? 0 : null,
               child: ClipRect(
@@ -337,7 +339,22 @@ class _LiveBadge extends StatefulWidget {
   State<_LiveBadge> createState() => _LiveBadgeState();
 }
 
-class _LiveBadgeState extends State<_LiveBadge>
+class _LiveBadgeState extends State<_LiveBadge> {
+  @override
+  Widget build(BuildContext context) {
+    return const RepaintBoundary(
+      child: _LiveBadgeBody(),
+    );
+  }
+}
+
+class _LiveBadgeBody extends StatefulWidget {
+  const _LiveBadgeBody();
+  @override
+  State<_LiveBadgeBody> createState() => _LiveBadgeBodyState();
+}
+
+class _LiveBadgeBodyState extends State<_LiveBadgeBody>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
   late Animation<double> _scale;
