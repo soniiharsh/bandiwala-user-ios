@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 import 'app_text_styles.dart';
 
@@ -29,13 +30,15 @@ abstract final class AppTheme {
       brightness: scheme.brightness,
       scaffoldBackgroundColor: scheme.surface,
       primaryColor: scheme.primary,
-      textTheme: const TextTheme(
-        displayLarge: AppTextStyles.displayLarge,
-        titleLarge:   AppTextStyles.titleLarge,
-        titleMedium:  AppTextStyles.titleMedium,
-        bodyLarge:    AppTextStyles.bodyLarge,
-        bodySmall:    AppTextStyles.bodySmall,
-        labelSmall:   AppTextStyles.labelSmall,
+      textTheme: GoogleFonts.poppinsTextTheme(
+        TextTheme(
+          displayLarge: AppTextStyles.displayLarge,
+          titleLarge:   AppTextStyles.titleLarge,
+          titleMedium:  AppTextStyles.titleMedium,
+          bodyLarge:    AppTextStyles.bodyLarge,
+          bodySmall:    AppTextStyles.bodySmall,
+          labelSmall:   AppTextStyles.labelSmall,
+        ),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: scheme.surface,

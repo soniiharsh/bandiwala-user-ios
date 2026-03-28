@@ -87,5 +87,8 @@ class SavedAddress with _$SavedAddress {
 
   String get shortLabel => label ?? 'Other';
 
+  bool get isInServiceZone =>
+      latitude >= 17.25 && latitude <= 17.55 && longitude >= 78.25 && longitude <= 78.65;
+
   Map<String, dynamic> toLocationJson() => toMap();
 }

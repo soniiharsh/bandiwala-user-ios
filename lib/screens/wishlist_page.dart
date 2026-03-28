@@ -9,9 +9,6 @@ import '../core/navigation/app_page_route.dart';
 import '../widgets/skeletons.dart';
 
 const _kBandiwalaYellow = AppColors.primary;
-const _kWhite = Colors.white;
-const _kBorderGrey = Color(0xFFE5E7EB);
-const _kLightGrey = Color(0xFFF9FAFB);
 
 class WishlistPage extends StatefulWidget {
   const WishlistPage({super.key});
@@ -118,22 +115,14 @@ class _WishlistPageState extends State<WishlistPage> with RouteAware {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _kLightGrey,
       appBar: AppBar(
         title: const Text(
           'My Wishlist',
-          style: TextStyle(
-            color: Colors.black87,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
-        backgroundColor: _kWhite,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1.0),
-          child: Divider(height: 1, thickness: 1, color: _kBorderGrey),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1.0),
+          child: Divider(height: 1, thickness: 1, color: Theme.of(context).colorScheme.outlineVariant),
         ),
         actions: [
           if (_wishlist.isNotEmpty)
@@ -176,7 +165,7 @@ class _WishlistPageState extends State<WishlistPage> with RouteAware {
           Container(
             padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
-              color: _kBandiwalaYellow.withOpacity(0.1),
+              color: _kBandiwalaYellow.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(
@@ -188,11 +177,7 @@ class _WishlistPageState extends State<WishlistPage> with RouteAware {
           const SizedBox(height: 24),
           const Text(
             'No Favourites Yet',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
@@ -200,7 +185,7 @@ class _WishlistPageState extends State<WishlistPage> with RouteAware {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey.shade600,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               height: 1.5,
             ),
           ),
@@ -220,15 +205,16 @@ class _WishlistVendorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: _kWhite,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kBorderGrey, width: 1),
+        border: Border.all(color: cs.outlineVariant, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: cs.shadow.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -255,14 +241,10 @@ class _WishlistVendorCard extends StatelessWidget {
                 child: SizedBox(
                   width: 90,
                   height: 90,
-                  child: vendor.imageUrl.isNotEmpty
+                  child: vendor.imageUrl.trim().isNotEmpty
                       ? CachedNetworkImage(
-                          imageUrl: vendor.imageUrl,
+                          imageUrl: vendor.imageUrl.trim(),
                           fit: BoxFit.cover,
-                          memCacheWidth: 180,
-                          memCacheHeight: 180,
-                          maxWidthDiskCache: 180,
-                          maxHeightDiskCache: 180,
                           placeholder: (_, __) => Container(
                             color: Colors.grey.shade200,
                           ),
@@ -291,7 +273,6 @@ class _WishlistVendorCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
                       ),
                     ),
                     const SizedBox(height: 5),

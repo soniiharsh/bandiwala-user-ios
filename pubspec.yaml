@@ -59,6 +59,7 @@ dependencies:
   riverpod_annotation: ^2.6.1
   freezed_annotation: ^2.4.4
   json_annotation: ^4.9.0
+  video_player: ^2.11.1
 
 dev_dependencies:
   flutter_test:
@@ -89,6 +90,7 @@ flutter:
 
   assets:
     - assets/images/splash.png
+    - assets/videos/splash.mov
 
   # To add assets to your application, add an assets section, like this:
   # assets:

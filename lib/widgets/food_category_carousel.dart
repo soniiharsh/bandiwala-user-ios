@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:math';
 import '../providers/food_categories_provider.dart';
-import 'promotional_banner.dart' show kBandiwalaYellow;
 import 'skeletons.dart';
 
 // ─── FoodCategoryCarousel ─────────────────────────────────────────────────────
@@ -47,6 +46,7 @@ class _FoodCategoryCarouselState extends State<FoodCategoryCarousel>
       final categories = await container.read(foodCategoriesProvider.future);
 
       final items = categories
+          .where((c) => c.name.toLowerCase() != 'all')
           .map(
             (c) => _CategoryItem(
               name: c.name,
@@ -59,14 +59,7 @@ class _FoodCategoryCarouselState extends State<FoodCategoryCarousel>
 
       if (mounted) {
         setState(() {
-          _categories = [
-            _CategoryItem(
-              name: 'All',
-              imageUrl: 'assets/images/Bajji pakoda.png',
-              isLocal: true,
-            ),
-            ...items,
-          ];
+          _categories = items;
           _isLoading = false;
           _hasLoaded = true;
         });
@@ -75,13 +68,7 @@ class _FoodCategoryCarouselState extends State<FoodCategoryCarousel>
       debugPrint('FoodCategoryCarousel error: $e');
       if (mounted) {
         setState(() {
-          _categories = [
-            _CategoryItem(
-              name: 'All',
-              imageUrl: 'assets/images/Bajji pakoda.png',
-              isLocal: true,
-            ),
-          ];
+          _categories = [];
           _isLoading = false;
           _hasLoaded = true;
         });
@@ -120,35 +107,43 @@ class _FoodCategoryCarouselState extends State<FoodCategoryCarousel>
           style: TextStyle(
             fontSize: 19,
             fontWeight: FontWeight.w700,
-            color: Colors.black87,
             letterSpacing: -0.3,
           ),
         ),
         const SizedBox(height: 14),
-        SizedBox(
-          height: 110,
-          child: _isLoading
-              ? const CategoryCarouselSkeleton()
-              : _categories.isEmpty
-              ? Center(
-                  child: Text(
-                    'No categories',
-                    style: TextStyle(color: Colors.grey.shade500),
-                  ),
-                )
-              : ListView.builder(
-                  controller: _scrollController,
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.zero,
-                  itemCount: _categories.length,
-                  itemBuilder: (context, index) => GestureDetector(
-                    onTap: () => _onCategoryTap(index),
-                    child: _CategoryCard(
-                      item: _categories[index],
-                      isSelected: index == _selectedIndex,
+        Builder(
+          builder: (context) {
+            final double screenHeight = MediaQuery.of(context).size.height;
+            final double carouselHeight = screenHeight * 0.14; // Responsive height
+
+            return SizedBox(
+              height: carouselHeight.clamp(110, 130), // Minimum and maximum safe heights
+              child: _isLoading
+                  ? const CategoryCarouselSkeleton()
+                  : _categories.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No categories',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: _scrollController,
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.zero,
+                      itemCount: _categories.length,
+                      itemBuilder: (context, index) => GestureDetector(
+                        onTap: () => _onCategoryTap(index),
+                        child: _CategoryCard(
+                          item: _categories[index],
+                          isSelected: index == _selectedIndex,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+            );
+          }
         ),
       ],
     );
@@ -178,9 +173,10 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       width: 72,
-      margin: const EdgeInsets.symmetric(horizontal: 3),
+      margin: const EdgeInsets.only(right: 8),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -190,18 +186,18 @@ class _CategoryCard extends StatelessWidget {
             height: 64,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white,
+              color: cs.surfaceContainerHighest,
               boxShadow: isSelected
                   ? [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.14),
+                        color: cs.shadow.withValues(alpha: 0.14),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
                     ]
                   : [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
+                        color: cs.shadow.withValues(alpha: 0.05),
                         blurRadius: 4,
                         offset: const Offset(0, 1),
                       ),
@@ -212,57 +208,37 @@ class _CategoryCard extends StatelessWidget {
                   ? Image.asset(
                       item.imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(
+                      errorBuilder: (_, __, ___) => Icon(
                         Icons.restaurant,
                         size: 28,
-                        color: Colors.grey,
+                        color: cs.onSurfaceVariant,
                       ),
                     )
                   : CachedNetworkImage(
-                      imageUrl: item.imageUrl,
+                      imageUrl: item.imageUrl.trim(),
                       fit: BoxFit.cover,
-                      memCacheWidth: 128,
-                      memCacheHeight: 128,
-                      maxWidthDiskCache: 128,
-                      maxHeightDiskCache: 128,
-                      placeholder: (_, __) => Container(
-                        color: Colors.grey.shade200,
-                      ),
-                      errorWidget: (_, __, ___) => const Icon(
-                        Icons.restaurant,
+                      placeholder: (_, __) =>
+                          Container(color: cs.surfaceContainerHighest),
+                      errorWidget: (_, __, ___) => Icon(
+                        Icons.radio_button_checked, // Changed icon to be more subtle if image fails
                         size: 28,
-                        color: Colors.grey,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
             ),
           ),
-          const SizedBox(height: 7),
-          Column(
-            children: [
-              Text(
-                item.name,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: isSelected ? 11.5 : 10.5,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? Colors.black87 : Colors.grey.shade600,
-                  height: 1.1,
-                ),
-              ),
-              const SizedBox(height: 4),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeInOutCubic,
-                width: isSelected ? 28 : 0,
-                height: 2.5,
-                decoration: BoxDecoration(
-                  color: kBandiwalaYellow,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            item.name,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              color: isSelected ? cs.onSurface : cs.onSurfaceVariant,
+              letterSpacing: -0.2,
+            ),
           ),
         ],
       ),

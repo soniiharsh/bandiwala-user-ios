@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import '../screens/profile_page.dart';
 import '../models/app_user.dart';
@@ -73,8 +72,7 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
   bool _speechEnabled = false;
   bool _isListening = false;
 
-  // ── Wallet ─────────────────────────────────────────────────────────────────
-  double _walletBalance = 0.0;
+
 
   // ── Search ─────────────────────────────────────────────────────────────────
   final TextEditingController _searchController = TextEditingController();
@@ -91,7 +89,6 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _initSpeech();
     _startLocationUpdates();
-    _loadWalletBalance();
     _searchController.addListener(_onSearchTextChanged);
     if (widget.activeAddress != null) {
       _activeAddress = widget.activeAddress;
@@ -130,22 +127,10 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       _startLocationUpdates();
-      _loadWalletBalance();
     }
   }
 
-  // ─── Wallet ────────────────────────────────────────────────────────────────
 
-  Future<void> _loadWalletBalance() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (mounted) {
-        setState(
-          () => _walletBalance = prefs.getDouble('wallet_balance') ?? 0.0,
-        );
-      }
-    } catch (_) {}
-  }
 
   // ─── Speech ────────────────────────────────────────────────────────────────
 
@@ -436,7 +421,7 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final hasAddr = _activeAddress != null;
-    final topLabel = hasAddr ? _activeAddress!.shortLabel : 'Current Location';
+    final topLabel = hasAddr ? _activeAddress!.shortLabel : 'Deliver to';
     final displayText = hasAddr
         ? _activeAddress!.geolocation
         : (_isLocationError
@@ -444,284 +429,185 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
               : _displayLocation);
     final showError = !hasAddr && _isLocationError;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // ── Top row: location + wallet + profile ──────────────────────────
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Row(
-            children: [
-              Icon(
-                showError ? Icons.error_outline : Icons.location_on_outlined,
-                color: showError ? Colors.red : _kYellow,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
+    return Container(
+      color: Theme.of(context).colorScheme.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Top row: location + profile ──────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                Icon(
+                  showError ? Icons.error_outline : Icons.location_on_rounded,
+                  color: showError ? Colors.red : _kYellow,
+                  size: 28,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _showLocationPicker,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          topLabel,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        if (!hasAddr) ...[
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              color: _kYellow,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'LIVE',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: _kYellow,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ] else ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _kYellow.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              _activeAddress!.shortLabel.toUpperCase(),
-                              style: const TextStyle(
-                                fontSize: 8,
-                                color: Colors.black87,
-                                fontWeight: FontWeight.bold,
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                topLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                ),
                               ),
                             ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              size: 18,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ],
+                        ),
+                        Text(
+                          displayText,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: showError ? Colors.red : Colors.grey.shade600,
                           ),
-                        ],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
-                    GestureDetector(
-                      onTap: _showLocationPicker,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              displayText,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: showError ? Colors.red : Colors.black87,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 18,
-                            color: Colors.black54,
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (hasAddr &&
-                        _activeAddress!.address != null &&
-                        _activeAddress!.address!.isNotEmpty)
-                      Text(
-                        _activeAddress!.address!,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              if (hasAddr)
-                GestureDetector(
-                  onTap: _showLocationPicker,
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => Navigator.push(
+                    context,
+                    AppPageRoute(builder: (_) => const ProfilePage()),
+                  ),
+                  borderRadius: BorderRadius.circular(24),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 5,
-                    ),
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
-                      color: _kYellow.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: _kYellow.withValues(alpha: 0.4),
-                      ),
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.grey.shade200),
                     ),
-                    child: const Text(
-                      'Change',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                      ),
+                    child: Icon(
+                      Icons.person_outline_rounded,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      size: 26,
                     ),
                   ),
                 ),
-              const SizedBox(width: 4),
-              InkWell(
-                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Wallet feature coming soon!'),
-                    duration: Duration(seconds: 2),
-                  ),
-                ),
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.account_balance_wallet_outlined,
-                        color: Colors.black87,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '₹${_walletBalance.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              InkWell(
-                onTap: () => Navigator.push(
-                  context,
-                  AppPageRoute(builder: (_) => const ProfilePage()),
-                ),
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.person_outline,
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
 
-        // ── Search bar ────────────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 46,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: (_isTyping || _isSearchActive)
-                          ? _kYellow
-                          : Colors.grey.shade300,
-                      width: (_isTyping || _isSearchActive) ? 2 : 1,
+          // ── Search bar + Mic ──────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 52,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(26),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white.withValues(alpha: 0.1)
+                              : Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.search, color: Colors.grey, size: 22),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          focusNode: _searchFocus,
-                          onSubmitted: (_) => _handleSearchSubmit(),
-                          textInputAction: TextInputAction.search,
-                          textCapitalization: TextCapitalization.sentences,
-                          decoration: const InputDecoration(
-                            isCollapsed: true,
-                            border: InputBorder.none,
-                            hintText: 'Search street food, stalls...',
-                            hintStyle: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.search_rounded, color: _kYellow, size: 24),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            focusNode: _searchFocus,
+                            onSubmitted: (_) => _handleSearchSubmit(),
+                            textInputAction: TextInputAction.search,
+                            textCapitalization: TextCapitalization.sentences,
+                            style: const TextStyle(fontSize: 15),
+                            decoration: InputDecoration(
+                              isCollapsed: true,
+                              border: InputBorder.none,
+                              filled: false,
+                              hintText: 'Search for food items',
+                              hintStyle: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade500,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      if (_isTyping || _isSearchActive)
-                        GestureDetector(
-                          onTap: _clearSearch,
-                          child: Icon(
-                            Icons.clear,
-                            color: Colors.grey.shade600,
-                            size: 20,
+                        if (_isTyping || _isSearchActive)
+                          GestureDetector(
+                            onTap: _clearSearch,
+                            child: Icon(
+                              Icons.close_rounded,
+                              color: Colors.grey.shade600,
+                              size: 22,
+                            ),
                           ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                InkWell(
+                  onTap: _isListening ? _stopListening : _startListening,
+                  borderRadius: BorderRadius.circular(26),
+                  child: Container(
+                    height: 52,
+                    width: 52,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white.withValues(alpha: 0.1)
+                              : Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
                         ),
-                    ],
+                      ],
+                    ),
+                    child: Icon(
+                      _isListening ? Icons.stop_rounded : Icons.mic_rounded,
+                      color: _kYellow,
+                      size: 24,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              InkWell(
-                onTap: _isTyping
-                    ? _handleSearchSubmit
-                    : (_isListening ? _stopListening : _startListening),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  height: 46,
-                  width: 46,
-                  decoration: BoxDecoration(
-                    color: _kYellow,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    _isTyping
-                        ? Icons.search
-                        : (_isListening ? Icons.stop : Icons.mic_none),
-                    color: Colors.black87,
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
 
-        // ── Search results panel ──────────────────────────────────────────
-        if (_isSearchActive) _buildResultsPanel(),
-      ],
+          // ── Search results panel ──────────────────────────────────────────
+          if (_isSearchActive) _buildResultsPanel(),
+        ],
+      ),
     );
   }
 
@@ -942,7 +828,9 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -1075,7 +963,8 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
         price: (item['price'] ?? 0).toDouble(),
         rating: (item['rating'] ?? vendor.rating).toDouble(),
         ratingCount: (item['ratingCount'] ?? 0).toInt(),
-        isAvailable: vendor.isAvailable,
+        isAvailable: item['isAvailable'] ?? true,
+        isVendorOnline: vendor.isAvailable,
       ),
     );
   }

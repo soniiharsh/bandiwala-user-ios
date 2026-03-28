@@ -6,14 +6,11 @@ class TermsConditionsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           'Terms & Conditions',
           style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
         ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
         elevation: 0.5,
         centerTitle: false,
       ),
@@ -226,7 +223,6 @@ class TermsConditionsPage extends StatelessWidget {
         style: const TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w700,
-          color: Colors.black87,
           height: 1.4,
         ),
       ),
@@ -241,7 +237,6 @@ class TermsConditionsPage extends StatelessWidget {
         style: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          color: Colors.black87,
           height: 1.4,
         ),
       ),
@@ -253,9 +248,8 @@ class TermsConditionsPage extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         text,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 13,
-          color: Colors.grey.shade800,
           height: 1.6,
           letterSpacing: 0.2,
         ),

@@ -1,21 +1,16 @@
-// nav_page.dart
-// Shell that owns the bottom nav, IndexedStack, and address guard.
-// The three pages it hosts are: HomePage, CartScreen, OrdersPage.
-
-import 'package:BandiWala/models/app_user.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'home_page.dart';
 import 'cart_page.dart';
-import 'orders_page.dart';
-import '../widgets/bottom_navigation.dart';
-import 'location_picker_page.dart';
 import '../widgets/active_order_bar.dart';
+import '../widgets/cart_bar.dart';
 import '../providers/user_provider.dart';
 import '../providers/active_address_provider.dart';
-import '../core/theme/theme.dart';
 import '../core/navigation/app_page_route.dart';
 import '../widgets/skeletons.dart';
+import '../models/app_user.dart';
+import 'location_picker_page.dart';
+import '../core/theme/theme.dart';
 
 class NavPage extends ConsumerStatefulWidget {
   const NavPage({super.key});
@@ -25,77 +20,74 @@ class NavPage extends ConsumerStatefulWidget {
 }
 
 class _NavPageState extends ConsumerState<NavPage> {
-  int _currentIndex = 0;
-
   @override
   Widget build(BuildContext context) {
     final authAsync = ref.watch(userProvider);
 
     return authAsync.when(
       loading: () => const AppBootSkeleton(),
-      error: (_, __) =>
-          const Scaffold(body: Center(child: Text('Something went wrong'))),
+      error: (_, __) => const Scaffold(body: Center(child: Text('Something went wrong'))),
       data: (appUser) {
-        // Guest (not signed in) — skip address guard, show home directly
-        if (appUser == null) {
-          final pages = <Widget>[
-            const HomePage(),
-            CartPage(onBackToHome: () => setState(() => _currentIndex = 0)),
-            const OrdersPage(),
-          ];
+        if (appUser == null) return const HomePage();
 
-          return PopScope(
-            canPop: _currentIndex == 0,
-            onPopInvokedWithResult: (didPop, _) {
-              if (!didPop && _currentIndex != 0) {
-                setState(() => _currentIndex = 0);
-              }
-            },
-            child: Scaffold(
-              backgroundColor: Colors.white,
-              body: IndexedStack(index: _currentIndex, children: pages),
-              bottomNavigationBar: BandiwalaBottomNavigation(
-                currentIndex: _currentIndex,
-                onItemSelected: (i) => setState(() => _currentIndex = i),
-              ),
-            ),
-          );
-        }
-
-        // No addresses yet — block everything until one is added
         if (appUser.savedAddresses.isEmpty) {
           return _ForceAddAddressScreen(
-            onAddressAdded: (loc) =>
-                ref.read(activeAddressProvider.notifier).setAddress(loc),
+            onAddressAdded: (loc) => ref.read(activeAddressProvider.notifier).setAddress(loc),
           );
         }
 
-        final pages = <Widget>[
-          const HomePage(),
-          CartPage(onBackToHome: () => setState(() => _currentIndex = 0)),
-          const OrdersPage(),
-        ];
-
-        return PopScope(
-          canPop: _currentIndex == 0,
-          onPopInvokedWithResult: (didPop, _) {
-            if (!didPop && _currentIndex != 0) {
-              setState(() => _currentIndex = 0);
-            }
-          },
-          child: Scaffold(
-            backgroundColor: Colors.white,
-            body: IndexedStack(index: _currentIndex, children: pages),
-            bottomNavigationBar: Column(
+        return Scaffold(
+          body: const HomePage(),
+          bottomNavigationBar: SafeArea(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 ActiveOrderBar(
-                  onViewTap: () => setState(() => _currentIndex = 2),
+                  onViewTap: () {
+                     // Potential direct navigation to orders
+                  },
                 ),
-                BandiwalaBottomNavigation(
-                  currentIndex: _currentIndex,
-                  onItemSelected: (i) => setState(() => _currentIndex = i),
+                CartBar(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      AppPageRoute(builder: (_) => CartPage(onBackToHome: () => Navigator.pop(context))),
+                    );
+                  },
                 ),
+                const SizedBox(height: 8),
+                Consumer(
+                  builder: (context, ref, _) {
+                    final activeAddress = ref.watch(activeAddressProvider);
+                    if (activeAddress == null) return const SizedBox.shrink();
+                    final area = activeAddress.geolocation.split(',').first.trim();
+                    final isInZone = activeAddress.isInServiceZone;
+                    final cs = Theme.of(context).colorScheme;
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            isInZone ? Icons.location_on : Icons.error_outline_rounded, 
+                            size: 11, 
+                            color: isInZone ? cs.onSurfaceVariant.withValues(alpha: 0.6) : Colors.red.shade600
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            isInZone ? "Delivering to $area" : "Not available at this address",
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: isInZone ? cs.onSurfaceVariant.withValues(alpha: 0.7) : Colors.red.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 4),
               ],
             ),
           ),
@@ -105,8 +97,6 @@ class _NavPageState extends ConsumerState<NavPage> {
   }
 }
 
-// ─── Force Add Address Screen ─────────────────────────────────────────────────
-
 class _ForceAddAddressScreen extends StatelessWidget {
   final void Function(SavedAddress) onAddressAdded;
   const _ForceAddAddressScreen({required this.onAddressAdded});
@@ -114,7 +104,6 @@ class _ForceAddAddressScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
           child: Padding(

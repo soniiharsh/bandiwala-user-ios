@@ -23,11 +23,26 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   String _selectedCategory = '';
+  final ScrollController _scrollController = ScrollController();
+  bool _marqueeHidden = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkName());
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    final hidden = _scrollController.offset > 10;
+    if (hidden != _marqueeHidden) setState(() => _marqueeHidden = hidden);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
   }
 
   // ─── Name prompt on first login ───────────────────────────────────────────
@@ -123,12 +138,22 @@ class _HomePageState extends ConsumerState<HomePage> {
             onAddressChanged: (loc) =>
                 ref.read(activeAddressProvider.notifier).setAddress(loc),
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12),
-            child: ScrollingAnnouncement(),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            child: SizedBox(
+              height: _marqueeHidden ? 0 : null,
+              child: ClipRect(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: const ScrollingAnnouncement(),
+                ),
+              ),
+            ),
           ),
           Expanded(
             child: _HomeContent(
+              scrollController: _scrollController,
               selectedCategory: _selectedCategory,
               onCategorySelected: (cat) =>
                   setState(() => _selectedCategory = cat),
@@ -147,11 +172,13 @@ class _HomeContent extends ConsumerWidget {
   final String selectedCategory;
   final void Function(String) onCategorySelected;
   final VoidCallback onCategoryClear;
+  final ScrollController scrollController;
 
   const _HomeContent({
     required this.selectedCategory,
     required this.onCategorySelected,
     required this.onCategoryClear,
+    required this.scrollController,
   });
 
   @override
@@ -159,7 +186,8 @@ class _HomeContent extends ConsumerWidget {
     final hasCategory = selectedCategory.isNotEmpty;
 
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      controller: scrollController,
+      padding: EdgeInsets.zero,
       children: [
         // ── Always visible ────────────────────────────────────────────────
         const SizedBox(height: 12),
@@ -168,44 +196,50 @@ class _HomeContent extends ConsumerWidget {
         const RecommendedVendorsStrip(),
         const SizedBox(height: 28),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: FoodCategoryCarousel(onCategorySelected: onCategorySelected),
         ),
         const SizedBox(height: 20),
 
         // ── Vendor section — filtered or full ─────────────────────────────
         if (hasCategory) ...[
-          Row(
-            children: [
-              const Text(
-                'Category:',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(width: 8),
-              Chip(
-                label: Text(selectedCategory),
-                deleteIcon: const Icon(Icons.close, size: 16),
-                onDeleted: onCategoryClear,
-                backgroundColor: AppColors.primary,
-                labelStyle: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.onPrimary,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                const Text(
+                  'Category:',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Chip(
+                  label: Text(selectedCategory),
+                  deleteIcon: const Icon(Icons.close, size: 16),
+                  onDeleted: onCategoryClear,
+                  backgroundColor: AppColors.primary,
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onPrimary,
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 8),
           _CategoryResults(category: selectedCategory, ref: ref),
         ] else ...[
-          Row(
-            children: [
-              const Text(
-                'Vendors near you',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(width: 8),
-              _LiveBadge(),
-            ],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                const Text(
+                  'Vendors near you',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(width: 8),
+                _LiveBadge(),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           VendorsList(matchedZone: null),

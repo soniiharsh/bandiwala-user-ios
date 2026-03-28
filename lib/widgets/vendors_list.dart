@@ -35,7 +35,7 @@ class VendorsList extends ConsumerWidget {
                   Icon(
                     Icons.store_mall_directory_outlined,
                     size: 60,
-                    color: Colors.grey.shade400,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -43,7 +43,10 @@ class VendorsList extends ConsumerWidget {
                         ? 'No vendors in $matchedZone right now'
                         : 'No vendors available right now',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -57,21 +60,23 @@ class VendorsList extends ConsumerWidget {
             return a.isAvailable ? -1 : 1;
           });
 
-        return Column(
-          children: sorted.map((v) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: VendorCard(
-                vendorId: v.id,
-                name: v.name,
-                imageUrl: v.imageUrl,
-                address: v.address,
-                category: v.category,
-                rating: v.rating,
-                isAvailable: v.isAvailable,
-              ),
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: sorted.length,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          itemBuilder: (context, index) {
+            final v = sorted[index];
+            return VendorCard(
+              vendorId: v.id,
+              name: v.name,
+              imageUrl: v.imageUrl,
+              address: v.address,
+              category: v.category,
+              rating: v.rating,
+              isAvailable: v.isAvailable,
             );
-          }).toList(),
+          },
         );
       },
     );

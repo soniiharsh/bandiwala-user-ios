@@ -3,7 +3,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../screens/vendor_items_page.dart';
-import '../core/theme/theme.dart';
 import '../core/navigation/app_page_route.dart';
 
 // ─── Wishlist ─────────────────────────────────────────────────────────────────
@@ -101,255 +100,193 @@ class VendorCard extends StatefulWidget {
 }
 
 class _VendorCardState extends State<VendorCard> {
-  static const Color _yellow = AppColors.primary;
   bool _inWishlist = false;
 
   @override
   void initState() {
     super.initState();
-    WishlistManager.isInWishlist(widget.vendorId).then((v) {
-      if (mounted) setState(() => _inWishlist = v);
-    });
+    _checkWishlist();
+  }
+
+  Future<void> _checkWishlist() async {
+    final inWish = await WishlistManager.isInWishlist(widget.vendorId);
+    if (mounted) setState(() => _inWishlist = inWish);
   }
 
   Future<void> _toggleWishlist() async {
-    await WishlistManager.toggle(
-      WishlistVendor(
+    final wv = WishlistVendor(
         vendorId: widget.vendorId,
         name: widget.name,
         imageUrl: widget.imageUrl,
         address: widget.address,
         category: widget.category,
-        rating: widget.rating,
-      ),
-    );
-    final now = await WishlistManager.isInWishlist(widget.vendorId);
+        rating: widget.rating);
+    await WishlistManager.toggle(wv);
+    await _checkWishlist();
     if (!mounted) return;
-    setState(() => _inWishlist = now);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          now
-              ? '${widget.name} added to wishlist'
-              : '${widget.name} removed from wishlist',
-        ),
-        backgroundColor: now ? Colors.green : Colors.grey.shade700,
+        content: Text(_inWishlist ? 'Added to wishlist' : 'Removed from wishlist'),
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        duration: const Duration(seconds: 1),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer(
-      ignoring: !widget.isAvailable,
-      child: Stack(
-        children: [
-          GestureDetector(
-            onTap: widget.isAvailable
-                ? () => Navigator.push(
-                    context,
-                    AppPageRoute(
-                      builder: (_) => VendorItemsPage(
-                        vendorId: widget.vendorId,
-                        vendorName: widget.name,
-                      ),
-                    ),
-                  )
-                : null,
-            child: Card(
-              elevation: 1.5,
-              color: Colors.white,
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    height: 160,
-                    width: double.infinity,
-                    child: widget.imageUrl.isNotEmpty
+    final cs = Theme.of(context).colorScheme;
+    final placeholder = cs.surfaceContainerHighest;
+
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        AppPageRoute(
+          builder: (_) => VendorItemsPage(
+            vendorId: widget.vendorId,
+            vendorName: widget.name,
+          ),
+        ),
+      ),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 24),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: widget.imageUrl.trim().isNotEmpty
                         ? CachedNetworkImage(
-                            imageUrl: widget.imageUrl,
+                            imageUrl: widget.imageUrl.trim(),
                             fit: BoxFit.cover,
-                            memCacheHeight: 400,
-                            placeholder: (_, __) => Container(
-                              color: Colors.grey.shade200,
-                            ),
+                            placeholder: (_, __) => Container(color: placeholder),
                             errorWidget: (_, __, ___) => Container(
-                              color: Colors.grey.shade200,
-                              child: const Center(child: Icon(Icons.store)),
+                              color: placeholder,
+                              child: const Icon(Icons.store, size: 40),
                             ),
                           )
                         : Container(
-                            color: Colors.grey.shade200,
-                            child: const Center(child: Icon(Icons.store)),
+                            color: placeholder,
+                            child: const Icon(Icons.store, size: 40),
                           ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                widget.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: _toggleWishlist,
-                              child: Icon(
-                                _inWishlist
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                size: 20,
-                                color: _inWishlist
-                                    ? Colors.red
-                                    : Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade600,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.star,
-                                    size: 12,
-                                    color: Colors.white,
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    widget.rating.toStringAsFixed(1),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                widget.address,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (widget.category.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            widget.category,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade500,
-                            ),
-                          ),
-                        ],
-                        if (widget.matchingItems != null &&
-                            widget.matchingItems!.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 4,
-                            children: widget.matchingItems!
-                                .take(3)
-                                .map(
-                                  (item) => Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: _yellow.withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: _yellow.withValues(alpha: 0.3),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      '${item['name']} · ₹${item['price']}',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                        ],
-                      ],
+                ),
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: GestureDetector(
+                    onTap: _toggleWishlist,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _inWishlist ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                        size: 20,
+                        color: _inWishlist ? Colors.red : Colors.grey,
+                      ),
                     ),
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade700,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.rating.toStringAsFixed(1),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            const Icon(Icons.star_rounded, size: 14, color: Colors.white),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.address,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Icon(Icons.timer_outlined, size: 14, color: Colors.grey.shade500),
+                      const SizedBox(width: 4),
+                      Text(
+                        '20-30 min',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-          ),
-          if (!widget.isAvailable)
-            Positioned.fill(
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.65),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade600,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      '😴 VENDOR OFFLINE',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

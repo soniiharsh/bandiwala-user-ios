@@ -22,8 +22,6 @@ class BandiwalaBottomNavigation extends ConsumerWidget {
     return BottomNavigationBar(
       currentIndex: currentIndex,
       selectedItemColor: bandiwalaYellow,
-      unselectedItemColor: Colors.grey.shade500,
-      backgroundColor: Colors.white,
       type: BottomNavigationBarType.fixed,
       onTap: onItemSelected,
       items: [

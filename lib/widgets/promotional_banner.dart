@@ -61,10 +61,13 @@ class _PromotionalBannerState extends ConsumerState<PromotionalBanner>
         WidgetsBinding.instance.addPostFrameCallback(
           (_) => _startAutoScroll(promotions.length),
         );
+        final screenWidth = MediaQuery.of(context).size.width;
+        final cardWidth = screenWidth * (356 / 390);
+        final cardHeight = cardWidth * (128 / 356);
         return Column(
           children: [
             SizedBox(
-              height: 180,
+              height: cardHeight,
               child: PageView.builder(
                 controller: _pageController,
                 onPageChanged: (i) => setState(() => _currentPage = i),
@@ -112,16 +115,12 @@ class _PromotionalImageCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: promotion.imageUrl.isNotEmpty
+        child: promotion.imageUrl.trim().isNotEmpty
             ? CachedNetworkImage(
-                imageUrl: promotion.imageUrl,
+                imageUrl: promotion.imageUrl.trim(),
                 fit: BoxFit.cover,
                 width: double.infinity,
                 height: double.infinity,
-                memCacheWidth: 1200,
-                memCacheHeight: 400,
-                maxWidthDiskCache: 1200,
-                maxHeightDiskCache: 400,
                 placeholder: (_, __) => Container(
                   color: Colors.grey.shade200,
                 ),

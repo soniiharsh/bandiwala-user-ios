@@ -8,8 +8,6 @@ import '../widgets/vendor_card.dart' show WishlistManager, WishlistVendor;
 import '../core/navigation/app_page_route.dart';
 import 'skeletons.dart';
 
-// ─── RecommendedVendorsStrip ──────────────────────────────────────────────────
-
 class RecommendedVendorsStrip extends StatefulWidget {
   const RecommendedVendorsStrip({super.key});
 
@@ -77,7 +75,6 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
               ? '${vendor.name} added to wishlist'
               : '${vendor.name} removed from wishlist',
         ),
-        backgroundColor: isNowIn ? Colors.green : Colors.grey.shade700,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -86,7 +83,6 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
   }
 
   void _openVendor(BuildContext context, Vendor vendor) {
-    if (!vendor.isAvailable) return;
     Navigator.of(context).push(
       AppPageRoute(
         builder: (_) =>
@@ -98,83 +94,108 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final cs = Theme.of(context).colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _tab('Recommended', 0),
-              const SizedBox(width: 10),
-              _tab(
-                'Favourites',
-                1,
-                icon: _activeTab == 1
-                    ? Icons.favorite_rounded
-                    : Icons.favorite_border_rounded,
-              ),
-            ],
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Expanded(child: _tab(context, 'Recommended', 0)),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: _tab(
+                    context,
+                    'Favourites',
+                    1,
+                    icon: _activeTab == 1
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 14),
-        SizedBox(
-          height: 215,
-          child: Consumer(
-            builder: (context, ref, _) {
-              final vendorsAsync = ref.watch(vendorsStreamProvider);
-              return vendorsAsync.when(
-                loading: () => const RecommendedVendorsSkeleton(),
-                error: (_, __) =>
-                    const Center(child: Text('Error loading vendors')),
-                data: (allVendors) {
-                  var displayed = List<Vendor>.from(allVendors);
+        const SizedBox(height: 24), // Added more padding here
+        Consumer(
+          builder: (context, ref, _) {
+            final vendorsAsync = ref.watch(vendorsStreamProvider);
+            return vendorsAsync.when(
+              loading: () => const RecommendedVendorsSkeleton(),
+              error: (_, __) =>
+                  const Center(child: Text('Error loading vendors')),
+              data: (allVendors) {
+                var displayed = List<Vendor>.from(allVendors);
 
-                  if (_activeTab == 1) {
-                    displayed = displayed
-                        .where((v) => _wishlistIds.contains(v.id))
-                        .toList();
-                  }
+                if (_activeTab == 1) {
+                  displayed = displayed
+                      .where((v) => _wishlistIds.contains(v.id))
+                      .toList();
+                } else {
+                    // Show all vendors in Recommended
+                }
 
-                  displayed.sort((a, b) {
-                    if (a.isAvailable == b.isAvailable) return 0;
-                    return a.isAvailable ? -1 : 1;
-                  });
+                displayed.sort((a, b) {
+                  if (a.isAvailable == b.isAvailable) return 0;
+                  return a.isAvailable ? -1 : 1;
+                });
 
-                  if (displayed.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            _activeTab == 1
-                                ? Icons.favorite_border_rounded
-                                : Icons.store_outlined,
-                            size: 42,
-                            color: Colors.grey.shade300,
+                if (displayed.isEmpty) {
+                  return Container(
+                    height: 150,
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _activeTab == 1
+                              ? Icons.favorite_border_rounded
+                              : Icons.store_outlined,
+                          size: 42,
+                          color: cs.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          _activeTab == 1
+                              ? 'No favourites yet'
+                              : 'No vendors available',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: cs.onSurfaceVariant,
+                            fontSize: 13,
                           ),
-                          const SizedBox(height: 10),
-                          Text(
-                            _activeTab == 1
-                                ? 'No favourites yet\nTap ♥ on any vendor to save'
-                                : 'No vendors available',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.grey.shade500,
-                              fontSize: 13,
-                              height: 1.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
-                  return ListView.builder(
+                // Doubled dimensions maintaining 2:1 ratio (240x120)
+                const double cardWidth = 240.0;
+                const double cardHeight = 120.0;
+                const double spacing = 12.0;
+
+                return SizedBox(
+                  height: (cardHeight * 2) + spacing + 10, // Height for 2 rows + spacing + shadow
+                  child: GridView.builder(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: displayed.length,
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: spacing,
+                      crossAxisSpacing: spacing,
+                      childAspectRatio: cardHeight / cardWidth, // 0.5 ratio
+                    ),
                     itemBuilder: (ctx, i) {
                       final v = displayed[i];
                       return _VendorMiniCard(
@@ -184,49 +205,60 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
                         onTap: () => _openVendor(ctx, v),
                       );
                     },
-                  );
-                },
-              );
-            },
-          ),
+                  ),
+                );
+              },
+            );
+          },
         ),
       ],
     );
   }
 
-  Widget _tab(String label, int index, {IconData? icon}) {
+  Widget _tab(BuildContext context, String label, int index, {IconData? icon}) {
     final isActive = _activeTab == index;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: () => setState(() => _activeTab = index),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: isActive ? Colors.black87 : Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isActive ? Colors.black87 : Colors.grey.shade300,
-          ),
+          color: isActive 
+              ? (isDark ? cs.surfaceContainerHighest : Colors.white) 
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: isDark 
+                        ? Colors.black.withValues(alpha: 0.2) 
+                        : Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [],
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (icon != null) ...[
               Icon(
                 icon,
-                size: 15,
-                color: isActive
-                    ? (index == 1 ? Colors.red.shade300 : Colors.white)
-                    : Colors.grey.shade600,
+                size: 16,
+                color: isActive ? (index == 1 ? Colors.red : cs.onSurface) : Colors.grey,
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: 6),
             ],
             Text(
               label,
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: isActive ? Colors.white : Colors.grey.shade700,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                color: isActive ? cs.onSurface : Colors.grey,
               ),
             ),
           ],
@@ -235,8 +267,6 @@ class _RecommendedVendorsStripState extends State<RecommendedVendorsStrip>
     );
   }
 }
-
-// ─── _VendorMiniCard ──────────────────────────────────────────────────────────
 
 class _VendorMiniCard extends StatelessWidget {
   final Vendor vendor;
@@ -253,230 +283,134 @@ class _VendorMiniCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final placeholder = cs.surfaceContainerHighest;
+
     return GestureDetector(
       onTap: onTap,
-      child: IgnorePointer(
-        ignoring: !vendor.isAvailable,
-        child: Stack(
+      child: Container(
+        width: 240,
+        height: 120,
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.08),
+              blurRadius: 12,
+              spreadRadius: 0,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
           children: [
-            Container(
-              width: 175,
-              margin: const EdgeInsets.only(right: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.07),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+            // 1. Image section (Left)
+            SizedBox(
+              width: 110,
+              height: 120,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(16),
+                ),
+                child: vendor.imageUrl.trim().isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: vendor.imageUrl.trim(),
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(color: placeholder),
+                        errorWidget: (_, __, ___) => Container(
+                          color: placeholder,
+                          child: Icon(Icons.store, size: 30, color: cs.onSurfaceVariant),
+                        ),
+                      )
+                    : Container(
+                        color: placeholder,
+                        child: Icon(Icons.store, size: 30, color: cs.onSurfaceVariant),
+                      ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(14),
-                        ),
-                        child: vendor.imageUrl.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: vendor.imageUrl,
-                                width: 175,
-                                height: 115,
-                                fit: BoxFit.cover,
-                                memCacheWidth: 350,
-                                memCacheHeight: 230,
-                                maxWidthDiskCache: 350,
-                                maxHeightDiskCache: 230,
-                                placeholder: (_, __) => Container(
-                                  width: 175,
-                                  height: 115,
-                                  color: Colors.grey.shade200,
-                                ),
-                                errorWidget: (_, __, ___) => Container(
-                                  width: 175,
-                                  height: 115,
-                                  color: Colors.grey.shade200,
-                                  child: const Icon(
-                                    Icons.store,
-                                    size: 32,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              )
-                            : Container(
-                                width: 175,
-                                height: 115,
-                                color: Colors.grey.shade200,
-                                child: const Icon(
-                                  Icons.store,
-                                  size: 32,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                      ),
-                      // Favourite heart
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: GestureDetector(
-                          onTap: onFavouriteTap,
-                          child: Container(
-                            width: 30,
-                            height: 30,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.15),
-                                  blurRadius: 4,
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              isFavourite
-                                  ? Icons.favorite_rounded
-                                  : Icons.favorite_border_rounded,
-                              size: 16,
-                              color: isFavourite
-                                  ? Colors.red
-                                  : Colors.grey.shade600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
-                    child: Column(
+            ),
+            // 2. Info section (Right)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          vendor.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                        Expanded(
+                          child: Text(
+                            vendor.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.2,
+                              height: 1.2,
+                            ),
                           ),
                         ),
-                        if (vendor.category.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            vendor.category,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey.shade500,
-                            ),
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: onFavouriteTap,
+                          child: Icon(
+                            isFavourite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                            size: 16,
+                            color: isFavourite ? Colors.red : Colors.grey,
                           ),
-                        ],
-                        const SizedBox(height: 7),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 5,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade600,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.star,
-                                    size: 11,
-                                    color: Colors.white,
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Text(
-                                    vendor.rating.toStringAsFixed(1),
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              width: 3,
-                              height: 3,
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade400,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Icon(
-                              Icons.access_time_rounded,
-                              size: 11,
-                              color: Colors.grey.shade500,
-                            ),
-                            const SizedBox(width: 3),
-                            const Expanded(
-                              child: Text(
-                                '20-30 min',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-            ),
-            if (!vendor.isAvailable)
-              Positioned.fill(
-                child: Container(
-                  margin: const EdgeInsets.only(right: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.65),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade600,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text(
-                        'OFFLINE',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.8,
+                    const SizedBox(height: 8),
+                    // Info row pinned to bottom
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade700,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                vendor.rating.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 1),
+                              const Icon(Icons.star_rounded, size: 10, color: Colors.white),
+                            ],
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.timer_outlined, size: 12, color: Colors.grey.shade600),
+                        const SizedBox(width: 2),
+                        Text(
+                          '20 min',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                  ],
                 ),
               ),
+            ),
           ],
         ),
       ),

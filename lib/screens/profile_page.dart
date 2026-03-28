@@ -458,20 +458,17 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Account',
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            color: cs.onSurface,
             fontSize: 22,
           ),
         ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
         centerTitle: false,
       ),
       body: _isLoading
@@ -534,6 +531,7 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
   // Greeting shows name + edit button
   Widget _buildGreetingSection() {
     final customerName = ref.watch(userProvider).valueOrNull?.name ?? '';
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -544,39 +542,39 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
               child: RichText(
                 text: TextSpan(
                   children: [
-                    const TextSpan(
+                    TextSpan(
                       text: 'Hello',
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
-                        color: kBandiwalaYellow,
+                        color: cs.primary,
                         letterSpacing: 0.5,
                       ),
                     ),
                     if (!_isGuest && customerName.isNotEmpty) ...[
-                      const TextSpan(
+                      TextSpan(
                         text: ', ',
                         style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
-                          color: kBandiwalaYellow,
+                          color: cs.primary,
                         ),
                       ),
                       TextSpan(
                         text: customerName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: cs.onSurface,
                         ),
                       ),
                     ] else if (_isGuest) ...[
-                      const TextSpan(
+                      TextSpan(
                         text: ' Guest',
                         style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
-                          color: kBandiwalaYellow,
+                          color: cs.primary,
                         ),
                       ),
                     ],
@@ -586,12 +584,12 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
             ),
             if (!_isGuest)
               _isSavingName
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: kBandiwalaYellow,
+                        color: cs.primary,
                       ),
                     )
                   : IconButton(
@@ -599,7 +597,7 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
                         customerName.isEmpty
                             ? Icons.add_circle_outline
                             : Icons.edit_outlined,
-                        color: kBandiwalaYellow,
+                        color: cs.primary,
                         size: 26,
                       ),
                       tooltip: customerName.isEmpty ? 'Add Name' : 'Edit Name',
@@ -614,17 +612,13 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
               onTap: _showEditNameDialog,
               child: Row(
                 children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 14,
-                    color: Colors.amber.shade700,
-                  ),
+                  Icon(Icons.info_outline, size: 14, color: cs.primary),
                   const SizedBox(width: 4),
                   Text(
                     'Tap to add your name',
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.amber.shade700,
+                      color: cs.primary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -634,10 +628,10 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
           else
             Text(
               _displayNumber.isNotEmpty ? _displayNumber : '',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
-                color: Colors.black87,
+                color: cs.onSurface,
               ),
             ),
         ],
@@ -651,18 +645,19 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
     IconData icon, {
     VoidCallback? onTap,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cs.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade200, width: 1.5),
+          border: Border.all(color: cs.outlineVariant, width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: cs.shadow.withValues(alpha: 0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -673,19 +668,19 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cs.surface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200, width: 1),
+                border: Border.all(color: cs.outlineVariant, width: 1),
               ),
-              child: Icon(icon, size: 28, color: Colors.black87),
+              child: Icon(icon, size: 28, color: cs.onSurface),
             ),
             const SizedBox(height: 12),
             Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color: cs.onSurface,
               ),
             ),
             const SizedBox(height: 4),
@@ -693,7 +688,7 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
               title,
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.grey.shade600,
+                color: cs.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
@@ -705,15 +700,21 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
   }
 
   Widget _buildMenuSection() {
+    final cs = Theme.of(context).colorScheme;
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = themeMode == ThemeMode.dark ||
+        (themeMode == ThemeMode.system &&
+            MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cs.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200, width: 1.5),
+              border: Border.all(color: cs.outlineVariant, width: 1.5),
             ),
             child: Column(
               children: [
@@ -728,15 +729,59 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
                   title: 'Wishlist',
                   onTap: _navigateToWishlist,
                 ),
+                _buildDivider(),
+                _buildMenuItem(
+                  icon: Icons.receipt_long_outlined,
+                  title: 'Your Orders',
+                  onTap: _navigateToOrders,
+                ),
               ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Appearance section with dark mode toggle
+          Container(
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: cs.outlineVariant, width: 1.5),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              child: Row(
+                children: [
+                  Icon(
+                    isDark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+                    size: 22,
+                    color: cs.onSurface,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      'Dark Mode',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                  ),
+                  Switch(
+                    value: isDark,
+                    onChanged: (_) =>
+                        ref.read(themeModeProvider.notifier).toggle(),
+                    activeColor: cs.primary,
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 16),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cs.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200, width: 1.5),
+              border: Border.all(color: cs.outlineVariant, width: 1.5),
             ),
             child: Column(
               children: [
@@ -763,9 +808,9 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
           const SizedBox(height: 16),
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: cs.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200, width: 1.5),
+              border: Border.all(color: cs.outlineVariant, width: 1.5),
             ),
             child: _buildHelpSupportItem(),
           ),
@@ -773,9 +818,9 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
             const SizedBox(height: 16),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cs.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200, width: 1.5),
+                border: Border.all(color: cs.outlineVariant, width: 1.5),
               ),
               child: _buildMenuItem(
                 icon: Icons.delete_forever_outlined,
@@ -796,7 +841,8 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
     required VoidCallback onTap,
     bool isDestructive = false,
   }) {
-    final color = isDestructive ? Colors.redAccent : Colors.black87;
+    final cs = Theme.of(context).colorScheme;
+    final color = isDestructive ? cs.error : cs.onSurface;
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -815,7 +861,7 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
                 ),
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 24),
+            Icon(Icons.chevron_right, color: cs.onSurfaceVariant, size: 24),
           ],
         ),
       ),
@@ -823,6 +869,7 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
   }
 
   Widget _buildHelpSupportItem() {
+    final cs = Theme.of(context).colorScheme;
     return InkWell(
       onTap: _navigateToHelpSupport,
       borderRadius: BorderRadius.circular(16),
@@ -830,13 +877,9 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            const Icon(
-              Icons.headset_mic_outlined,
-              size: 22,
-              color: Colors.black87,
-            ),
+            Icon(Icons.headset_mic_outlined, size: 22, color: cs.onSurface),
             const SizedBox(width: 16),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -845,18 +888,18 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+                      color: cs.onSurface,
                     ),
                   ),
-                  SizedBox(height: 2),
+                  const SizedBox(height: 2),
                   Text(
                     'Get assistance anytime',
-                    style: TextStyle(fontSize: 12, color: Colors.black54),
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 24),
+            Icon(Icons.chevron_right, color: cs.onSurfaceVariant, size: 24),
           ],
         ),
       ),
@@ -867,13 +910,14 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
     return Divider(
       height: 1,
       thickness: 1,
-      color: Colors.grey.shade200,
+      color: Theme.of(context).colorScheme.outlineVariant,
       indent: 20,
       endIndent: 20,
     );
   }
 
   Widget _buildLogoutButton() {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: SizedBox(
@@ -892,7 +936,7 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
               : _logout,
           icon: Icon(
             _isGuest ? Icons.login : Icons.logout,
-            color: _isGuest ? kBandiwalaYellow : Colors.redAccent,
+            color: _isGuest ? cs.primary : cs.error,
             size: 20,
           ),
           label: Text(
@@ -900,12 +944,12 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: _isGuest ? kBandiwalaYellow : Colors.redAccent,
+              color: _isGuest ? cs.primary : cs.error,
             ),
           ),
           style: OutlinedButton.styleFrom(
             side: BorderSide(
-              color: _isGuest ? kBandiwalaYellow : Colors.redAccent,
+              color: _isGuest ? cs.primary : cs.error,
               width: 2,
             ),
             shape: RoundedRectangleBorder(

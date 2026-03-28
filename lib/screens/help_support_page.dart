@@ -51,15 +51,13 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           'Help & Support',
           style: TextStyle(fontWeight: FontWeight.w600, fontSize: 17),
         ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
         elevation: 0.5,
         centerTitle: false,
         actions: [
@@ -75,14 +73,13 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Compact header ──────────────────────────────────────────
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: cs.outlineVariant),
               ),
               child: Column(
                 children: [
@@ -94,31 +91,22 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                   const SizedBox(height: 8),
                   const Text(
                     'Get Help Fast',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Check FAQs or chat with support',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                   ),
                 ],
               ),
             ),
 
             const SizedBox(height: 16),
-
             // ── FAQs ────────────────────────────────────────────────────
             const Text(
               'FAQs',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: Colors.black87,
-              ),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 10),
 
@@ -187,28 +175,20 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: cs.outlineVariant),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      const Icon(
-                        Icons.flash_on,
-                        color: kBandiwalaYellow,
-                        size: 16,
-                      ),
+                      const Icon(Icons.flash_on, color: kBandiwalaYellow, size: 16),
                       const SizedBox(width: 6),
                       const Text(
                         'Quick Actions',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black87,
-                        ),
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                       ),
                     ],
                   ),
@@ -253,30 +233,22 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: kBandiwalaYellow.withOpacity(0.1),
+                color: kBandiwalaYellow.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kBandiwalaYellow.withOpacity(0.3)),
+                border: Border.all(color: kBandiwalaYellow.withValues(alpha: 0.3)),
               ),
               child: Column(
                 children: [
-                  const Icon(
-                    Icons.chat_bubble_outline,
-                    size: 32,
-                    color: kBandiwalaYellow,
-                  ),
+                  const Icon(Icons.chat_bubble_outline, size: 32, color: kBandiwalaYellow),
                   const SizedBox(height: 10),
                   const Text(
                     'Still Need Help?',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Chat on WhatsApp\n9 AM – 10 PM (Mon–Sat)',
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                    style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 12),
@@ -324,9 +296,9 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
   ) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         children: [
@@ -343,7 +315,6 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
                       ),
                     ),
                   ),
@@ -370,7 +341,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                           line,
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.grey.shade700,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                             height: 1.4,
                           ),
                         ),
@@ -399,15 +370,11 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
         icon: Icon(icon, color: kBandiwalaYellow, size: 16),
         label: Text(
           label,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: Colors.black87,
-          ),
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ),
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          side: BorderSide(color: Colors.grey.shade300),
+          side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
         ),
       ),

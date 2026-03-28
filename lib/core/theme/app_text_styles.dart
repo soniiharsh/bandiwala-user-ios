@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 /// Typography scale — no hardcoded colors.
 /// Colors are inherited from the surrounding theme automatically.
 abstract final class AppTextStyles {
-  static const String _font = 'Roboto';
+  static const String _font = 'Poppins';
 
   static const TextStyle displayLarge = TextStyle(
     fontFamily: _font,

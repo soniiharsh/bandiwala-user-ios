@@ -7,10 +7,6 @@ import '../core/theme/theme.dart';
 import '../widgets/skeletons.dart';
 
 const kBandiwalaYellow = AppColors.primary;
-const kWhite = Colors.white;
-const kBorderGrey = Color(0xFFE5E7EB);
-const kTextGrey = Color(0xFF6B7280);
-const kLightGrey = Color(0xFFF9FAFB);
 
 class OrdersPage extends ConsumerWidget {
   const OrdersPage({super.key});
@@ -18,24 +14,17 @@ class OrdersPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ordersAsync = ref.watch(userOrdersProvider);
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: kLightGrey,
       appBar: AppBar(
         title: const Text(
           'My Orders',
-          style: TextStyle(
-            color: Colors.black87,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
-        backgroundColor: kWhite,
-        foregroundColor: Colors.black87,
-        elevation: 0,
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1.0),
-          child: Divider(height: 1, thickness: 1, color: kBorderGrey),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1.0),
+          child: Divider(height: 1, thickness: 1, color: cs.outlineVariant),
         ),
       ),
       body: ordersAsync.when(
@@ -73,7 +62,7 @@ class OrdersPage extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: kBandiwalaYellow.withOpacity(0.1),
+              color: kBandiwalaYellow.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, size: 64, color: kBandiwalaYellow),
@@ -83,7 +72,6 @@ class OrdersPage extends ConsumerWidget {
             message,
             style: const TextStyle(
               fontSize: 16,
-              color: kTextGrey,
               fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
@@ -100,15 +88,16 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: kWhite,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kBorderGrey, width: 1),
+        border: Border.all(color: cs.outlineVariant, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: cs.shadow.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -119,9 +108,9 @@ class _OrderCard extends StatelessWidget {
           // Order Header
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: kLightGrey,
-              borderRadius: BorderRadius.only(
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(12),
                 topRight: Radius.circular(12),
               ),
@@ -147,20 +136,18 @@ class _OrderCard extends StatelessWidget {
                     children: [
                       Text(
                         order.id,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          color: cs.onSurface,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         order.createdAt != null
-                            ? DateFormat(
-                                'dd MMM yyyy, hh:mm a',
-                              ).format(order.createdAt!)
+                            ? DateFormat('dd MMM yyyy, hh:mm a').format(order.createdAt!)
                             : 'Date N/A',
-                        style: const TextStyle(fontSize: 12, color: kTextGrey),
+                        style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -187,21 +174,21 @@ class _OrderCard extends StatelessWidget {
           // Order Footer
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: kBorderGrey, width: 1)),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant, width: 1)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.payments_outlined, size: 16, color: kTextGrey),
-                    SizedBox(width: 6),
+                    Icon(Icons.payments_outlined, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 6),
                     Text(
                       'Total Amount',
                       style: TextStyle(
                         fontSize: 14,
-                        color: kTextGrey,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -231,32 +218,32 @@ class _OrderCard extends StatelessWidget {
     switch (status.toLowerCase()) {
       case 'confirmed':
       case 'order_created':
-        bgColor = Colors.blue.withOpacity(0.1);
+        bgColor = Colors.blue.withValues(alpha: 0.1);
         textColor = Colors.blue;
         icon = Icons.check_circle_outline;
         break;
       case 'preparing':
-        bgColor = Colors.orange.withOpacity(0.1);
+        bgColor = Colors.orange.withValues(alpha: 0.1);
         textColor = Colors.orange;
         icon = Icons.restaurant;
         break;
       case 'ready':
-        bgColor = Colors.purple.withOpacity(0.1);
+        bgColor = Colors.purple.withValues(alpha: 0.1);
         textColor = Colors.purple;
         icon = Icons.delivery_dining;
         break;
       case 'completed':
-        bgColor = Colors.green.withOpacity(0.1);
+        bgColor = Colors.green.withValues(alpha: 0.1);
         textColor = Colors.green;
         icon = Icons.check_circle;
         break;
       case 'cancelled':
-        bgColor = Colors.red.withOpacity(0.1);
+        bgColor = Colors.red.withValues(alpha: 0.1);
         textColor = Colors.red;
         icon = Icons.cancel;
         break;
       default:
-        bgColor = Colors.grey.withOpacity(0.1);
+        bgColor = Colors.grey.withValues(alpha: 0.1);
         textColor = Colors.grey;
         icon = Icons.info_outline;
     }
@@ -293,19 +280,19 @@ class _VendorSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final vendorName = vendorOrder.vendorName;
     final items = vendorOrder.items;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Vendor Header with Status
         Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: kBandiwalaYellow.withOpacity(0.15),
+                color: kBandiwalaYellow.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(Icons.store, color: kBandiwalaYellow, size: 18),
@@ -314,22 +301,19 @@ class _VendorSection extends StatelessWidget {
             Expanded(
               child: Text(
                 vendorName,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                  color: cs.onSurface,
                 ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-
-        // Items List
         ...items.entries.map((entry) {
           final item = entry.value;
           final itemTotal = item.price * item.quantity;
-
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Row(
@@ -337,8 +321,8 @@ class _VendorSection extends StatelessWidget {
                 Container(
                   width: 4,
                   height: 4,
-                  decoration: const BoxDecoration(
-                    color: kTextGrey,
+                  decoration: BoxDecoration(
+                    color: cs.onSurfaceVariant,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -346,46 +330,45 @@ class _VendorSection extends StatelessWidget {
                 Expanded(
                   child: Text(
                     '${item.name} × ${item.quantity}',
-                    style: const TextStyle(fontSize: 13, color: Colors.black87),
+                    style: TextStyle(fontSize: 13, color: cs.onSurface),
                   ),
                 ),
                 Text(
                   '₹${itemTotal.toStringAsFixed(0)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    color: cs.onSurface,
                   ),
                 ),
               ],
             ),
           );
         }),
-
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: kLightGrey,
+            color: cs.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'Subtotal',
                 style: TextStyle(
                   fontSize: 12,
-                  color: kTextGrey,
+                  color: cs.onSurfaceVariant,
                   fontWeight: FontWeight.w500,
                 ),
               ),
               Text(
                 '₹${items.values.fold(0.0, (s, i) => s + i.price * i.quantity).toStringAsFixed(0)}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: cs.onSurface,
                 ),
               ),
             ],

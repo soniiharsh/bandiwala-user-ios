@@ -100,7 +100,6 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor: kWhite, // ✅ WHITE BACKGROUND
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(20.0),
@@ -124,11 +123,11 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                         width: 100, // ✅ SMALLER
                         height: 100,
                         decoration: BoxDecoration(
-                          color: kWhite,
+                          color: Theme.of(context).colorScheme.surface,
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.1),
                               blurRadius: 20,
                               spreadRadius: 2,
                             ),
@@ -191,10 +190,10 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: kBandiwalaYellow.withOpacity(0.05),
+                      color: kBandiwalaYellow.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: kBandiwalaYellow.withOpacity(0.2),
+                        color: kBandiwalaYellow.withValues(alpha: 0.2),
                       ),
                     ),
                     child: Column(

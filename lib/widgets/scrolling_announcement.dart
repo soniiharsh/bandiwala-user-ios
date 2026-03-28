@@ -40,7 +40,7 @@ class ScrollingAnnouncement extends ConsumerWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
@@ -74,7 +74,7 @@ class ScrollingAnnouncement extends ConsumerWidget {
                     style: GoogleFonts.outfit(
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
-                      color: Colors.black87,
+                      color: Theme.of(context).colorScheme.onSurface,
                       letterSpacing: 0.2,
                     ),
                     scrollAxis: Axis.horizontal,

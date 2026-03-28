@@ -200,7 +200,6 @@ class _CartPageState extends ConsumerState<CartPage> {
 
   Widget _buildLoginGate() {
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
@@ -329,7 +328,6 @@ class _CartPageState extends ConsumerState<CartPage> {
     final vendorIds = cart.cartByVendor.keys.toList();
 
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
@@ -440,10 +438,10 @@ class _CartPageState extends ConsumerState<CartPage> {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -658,10 +656,10 @@ class AddressSection extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: hasAddress ? Colors.green.shade300 : Colors.grey.shade300,
+          color: hasAddress ? Colors.green.shade300 : Theme.of(context).colorScheme.outlineVariant,
           width: 1.5,
         ),
       ),
@@ -695,11 +693,14 @@ class AddressSection extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text(
-                            hasAddress ? 'Delivery Address' : 'Add Address',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
+                          Flexible(
+                            child: Text(
+                              hasAddress ? 'Delivery Address' : 'Add Address',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           if (!hasAddress) ...[
@@ -725,20 +726,23 @@ class AddressSection extends StatelessWidget {
                           ],
                           if (hasAddress && selectedAddress!.label != null) ...[
                             const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: kBandiwalaYellow.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                selectedAddress!.label!.toUpperCase(),
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: kBandiwalaYellow.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  selectedAddress!.label!.toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ),
@@ -770,6 +774,8 @@ class AddressSection extends StatelessWidget {
                               fontSize: 11,
                               color: Colors.grey.shade600,
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                     ],
@@ -905,12 +911,12 @@ class SuggestionCard extends ConsumerWidget {
     return Container(
       width: 140,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200, width: 1),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 3,
             offset: const Offset(0, 1),
           ),
@@ -1092,12 +1098,12 @@ class VendorCartSection extends ConsumerWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),

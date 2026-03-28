@@ -9,9 +9,10 @@ class SkeletonShimmer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Shimmer.fromColors(
-      baseColor: Colors.grey.shade200,
-      highlightColor: Colors.grey.shade100,
+      baseColor: isDark ? const Color(0xFF2C2C2C) : Colors.grey.shade200,
+      highlightColor: isDark ? const Color(0xFF3D3D3D) : Colors.grey.shade100,
       child: child,
     );
   }
@@ -33,11 +34,12 @@ class SkeletonBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
     return Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: color,
         borderRadius: BorderRadius.circular(radius),
       ),
     );
@@ -52,13 +54,11 @@ class SkeletonCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
     return Container(
       width: size,
       height: size,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
 }
@@ -102,12 +102,16 @@ class PromotionalBannerSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final cardWidth = screenWidth * (356 / 390);
+    final cardHeight = cardWidth * (128 / 356);
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
     return SkeletonShimmer(
       child: Container(
-        height: 180,
+        height: cardHeight,
         margin: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: color,
           borderRadius: BorderRadius.circular(16),
         ),
       ),
@@ -122,6 +126,7 @@ class RecommendedVendorsSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
     return SkeletonShimmer(
       child: SizedBox(
         height: 215,
@@ -133,7 +138,7 @@ class RecommendedVendorsSkeleton extends StatelessWidget {
             width: 175,
             margin: const EdgeInsets.only(right: 12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: color,
               borderRadius: BorderRadius.circular(14),
             ),
             child: Column(
@@ -141,9 +146,9 @@ class RecommendedVendorsSkeleton extends StatelessWidget {
               children: [
                 Container(
                   height: 115,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(14),
                     ),
                   ),
@@ -176,12 +181,13 @@ class VendorCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
     return SkeletonShimmer(
       child: Container(
         height: 220,
         margin: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: color,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -189,9 +195,10 @@ class VendorCardSkeleton extends StatelessWidget {
           children: [
             Container(
               height: 160,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
               ),
             ),
             Padding(
@@ -238,15 +245,12 @@ class VendorItemsSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
     return SkeletonShimmer(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Hero image
-          Container(
-            height: 220,
-            color: Colors.white,
-          ),
+          Container(height: 220, color: color),
           const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -257,7 +261,6 @@ class VendorItemsSkeleton extends StatelessWidget {
                 const SizedBox(height: 8),
                 SkeletonBox(height: 13, width: 140),
                 const SizedBox(height: 16),
-                // Filter chips
                 Row(
                   children: List.generate(
                     4,
@@ -268,7 +271,6 @@ class VendorItemsSkeleton extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
-                // Item cards
                 ...List.generate(
                   4,
                   (_) => Padding(
@@ -281,7 +283,8 @@ class VendorItemsSkeleton extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              SkeletonBox(height: 14, width: double.infinity),
+                              SkeletonBox(
+                                  height: 14, width: double.infinity),
                               const SizedBox(height: 6),
                               SkeletonBox(height: 11, width: 120),
                               const SizedBox(height: 10),
@@ -309,12 +312,13 @@ class OrderCardSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
     return SkeletonShimmer(
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: color,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
@@ -378,6 +382,7 @@ class CouponsListSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
     return SkeletonShimmer(
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
@@ -386,7 +391,7 @@ class CouponsListSkeleton extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: color,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -396,7 +401,9 @@ class CouponsListSkeleton extends StatelessWidget {
                 children: [
                   SkeletonBox(height: 36, width: 36, radius: 8),
                   const SizedBox(width: 12),
-                  Expanded(child: SkeletonBox(height: 14, width: double.infinity)),
+                  Expanded(
+                      child:
+                          SkeletonBox(height: 14, width: double.infinity)),
                   const SizedBox(width: 12),
                   SkeletonBox(height: 28, width: 70, radius: 6),
                 ],
@@ -420,6 +427,7 @@ class ProfilePageSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
     return SkeletonShimmer(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -427,19 +435,17 @@ class ProfilePageSkeleton extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 8),
-            // Greeting
             SkeletonBox(height: 22, width: 180),
             const SizedBox(height: 6),
             SkeletonBox(height: 14, width: 120),
             const SizedBox(height: 20),
-            // Stats row
             Row(
               children: [
                 Expanded(
                   child: Container(
                     height: 80,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: color,
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -449,7 +455,7 @@ class ProfilePageSkeleton extends StatelessWidget {
                   child: Container(
                     height: 80,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: color,
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -457,7 +463,6 @@ class ProfilePageSkeleton extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
-            // Menu items
             ...List.generate(
               6,
               (_) => Padding(
@@ -466,7 +471,9 @@ class ProfilePageSkeleton extends StatelessWidget {
                   children: [
                     SkeletonBox(height: 40, width: 40, radius: 10),
                     const SizedBox(width: 14),
-                    Expanded(child: SkeletonBox(height: 14, width: double.infinity)),
+                    Expanded(
+                        child:
+                            SkeletonBox(height: 14, width: double.infinity)),
                     const SizedBox(width: 12),
                     SkeletonBox(height: 14, width: 20),
                   ],
@@ -487,6 +494,7 @@ class WishlistPageSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
     return SkeletonShimmer(
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
@@ -495,16 +503,17 @@ class WishlistPageSkeleton extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 12),
           height: 90,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: color,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
             children: [
               Container(
                 width: 90,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.horizontal(left: Radius.circular(14)),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: const BorderRadius.horizontal(
+                      left: Radius.circular(14)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -537,6 +546,7 @@ class SavedAddressesSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
     return SkeletonShimmer(
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
@@ -545,7 +555,7 @@ class SavedAddressesSkeleton extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: color,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -579,8 +589,8 @@ class CartLoadingSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
       body: SkeletonShimmer(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -597,7 +607,7 @@ class CartLoadingSkeleton extends StatelessWidget {
                   child: Container(
                     height: 100,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: color,
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -607,7 +617,7 @@ class CartLoadingSkeleton extends StatelessWidget {
               Container(
                 height: 56,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: color,
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
@@ -628,7 +638,6 @@ class AppBootSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      backgroundColor: Colors.white,
       body: Center(
         child: SizedBox(
           width: 48,
