@@ -79,6 +79,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
   Map<String, dynamic>? _appliedCoupon;
   double _couponDiscount = 0;
+  // vendorId of the applied coupon — "" means global
+  String _couponVendorId = '';
 
   // ── Pricing ───────────────────────────────────────────────────────────────
 
@@ -179,6 +181,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       couponDiscount: _isFreeDelivery ? 0.0 : _couponDiscount,
       couponMaxDiscountableAmount:
           (_appliedCoupon?['maxDiscountableAmount'] ?? 0).toDouble(),
+      couponVendorId: _couponVendorId,
       grandTotal: _grandTotal,
       status: 'order_created',
     );
@@ -220,15 +223,26 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     final type = _appliedCoupon!['couponType'] ?? '';
     if (type == 'free_delivery') return 0.0;
 
-    final total =
-        widget.itemsTotal + _deliveryCharge + _platformFee + _totalTaxAmount;
+    final vendorId = _appliedCoupon!['vendorId'] ?? '';
+    final isVendorCoupon = vendorId.isNotEmpty;
+
+    // For vendor coupons, apply discount only to that vendor's subtotal
+    double base;
+    if (isVendorCoupon) {
+      final cart = ref.read(cartProvider);
+      base = cart.vendorTotal(vendorId);
+    } else {
+      base =
+          widget.itemsTotal + _deliveryCharge + _platformFee + _totalTaxAmount;
+    }
+
     final discount = (_appliedCoupon!['discount'] ?? 0).toDouble();
     final maxDiscountable = (_appliedCoupon!['maxDiscountableAmount'] ?? 0)
         .toDouble();
 
-    if (type == 'flat_off') return discount;
+    if (type == 'flat_off') return discount.clamp(0, base);
     if (type == 'discount') {
-      final pct = total * (discount / 100);
+      final pct = base * (discount / 100);
       return maxDiscountable > 0
           ? pct.clamp(0, maxDiscountable).toDouble()
           : pct;
@@ -242,12 +256,19 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       context,
       AppPageRoute(
         type: PageTransitionType.slideUp,
-        builder: (_) => CouponsPage(cartAmount: cart.grandTotal),
+        builder: (_) => CouponsPage(
+          cartAmount: cart.grandTotal,
+          vendorSubtotals: {
+            for (final e in cart.cartByVendor.entries)
+              e.key: cart.vendorTotal(e.key),
+          },
+        ),
       ),
     );
     if (selected != null && mounted) {
       setState(() {
         _appliedCoupon = selected;
+        _couponVendorId = selected['vendorId'] ?? '';
         _couponDiscount = _calculateCouponDiscount();
       });
       if (selected['id'] != null) incrementCouponUsage(selected['id']);
@@ -257,6 +278,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   void _removeCoupon() => setState(() {
     _appliedCoupon = null;
     _couponDiscount = 0;
+    _couponVendorId = '';
   });
 
   // ── Actions ───────────────────────────────────────────────────────────────

@@ -85,6 +85,7 @@ _$AppOrderImpl _$$AppOrderImplFromJson(Map<String, dynamic> json) =>
       couponDiscount: (json['couponDiscount'] as num?)?.toDouble() ?? 0,
       couponMaxDiscountableAmount:
           (json['couponMaxDiscountableAmount'] as num?)?.toDouble() ?? 0,
+      couponVendorId: json['couponVendorId'] as String? ?? '',
       grandTotal: (json['grandTotal'] as num).toDouble(),
       status: json['status'] as String,
       statusUpdatedAt: json['statusUpdatedAt'] == null
@@ -115,6 +116,7 @@ Map<String, dynamic> _$$AppOrderImplToJson(_$AppOrderImpl instance) =>
       'couponType': instance.couponType,
       'couponDiscount': instance.couponDiscount,
       'couponMaxDiscountableAmount': instance.couponMaxDiscountableAmount,
+      'couponVendorId': instance.couponVendorId,
       'grandTotal': instance.grandTotal,
       'status': instance.status,
       'statusUpdatedAt': instance.statusUpdatedAt?.toIso8601String(),

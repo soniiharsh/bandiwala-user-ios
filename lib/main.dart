@@ -1,3 +1,4 @@
+import 'package:BandiWala/core/db_collections.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -62,9 +63,9 @@ class MyApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     final brightness = switch (themeMode) {
-      ThemeMode.dark  => Brightness.dark,
+      ThemeMode.dark => Brightness.dark,
       ThemeMode.light => Brightness.light,
-      _               => MediaQuery.platformBrightnessOf(context),
+      _ => MediaQuery.platformBrightnessOf(context),
     };
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -108,7 +109,7 @@ class _VersionCheckWrapperState extends State<VersionCheckWrapper> {
       final currentVersion = packageInfo.version;
 
       final snap = await FirebaseFirestore.instance
-          .collection('latest-version')
+          .collection(DbCollections.latestVersion)
           .limit(1)
           .get();
       if (snap.docs.isEmpty) return;

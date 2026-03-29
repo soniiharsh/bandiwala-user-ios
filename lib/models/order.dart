@@ -50,10 +50,10 @@ class OrderItem with _$OrderItem {
       _$OrderItemFromJson(json);
 
   factory OrderItem.fromMap(Map<String, dynamic> m) => OrderItem(
-        name: m['name'] ?? '',
-        price: (m['price'] as num? ?? 0).toDouble(),
-        quantity: (m['quantity'] as num? ?? 1).toInt(),
-      );
+    name: m['name'] ?? '',
+    price: (m['price'] as num? ?? 0).toDouble(),
+    quantity: (m['quantity'] as num? ?? 1).toInt(),
+  );
 }
 
 @freezed
@@ -76,8 +76,9 @@ class VendorOrder with _$VendorOrder {
 
     if (rawItems is Map) {
       rawItems.forEach((key, value) {
-        items[key.toString()] =
-            OrderItem.fromMap(Map<String, dynamic>.from(value as Map));
+        items[key.toString()] = OrderItem.fromMap(
+          Map<String, dynamic>.from(value as Map),
+        );
       });
     } else if (rawItems is List) {
       for (int i = 0; i < rawItems.length; i++) {
@@ -96,13 +97,13 @@ class VendorOrder with _$VendorOrder {
   }
 
   Map<String, dynamic> toMap() => {
-        'vendorName': vendorName,
-        'items': items.map((k, v) => MapEntry(k, v.toJson())),
-        'status': status,
-        'statusUpdatedAt': statusUpdatedAt != null
-            ? Timestamp.fromDate(statusUpdatedAt!)
-            : FieldValue.serverTimestamp(),
-      };
+    'vendorName': vendorName,
+    'items': items.map((k, v) => MapEntry(k, v.toJson())),
+    'status': status,
+    'statusUpdatedAt': statusUpdatedAt != null
+        ? Timestamp.fromDate(statusUpdatedAt!)
+        : FieldValue.serverTimestamp(),
+  };
 }
 
 @freezed
@@ -128,6 +129,9 @@ class AppOrder with _$AppOrder {
     @Default('') String couponType,
     @Default(0) double couponDiscount,
     @Default(0) double couponMaxDiscountableAmount,
+
+    /// "" = global coupon was applied; "<vendorId>" = vendor coupon
+    @Default('') String couponVendorId,
     required double grandTotal,
     required String status,
     DateTime? statusUpdatedAt,
@@ -138,9 +142,8 @@ class AppOrder with _$AppOrder {
       _$AppOrderFromJson(json);
 
   double get itemsTotal => itemsByVendor.values.fold(0.0, (acc, vo) {
-        return acc +
-            vo.items.values.fold(0.0, (s, i) => s + i.price * i.quantity);
-      });
+    return acc + vo.items.values.fold(0.0, (s, i) => s + i.price * i.quantity);
+  });
 
   factory AppOrder.fromDoc(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
@@ -149,8 +152,9 @@ class AppOrder with _$AppOrder {
     final ibv = d['itemsByVendor'];
     if (ibv is Map) {
       ibv.forEach((key, value) {
-        itemsByVendor[key.toString()] =
-            VendorOrder.fromMap(Map<String, dynamic>.from(value as Map));
+        itemsByVendor[key.toString()] = VendorOrder.fromMap(
+          Map<String, dynamic>.from(value as Map),
+        );
       });
     } else if (ibv is List) {
       for (final entry in ibv) {
@@ -175,8 +179,8 @@ class AppOrder with _$AppOrder {
       vendorIds: List<String>.from(d['vendorIds'] ?? []),
       paymentMethod: d['paymentMethod'] ?? '',
       paymentId: d['paymentId'] ?? '',
-      deliveryFee:
-          (d['deliveryFee'] ?? d['deliveryCharge'] as num? ?? 0).toDouble(),
+      deliveryFee: (d['deliveryFee'] ?? d['deliveryCharge'] as num? ?? 0)
+          .toDouble(),
       platformFee: (d['platformFee'] as num? ?? 0).toDouble(),
       foodTax: (d['foodTax'] ?? d['foodTaxAmount'] as num? ?? 0).toDouble(),
       deliveryTax: (d['deliveryTax'] as num? ?? 0).toDouble(),
@@ -187,12 +191,12 @@ class AppOrder with _$AppOrder {
       couponDiscount: (d['couponDiscount'] as num? ?? 0).toDouble(),
       couponMaxDiscountableAmount:
           (d['couponMaxDiscountableAmount'] as num? ?? 0).toDouble(),
+      couponVendorId: d['couponVendorId'] ?? '',
       grandTotal: (d['grandTotal'] as num? ?? 0).toDouble(),
       status: d['status'] ?? 'unknown',
       statusUpdatedAt: (d['statusUpdatedAt'] as Timestamp?)?.toDate(),
-      createdAt:
-          (d['createdAt'] as Timestamp? ?? d['timestamp'] as Timestamp?)
-              ?.toDate(),
+      createdAt: (d['createdAt'] as Timestamp? ?? d['timestamp'] as Timestamp?)
+          ?.toDate(),
     );
   }
 }

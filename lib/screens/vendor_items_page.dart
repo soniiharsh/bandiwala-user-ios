@@ -6,6 +6,8 @@ import '../providers/cart_provider.dart';
 import '../providers/vendors_provider.dart';
 import '../providers/active_address_provider.dart';
 import '../providers/items_provider.dart';
+import '../providers/coupons_provider.dart';
+import '../models/coupon.dart';
 import '../core/theme/theme.dart';
 import '../widgets/cart_bar.dart';
 import '../widgets/active_order_bar.dart';
@@ -75,7 +77,9 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final vendor = ref.read(vendorStreamProvider(widget.vendorId)).valueOrNull;
+      final vendor = ref
+          .read(vendorStreamProvider(widget.vendorId))
+          .valueOrNull;
       if (vendor != null && !vendor.isAvailable && !_hasShownOfflineSnackbar) {
         _showOfflineSnackbar();
         _hasShownOfflineSnackbar = true;
@@ -101,7 +105,9 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
   Future<void> _checkWishlist() async {
     final list = await WishlistManager.getWishlist();
     if (mounted) {
-      setState(() => _isWishlisted = list.any((v) => v.vendorId == widget.vendorId));
+      setState(
+        () => _isWishlisted = list.any((v) => v.vendorId == widget.vendorId),
+      );
     }
   }
 
@@ -125,7 +131,7 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
 
     final vendorAsync = ref.watch(vendorStreamProvider(widget.vendorId));
     final itemsAsync = ref.watch(vendorItemsStreamProvider(widget.vendorId));
-    
+
     final vendor = vendorAsync.valueOrNull;
     final isVendorOnline = vendor?.isAvailable ?? true;
     final allItems = itemsAsync.valueOrNull ?? [];
@@ -133,16 +139,21 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
     if (_heroImageUrl.trim().isEmpty) {
       if (vendor?.imageUrl != null && vendor!.imageUrl.trim().isNotEmpty) {
         _heroImageUrl = vendor.imageUrl.trim();
-      } else if (allItems.isNotEmpty && (allItems.first.imageUrl as String?)?.trim().isNotEmpty == true) {
+      } else if (allItems.isNotEmpty &&
+          (allItems.first.imageUrl as String?)?.trim().isNotEmpty == true) {
         _heroImageUrl = allItems.first.imageUrl.trim();
       }
     }
 
     var filtered = allItems;
     if (_searchQuery.isNotEmpty) {
-      filtered = filtered.where((item) => 
-        item.name.toLowerCase().contains(_searchQuery) ||
-        item.category.toLowerCase().contains(_searchQuery)).toList();
+      filtered = filtered
+          .where(
+            (item) =>
+                item.name.toLowerCase().contains(_searchQuery) ||
+                item.category.toLowerCase().contains(_searchQuery),
+          )
+          .toList();
     }
     if (_activeFilter == 'Veg') {
       filtered = filtered.where((item) => item.isVeg).toList();
@@ -191,15 +202,20 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ActiveOrderBar(onViewTap: () {
-              Navigator.of(context).push(
-                AppPageRoute(builder: (_) => const OrdersPage()),
-              );
-            }),
+            ActiveOrderBar(
+              onViewTap: () {
+                Navigator.of(
+                  context,
+                ).push(AppPageRoute(builder: (_) => const OrdersPage()));
+              },
+            ),
             CartBar(
               onTap: () {
                 Navigator.of(context).push(
-                  AppPageRoute(builder: (_) => CartPage(onBackToHome: () => Navigator.pop(context))),
+                  AppPageRoute(
+                    builder: (_) =>
+                        CartPage(onBackToHome: () => Navigator.pop(context)),
+                  ),
                 );
               },
             ),
@@ -218,17 +234,25 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        isInZone ? Icons.location_on : Icons.error_outline_rounded, 
-                        size: 11, 
-                        color: isInZone ? cs.onSurfaceVariant.withValues(alpha: 0.6) : Colors.red.shade600
+                        isInZone
+                            ? Icons.location_on
+                            : Icons.error_outline_rounded,
+                        size: 11,
+                        color: isInZone
+                            ? cs.onSurfaceVariant.withValues(alpha: 0.6)
+                            : Colors.red.shade600,
                       ),
                       const SizedBox(width: 5),
                       Text(
-                        isInZone ? "Delivering to $area" : "Not available at this address",
+                        isInZone
+                            ? "Delivering to $area"
+                            : "Not available at this address",
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
-                          color: isInZone ? cs.onSurfaceVariant.withValues(alpha: 0.7) : Colors.red.shade700,
+                          color: isInZone
+                              ? cs.onSurfaceVariant.withValues(alpha: 0.7)
+                              : Colors.red.shade700,
                         ),
                       ),
                     ],
@@ -240,7 +264,10 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
           ],
         ),
       ),
-      floatingActionButton: _buildMenuFAB(allItems: allItems, isVendorOnline: isVendorOnline),
+      floatingActionButton: _buildMenuFAB(
+        allItems: allItems,
+        isVendorOnline: isVendorOnline,
+      ),
     );
   }
 
@@ -269,10 +296,22 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
                         ? CachedNetworkImage(
                             imageUrl: _heroImageUrl.trim(),
                             fit: BoxFit.cover,
-                            placeholder: (_, __) => Container(color: isDark ? Colors.grey.shade900 : Colors.grey.shade100),
-                            errorWidget: (_, __, ___) => Container(color: isDark ? Colors.grey.shade900 : Colors.grey.shade200),
+                            placeholder: (_, __) => Container(
+                              color: isDark
+                                  ? Colors.grey.shade900
+                                  : Colors.grey.shade100,
+                            ),
+                            errorWidget: (_, __, ___) => Container(
+                              color: isDark
+                                  ? Colors.grey.shade900
+                                  : Colors.grey.shade200,
+                            ),
                           )
-                        : Container(color: isDark ? Colors.grey.shade900 : Colors.grey.shade200),
+                        : Container(
+                            color: isDark
+                                ? Colors.grey.shade900
+                                : Colors.grey.shade200,
+                          ),
                   ),
                   Positioned(
                     top: MediaQuery.of(context).padding.top + 10,
@@ -286,8 +325,12 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
                     top: MediaQuery.of(context).padding.top + 10,
                     right: 16,
                     child: _CircleButton(
-                      icon: _isWishlisted ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                      iconColor: _isWishlisted ? Colors.red : (isDark ? Colors.white : Colors.black87),
+                      icon: _isWishlisted
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      iconColor: _isWishlisted
+                          ? Colors.red
+                          : (isDark ? Colors.white : Colors.black87),
                       onTap: _toggleWishlist,
                     ),
                   ),
@@ -308,7 +351,9 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
+                  color: (isDark ? Colors.white : Colors.black).withValues(
+                    alpha: 0.1,
+                  ),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -320,8 +365,8 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
                 Text(
                   widget.vendorName,
                   style: GoogleFonts.poppins(
-                    fontSize: 24, 
-                    fontWeight: FontWeight.w700, 
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
                     height: 1.1,
                     color: isDark ? Colors.white : Colors.black87,
                   ),
@@ -331,42 +376,56 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
                   children: [
                     const Icon(Icons.star, color: Colors.green, size: 20),
                     const SizedBox(width: 4),
-                    Text(rating, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(
+                      rating,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
                     const SizedBox(width: 4),
-                    Text("(143 Reviews)", style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontSize: 14)),
+                    Text(
+                      "(143 Reviews)",
+                      style: TextStyle(
+                        color: isDark
+                            ? Colors.grey.shade400
+                            : Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                    ),
                     const SizedBox(width: 8),
-                    Text("•", style: TextStyle(color: isDark ? Colors.grey.shade700 : Colors.grey.shade400)),
+                    Text(
+                      "•",
+                      style: TextStyle(
+                        color: isDark
+                            ? Colors.grey.shade700
+                            : Colors.grey.shade400,
+                      ),
+                    ),
                     const SizedBox(width: 8),
-                    Icon(Icons.timer_outlined, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, size: 18),
+                    Icon(
+                      Icons.timer_outlined,
+                      color: isDark
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
+                      size: 18,
+                    ),
                     const SizedBox(width: 4),
-                    Text(deliveryTime, style: TextStyle(color: isDark ? Colors.grey.shade300 : Colors.grey.shade600, fontWeight: FontWeight.w500)),
+                    Text(
+                      deliveryTime,
+                      style: TextStyle(
+                        color: isDark
+                            ? Colors.grey.shade300
+                            : Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
                 Divider(height: 1, color: theme.dividerColor),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withValues(alpha: isDark ? 0.2 : 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(Icons.percent_rounded, color: isDark ? Colors.blue.shade300 : Colors.blue.shade400, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text("Unlock 50% OFF", style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.teal.shade300 : Colors.teal.shade700)),
-                          Text("Use code FIRST50 | above ₹299", style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                _VendorCouponStrip(vendorId: widget.vendorId),
               ],
             ),
           ),
@@ -382,8 +441,22 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
     required bool isLoading,
     bool hasError = false,
   }) {
-    if (isLoading) return const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(16), child: VendorItemsSkeleton()));
-    if (filtered.isEmpty) return const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.all(40), child: Text("No items found"))));
+    if (isLoading)
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: VendorItemsSkeleton(),
+        ),
+      );
+    if (filtered.isEmpty)
+      return const SliverToBoxAdapter(
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.all(40),
+            child: Text("No items found"),
+          ),
+        ),
+      );
 
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
@@ -415,16 +488,30 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
     );
   }
 
-  Widget _buildMenuFAB({required List<dynamic> allItems, required bool isVendorOnline}) {
+  Widget _buildMenuFAB({
+    required List<dynamic> allItems,
+    required bool isVendorOnline,
+  }) {
     return FloatingActionButton.extended(
-      onPressed: () => _showMenuSheet(allItems: allItems, isVendorOnline: isVendorOnline),
+      onPressed: () =>
+          _showMenuSheet(allItems: allItems, isVendorOnline: isVendorOnline),
       backgroundColor: Colors.black, // Still black as it's a fixed FAB
-      icon: const Icon(Icons.restaurant_menu_rounded, color: Colors.white, size: 18),
-      label: const Text('Menu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      icon: const Icon(
+        Icons.restaurant_menu_rounded,
+        color: Colors.white,
+        size: 18,
+      ),
+      label: const Text(
+        'Menu',
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      ),
     );
   }
 
-  void _showMenuSheet({required List<dynamic> allItems, required bool isVendorOnline}) {
+  void _showMenuSheet({
+    required List<dynamic> allItems,
+    required bool isVendorOnline,
+  }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -460,27 +547,33 @@ class _StickySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => 140.0;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final bool isPinned = shrinkOffset > 0;
-    
+
     return Container(
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
-        boxShadow: isPinned ? [
-          BoxShadow(
-            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
-            blurRadius: 10, offset: const Offset(0, 4),
-          )
-        ] : null,
+        boxShadow: isPinned
+            ? [
+                BoxShadow(
+                  color: (isDark ? Colors.white : Colors.black).withValues(
+                    alpha: 0.1,
+                  ),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       padding: const EdgeInsets.only(top: 10),
       child: Column(
-        children: [
-          _buildSearchBar(context),
-          _buildFilterChips(context),
-        ],
+        children: [_buildSearchBar(context), _buildFilterChips(context)],
       ),
     );
   }
@@ -488,7 +581,7 @@ class _StickySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
   Widget _buildSearchBar(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
@@ -509,10 +602,17 @@ class _StickySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
                   Expanded(
                     child: TextField(
                       controller: searchCtrl,
-                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
                       decoration: InputDecoration(
                         hintText: "Search for food items",
-                        hintStyle: TextStyle(color: isDark ? Colors.grey.shade600 : Colors.grey.shade400, fontSize: 14),
+                        hintStyle: TextStyle(
+                          color: isDark
+                              ? Colors.grey.shade600
+                              : Colors.grey.shade400,
+                          fontSize: 14,
+                        ),
                         border: InputBorder.none,
                       ),
                     ),
@@ -547,34 +647,47 @@ class _StickySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
             onSelected: onSortChanged,
             color: Theme.of(context).cardColor,
             itemBuilder: (ctx) => [
-              const PopupMenuItem(value: 'LowToHigh', child: Text('Price: Low to High')),
-              const PopupMenuItem(value: 'HighToLow', child: Text('Price: High to Low')),
+              const PopupMenuItem(
+                value: 'LowToHigh',
+                child: Text('Price: Low to High'),
+              ),
+              const PopupMenuItem(
+                value: 'HighToLow',
+                child: Text('Price: High to Low'),
+              ),
               const PopupMenuItem(value: 'None', child: Text('Clear Sort')),
             ],
             child: _FilterChip(
-              label: activeSort == 'None' ? "Filters" : (activeSort == 'LowToHigh' ? "Price ↑" : "Price ↓"), 
+              label: activeSort == 'None'
+                  ? "Filters"
+                  : (activeSort == 'LowToHigh' ? "Price ↑" : "Price ↓"),
               icon: Icons.tune_rounded,
               isActive: activeSort != 'None',
             ),
           ),
           const SizedBox(width: 8),
           _FilterChip(
-            label: "Veg", 
-            icon: Icons.radio_button_checked, 
+            label: "Veg",
+            icon: Icons.radio_button_checked,
             iconColor: Colors.green,
             isActive: activeFilter == 'Veg',
             onTap: () => onFilterChanged(activeFilter == 'Veg' ? 'All' : 'Veg'),
           ),
           const SizedBox(width: 8),
           _FilterChip(
-            label: "Non-veg", 
-            icon: Icons.radio_button_checked, 
+            label: "Non-veg",
+            icon: Icons.radio_button_checked,
             iconColor: Colors.red,
             isActive: activeFilter == 'Non-veg',
-            onTap: () => onFilterChanged(activeFilter == 'Non-veg' ? 'All' : 'Non-veg'),
+            onTap: () =>
+                onFilterChanged(activeFilter == 'Non-veg' ? 'All' : 'Non-veg'),
           ),
           const SizedBox(width: 8),
-          _FilterChip(label: "Best Seller", icon: Icons.verified, iconColor: Colors.blue),
+          _FilterChip(
+            label: "Best Seller",
+            icon: Icons.verified,
+            iconColor: Colors.blue,
+          ),
         ],
       ),
     );
@@ -582,9 +695,9 @@ class _StickySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _StickySearchHeaderDelegate oldDelegate) {
-    return oldDelegate.activeFilter != activeFilter || 
-           oldDelegate.activeSort != activeSort || 
-           oldDelegate.searchCtrl != searchCtrl;
+    return oldDelegate.activeFilter != activeFilter ||
+        oldDelegate.activeSort != activeSort ||
+        oldDelegate.searchCtrl != searchCtrl;
   }
 }
 
@@ -592,7 +705,11 @@ class _CircleButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final Color? iconColor;
-  const _CircleButton({required this.icon, required this.onTap, this.iconColor});
+  const _CircleButton({
+    required this.icon,
+    required this.onTap,
+    this.iconColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -600,18 +717,25 @@ class _CircleButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 40, height: 40,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
-          color: isDark ? Colors.grey.shade900 : Colors.white, 
+          color: isDark ? Colors.grey.shade900 : Colors.white,
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
+              color: (isDark ? Colors.white : Colors.black).withValues(
+                alpha: 0.1,
+              ),
               blurRadius: 4,
-            )
-          ]
+            ),
+          ],
         ),
-        child: Icon(icon, size: 24, color: iconColor ?? (isDark ? Colors.white : Colors.black87)),
+        child: Icon(
+          icon,
+          size: 24,
+          color: iconColor ?? (isDark ? Colors.white : Colors.black87),
+        ),
       ),
     );
   }
@@ -624,7 +748,13 @@ class _FilterChip extends StatelessWidget {
   final bool isActive;
   final VoidCallback? onTap;
 
-  const _FilterChip({required this.label, required this.icon, this.iconColor, this.isActive = false, this.onTap});
+  const _FilterChip({
+    required this.label,
+    required this.icon,
+    this.iconColor,
+    this.isActive = false,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -636,36 +766,43 @@ class _FilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? (isDark ? _kYellow : Colors.black) : theme.cardColor,
+          color: isActive
+              ? (isDark ? _kYellow : Colors.black)
+              : theme.cardColor,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isActive ? Colors.transparent : theme.dividerColor),
+          border: Border.all(
+            color: isActive ? Colors.transparent : theme.dividerColor,
+          ),
         ),
         child: Row(
           children: [
             Icon(
-              icon, 
-              size: 16, 
-              color: isActive 
-                ? (isDark ? Colors.black87 : Colors.white) 
-                : (iconColor ?? (isDark ? Colors.grey.shade400 : Colors.grey.shade600))
+              icon,
+              size: 16,
+              color: isActive
+                  ? (isDark ? Colors.black87 : Colors.white)
+                  : (iconColor ??
+                        (isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
             ),
             const SizedBox(width: 6),
             Text(
-              label, 
+              label,
               style: TextStyle(
-                fontWeight: FontWeight.w600, 
-                color: isActive 
-                  ? (isDark ? Colors.black87 : Colors.white) 
-                  : (isDark ? Colors.white : Colors.black87)
-              )
+                fontWeight: FontWeight.w600,
+                color: isActive
+                    ? (isDark ? Colors.black87 : Colors.white)
+                    : (isDark ? Colors.white : Colors.black87),
+              ),
             ),
             if (label.contains("Filters") || label.contains("Price")) ...[
-              const SizedBox(width: 4), 
+              const SizedBox(width: 4),
               Icon(
-                Icons.keyboard_arrow_down, 
-                size: 16, 
-                color: isActive ? (isDark ? Colors.black87 : Colors.white) : (isDark ? Colors.white : Colors.black87)
-              )
+                Icons.keyboard_arrow_down,
+                size: 16,
+                color: isActive
+                    ? (isDark ? Colors.black87 : Colors.white)
+                    : (isDark ? Colors.white : Colors.black87),
+              ),
             ],
           ],
         ),
@@ -675,15 +812,29 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _ItemCard extends StatelessWidget {
-  final String vendorId, vendorName, itemId, name, imageUrl, category, description;
+  final String vendorId,
+      vendorName,
+      itemId,
+      name,
+      imageUrl,
+      category,
+      description;
   final bool isAvailable, isVendorOnline, isVeg;
   final double price, rating;
 
   const _ItemCard({
-    required this.vendorId, required this.vendorName, required this.itemId,
-    required this.name, required this.imageUrl, required this.category,
-    required this.description, required this.isAvailable, required this.isVendorOnline,
-    required this.isVeg, required this.price, required this.rating,
+    required this.vendorId,
+    required this.vendorName,
+    required this.itemId,
+    required this.name,
+    required this.imageUrl,
+    required this.category,
+    required this.description,
+    required this.isAvailable,
+    required this.isVendorOnline,
+    required this.isVeg,
+    required this.price,
+    required this.rating,
   });
 
   @override
@@ -700,9 +851,12 @@ class _ItemCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05), 
-              blurRadius: 10, offset: const Offset(0, 4)
-            )
+              color: (isDark ? Colors.white : Colors.black).withValues(
+                alpha: 0.05,
+              ),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
           ],
         ),
         child: Column(
@@ -710,38 +864,56 @@ class _ItemCard extends StatelessWidget {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
                   child: AspectRatio(
                     aspectRatio: 1,
-                    child: imageUrl.trim().isNotEmpty 
-                      ? CachedNetworkImage(
-                          imageUrl: imageUrl.trim(), 
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => Container(color: isDark ? Colors.grey.shade900 : Colors.grey.shade100),
-                          errorWidget: (_, __, ___) => Container(color: isDark ? Colors.grey.shade900 : Colors.grey.shade100),
-                        )
-                      : Container(color: isDark ? Colors.grey.shade900 : Colors.grey.shade100),
+                    child: imageUrl.trim().isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: imageUrl.trim(),
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => Container(
+                              color: isDark
+                                  ? Colors.grey.shade900
+                                  : Colors.grey.shade100,
+                            ),
+                            errorWidget: (_, __, ___) => Container(
+                              color: isDark
+                                  ? Colors.grey.shade900
+                                  : Colors.grey.shade100,
+                            ),
+                          )
+                        : Container(
+                            color: isDark
+                                ? Colors.grey.shade900
+                                : Colors.grey.shade100,
+                          ),
                   ),
                 ),
                 Positioned(
-                  top: 8, left: 8,
+                  top: 8,
+                  left: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
-                      color: isDark ? Colors.black87 : Colors.white, 
-                      borderRadius: BorderRadius.circular(6)
+                      color: isDark ? Colors.black87 : Colors.white,
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: Row(
                       children: [
                         const Icon(Icons.star, color: Colors.green, size: 10),
                         const SizedBox(width: 2),
                         Text(
-                          rating.toString(), 
+                          rating.toString(),
                           style: TextStyle(
-                            fontSize: 10, 
+                            fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : Colors.black
-                          )
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
                         ),
                       ],
                     ),
@@ -757,50 +929,70 @@ class _ItemCard extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.radio_button_checked, color: isVeg ? Colors.green : Colors.red, size: 10),
+                        Icon(
+                          Icons.radio_button_checked,
+                          color: isVeg ? Colors.green : Colors.red,
+                          size: 10,
+                        ),
                         const SizedBox(width: 4),
-                        Expanded(child: Text(category, style: TextStyle(fontSize: 10, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600), maxLines: 1)),
+                        Expanded(
+                          child: Text(
+                            category,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
+                            ),
+                            maxLines: 1,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      name, 
+                      name,
                       style: TextStyle(
-                        fontWeight: FontWeight.w700, 
+                        fontWeight: FontWeight.w700,
                         fontSize: 13,
-                        color: isDark ? Colors.white : Colors.black
-                      ), 
-                      maxLines: 1, 
-                      overflow: TextOverflow.ellipsis
+                        color: isDark ? Colors.white : Colors.black,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Expanded(
                       child: Text(
-                        description, 
+                        description,
                         style: TextStyle(
-                          fontSize: 9, 
-                          color: isDark ? Colors.grey.shade500 : Colors.grey.shade500, 
-                          height: 1.1
-                        ), 
-                        maxLines: 2, 
-                        overflow: TextOverflow.ellipsis
-                      )
+                          fontSize: 9,
+                          color: isDark
+                              ? Colors.grey.shade500
+                              : Colors.grey.shade500,
+                          height: 1.1,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          "₹${price.toInt()}", 
+                          "₹${price.toInt()}",
                           style: TextStyle(
-                            fontWeight: FontWeight.w900, 
+                            fontWeight: FontWeight.w900,
                             fontSize: 14,
-                            color: isDark ? Colors.white : Colors.black
-                          )
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
                         ),
                         _AddButton(
-                          vendorId: vendorId, vendorName: vendorName,
-                          itemId: itemId, itemName: name, price: price,
+                          vendorId: vendorId,
+                          vendorName: vendorName,
+                          itemId: itemId,
+                          itemName: name,
+                          price: price,
                           isAvailable: canAdd,
                         ),
                       ],
@@ -821,10 +1013,18 @@ class _ItemCard extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => ProductDetailOverlay(
-        vendorId: vendorId, vendorName: vendorName, itemId: itemId,
-        name: name, imageUrl: imageUrl, category: category,
-        description: description, isVeg: isVeg, price: price,
-        rating: rating, ratingCount: 143, isAvailable: isAvailable,
+        vendorId: vendorId,
+        vendorName: vendorName,
+        itemId: itemId,
+        name: name,
+        imageUrl: imageUrl,
+        category: category,
+        description: description,
+        isVeg: isVeg,
+        price: price,
+        rating: rating,
+        ratingCount: 143,
+        isAvailable: isAvailable,
         isVendorOnline: isVendorOnline,
       ),
     );
@@ -835,46 +1035,110 @@ class _AddButton extends ConsumerWidget {
   final String vendorId, vendorName, itemId, itemName;
   final double price;
   final bool isAvailable;
-  const _AddButton({required this.vendorId, required this.vendorName, required this.itemId, required this.itemName, required this.price, required this.isAvailable});
+  const _AddButton({
+    required this.vendorId,
+    required this.vendorName,
+    required this.itemId,
+    required this.itemName,
+    required this.price,
+    required this.isAvailable,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cart = ref.watch(cartProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final qty = cart.cartByVendor[vendorId]?.items.firstWhere((i) => i.id == itemId, orElse: () => CartItem(id: '', name: '', price: 0, quantity: 0)).quantity ?? 0;
+    final qty =
+        cart.cartByVendor[vendorId]?.items
+            .firstWhere(
+              (i) => i.id == itemId,
+              orElse: () => CartItem(id: '', name: '', price: 0, quantity: 0),
+            )
+            .quantity ??
+        0;
 
     if (qty > 0) {
       return Container(
-        height: 28, width: 64,
-        decoration: BoxDecoration(color: _kYellow, borderRadius: BorderRadius.circular(8)),
+        height: 28,
+        width: 64,
+        decoration: BoxDecoration(
+          color: _kYellow,
+          borderRadius: BorderRadius.circular(8),
+        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            GestureDetector(onTap: () => ref.read(cartProvider.notifier).updateQuantity(vendorId: vendorId, itemId: itemId, delta: -1), child: const Icon(Icons.remove, size: 12, color: Colors.white)),
-            Text("$qty", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
-            GestureDetector(onTap: () => ref.read(cartProvider.notifier).addItem(vendorId: vendorId, vendorName: vendorName, itemId: itemId, itemName: itemName, price: price), child: const Icon(Icons.add, size: 12, color: Colors.white)),
+            GestureDetector(
+              onTap: () => ref
+                  .read(cartProvider.notifier)
+                  .updateQuantity(
+                    vendorId: vendorId,
+                    itemId: itemId,
+                    delta: -1,
+                  ),
+              child: const Icon(Icons.remove, size: 12, color: Colors.white),
+            ),
+            Text(
+              "$qty",
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+              ),
+            ),
+            GestureDetector(
+              onTap: () => ref
+                  .read(cartProvider.notifier)
+                  .addItem(
+                    vendorId: vendorId,
+                    vendorName: vendorName,
+                    itemId: itemId,
+                    itemName: itemName,
+                    price: price,
+                  ),
+              child: const Icon(Icons.add, size: 12, color: Colors.white),
+            ),
           ],
         ),
       );
     }
 
     return GestureDetector(
-      onTap: isAvailable ? () => ref.read(cartProvider.notifier).addItem(vendorId: vendorId, vendorName: vendorName, itemId: itemId, itemName: itemName, price: price) : null,
+      onTap: isAvailable
+          ? () => ref
+                .read(cartProvider.notifier)
+                .addItem(
+                  vendorId: vendorId,
+                  vendorName: vendorName,
+                  itemId: itemId,
+                  itemName: itemName,
+                  price: price,
+                )
+          : null,
       child: Container(
-        height: 28, width: 64,
+        height: 28,
+        width: 64,
         decoration: BoxDecoration(
-          color: isAvailable ? (isDark ? Colors.transparent : Colors.white) : Colors.transparent,
-          border: Border.all(color: isAvailable ? _kYellow : (isDark ? Colors.grey.shade800 : Colors.grey.shade300)),
+          color: isAvailable
+              ? (isDark ? Colors.transparent : Colors.white)
+              : Colors.transparent,
+          border: Border.all(
+            color: isAvailable
+                ? _kYellow
+                : (isDark ? Colors.grey.shade800 : Colors.grey.shade300),
+          ),
           borderRadius: BorderRadius.circular(8),
         ),
         alignment: Alignment.center,
         child: Text(
-          "ADD", 
+          "ADD",
           style: TextStyle(
-            color: isAvailable ? _kYellow : (isDark ? Colors.grey.shade800 : Colors.grey.shade400), 
-            fontWeight: FontWeight.bold, 
-            fontSize: 10
-          )
+            color: isAvailable
+                ? _kYellow
+                : (isDark ? Colors.grey.shade800 : Colors.grey.shade400),
+            fontWeight: FontWeight.bold,
+            fontSize: 10,
+          ),
         ),
       ),
     );
@@ -885,7 +1149,12 @@ class _MenuSheet extends StatelessWidget {
   final String vendorId, vendorName;
   final List<dynamic> items;
   final bool isVendorOnline;
-  const _MenuSheet({required this.vendorId, required this.vendorName, required this.items, required this.isVendorOnline});
+  const _MenuSheet({
+    required this.vendorId,
+    required this.vendorName,
+    required this.items,
+    required this.isVendorOnline,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -896,31 +1165,46 @@ class _MenuSheet extends StatelessWidget {
       initialChildSize: 0.6,
       builder: (_, controller) => Container(
         decoration: BoxDecoration(
-          color: theme.cardColor, 
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20))
+          color: theme.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
           children: [
             Container(
-              margin: const EdgeInsets.all(12), 
-              height: 4, width: 40, 
+              margin: const EdgeInsets.all(12),
+              height: 4,
+              width: 40,
               decoration: BoxDecoration(
-                color: isDark ? Colors.grey.shade800 : Colors.grey.shade300, 
-                borderRadius: BorderRadius.circular(2)
-              )
+                color: isDark ? Colors.grey.shade800 : Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
             Expanded(
               child: ListView.builder(
                 controller: controller,
                 itemCount: items.length,
                 itemBuilder: (ctx, i) => ListTile(
-                  title: Text(items[i].name, style: TextStyle(color: isDark ? Colors.white : Colors.black87)),
-                  subtitle: Text("₹${items[i].price}", style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
+                  title: Text(
+                    items[i].name,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  subtitle: Text(
+                    "₹${items[i].price}",
+                    style: TextStyle(
+                      color: isDark
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
+                    ),
+                  ),
                   trailing: _AddButton(
-                    vendorId: vendorId, vendorName: vendorName, 
-                    itemId: items[i].id, itemName: items[i].name, 
-                    price: items[i].price.toDouble(), 
-                    isAvailable: isVendorOnline && items[i].isAvailable
+                    vendorId: vendorId,
+                    vendorName: vendorName,
+                    itemId: items[i].id,
+                    itemName: items[i].name,
+                    price: items[i].price.toDouble(),
+                    isAvailable: isVendorOnline && items[i].isAvailable,
                   ),
                 ),
               ),
@@ -933,16 +1217,32 @@ class _MenuSheet extends StatelessWidget {
 }
 
 class ProductDetailOverlay extends ConsumerWidget {
-  final String vendorId, vendorName, itemId, name, imageUrl, category, description;
+  final String vendorId,
+      vendorName,
+      itemId,
+      name,
+      imageUrl,
+      category,
+      description;
   final bool isVeg, isAvailable, isVendorOnline;
   final double price, rating;
   final int ratingCount;
 
   const ProductDetailOverlay({
-    super.key, required this.vendorId, required this.vendorName, required this.itemId,
-    required this.name, required this.imageUrl, required this.category,
-    required this.description, required this.isVeg, required this.price,
-    required this.rating, required this.ratingCount, required this.isAvailable, required this.isVendorOnline,
+    super.key,
+    required this.vendorId,
+    required this.vendorName,
+    required this.itemId,
+    required this.name,
+    required this.imageUrl,
+    required this.category,
+    required this.description,
+    required this.isVeg,
+    required this.price,
+    required this.rating,
+    required this.ratingCount,
+    required this.isAvailable,
+    required this.isVendorOnline,
   });
 
   @override
@@ -952,39 +1252,169 @@ class ProductDetailOverlay extends ConsumerWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: theme.cardColor, 
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24))
+        color: theme.cardColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (imageUrl.isNotEmpty) ClipRRect(borderRadius: BorderRadius.circular(16), child: CachedNetworkImage(imageUrl: imageUrl, height: 200, width: double.infinity, fit: BoxFit.cover)),
+          if (imageUrl.isNotEmpty)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: CachedNetworkImage(
+                imageUrl: imageUrl,
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
           const SizedBox(height: 16),
-          Row(children: [Icon(Icons.radio_button_checked, color: isVeg ? Colors.green : Colors.red, size: 16), const SizedBox(width: 8), Text(category, style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600))]),
+          Row(
+            children: [
+              Icon(
+                Icons.radio_button_checked,
+                color: isVeg ? Colors.green : Colors.red,
+                size: 16,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                category,
+                style: TextStyle(
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
-          Text(name, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87)),
+          Text(
+            name,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text(description, style: TextStyle(color: isDark ? Colors.grey.shade400 : Colors.grey.shade600, height: 1.4)),
+          Text(
+            description,
+            style: TextStyle(
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+              height: 1.4,
+            ),
+          ),
           const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "₹${price.toInt()}", 
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: _kYellow)
+                "₹${price.toInt()}",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: _kYellow,
+                ),
               ),
               _AddButton(
-                vendorId: vendorId, vendorName: vendorName, 
-                itemId: itemId, itemName: name, price: price, 
-                isAvailable: isAvailable && isVendorOnline
+                vendorId: vendorId,
+                vendorName: vendorName,
+                itemId: itemId,
+                itemName: name,
+                price: price,
+                isAvailable: isAvailable && isVendorOnline,
               ),
             ],
           ),
           const SizedBox(height: 24),
         ],
       ),
+    );
+  }
+}
+
+// ─── Vendor Coupon Strip ──────────────────────────────────────────────────────
+
+class _VendorCouponStrip extends ConsumerWidget {
+  final String vendorId;
+  const _VendorCouponStrip({required this.vendorId});
+
+  String _couponLabel(Coupon c) {
+    switch (c.couponType) {
+      case 'free_delivery':
+        return 'FREE delivery';
+      case 'flat_off':
+        return '₹${c.discount.toInt()} off on ₹${c.minAmount.toInt()}+';
+      case 'discount':
+        final cap = c.maxDiscountableAmount > 0
+            ? ' upto ₹${c.maxDiscountableAmount}'
+            : '';
+        return '${c.discount.toInt()}%$cap off';
+      default:
+        return c.couponCode;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final couponsAsync = ref.watch(vendorCouponsProvider(vendorId));
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return couponsAsync.when(
+      loading: () => const SizedBox(height: 28),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (coupons) {
+        if (coupons.isEmpty) return const SizedBox.shrink();
+        return SizedBox(
+          height: 28,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: coupons.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (_, i) {
+              final c = coupons[i];
+              return Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.teal.shade900.withValues(alpha: 0.5)
+                      : Colors.teal.shade50,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isDark ? Colors.teal.shade700 : Colors.teal.shade200,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.local_offer_rounded,
+                      size: 12,
+                      color: isDark
+                          ? Colors.teal.shade300
+                          : Colors.teal.shade700,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _couponLabel(c),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: isDark
+                            ? Colors.teal.shade300
+                            : Colors.teal.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

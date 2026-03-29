@@ -1,12 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/item.dart';
+import '../core/db_collections.dart';
 
 // Single real-time stream of ALL items.
 // Every other provider derives from this — no extra Firestore listeners.
 final allItemsStreamProvider = StreamProvider<List<Item>>((ref) {
   return FirebaseFirestore.instance
-      .collection('items1')
+      .collection(DbCollections.items)
       .snapshots()
       .map((snap) => snap.docs.map(Item.fromDoc).toList());
 });

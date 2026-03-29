@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import '../providers/coupons_provider.dart';
+import '../models/coupon.dart';
 import '../screens/vendor_items_page.dart';
 import '../core/navigation/app_page_route.dart';
 
@@ -77,7 +80,7 @@ class WishlistManager {
 
 // ─── VendorCard ───────────────────────────────────────────────────────────────
 
-class VendorCard extends StatefulWidget {
+class VendorCard extends ConsumerStatefulWidget {
   final String vendorId, name, imageUrl, address, category;
   final double rating;
   final bool isAvailable;
@@ -96,10 +99,10 @@ class VendorCard extends StatefulWidget {
   });
 
   @override
-  State<VendorCard> createState() => _VendorCardState();
+  ConsumerState<VendorCard> createState() => _VendorCardState();
 }
 
-class _VendorCardState extends State<VendorCard> {
+class _VendorCardState extends ConsumerState<VendorCard> {
   bool _inWishlist = false;
 
   @override
@@ -115,18 +118,21 @@ class _VendorCardState extends State<VendorCard> {
 
   Future<void> _toggleWishlist() async {
     final wv = WishlistVendor(
-        vendorId: widget.vendorId,
-        name: widget.name,
-        imageUrl: widget.imageUrl,
-        address: widget.address,
-        category: widget.category,
-        rating: widget.rating);
+      vendorId: widget.vendorId,
+      name: widget.name,
+      imageUrl: widget.imageUrl,
+      address: widget.address,
+      category: widget.category,
+      rating: widget.rating,
+    );
     await WishlistManager.toggle(wv);
     await _checkWishlist();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(_inWishlist ? 'Added to wishlist' : 'Removed from wishlist'),
+        content: Text(
+          _inWishlist ? 'Added to wishlist' : 'Removed from wishlist',
+        ),
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 1),
       ),
@@ -176,7 +182,8 @@ class _VendorCardState extends State<VendorCard> {
                         ? CachedNetworkImage(
                             imageUrl: widget.imageUrl.trim(),
                             fit: BoxFit.cover,
-                            placeholder: (_, __) => Container(color: placeholder),
+                            placeholder: (_, __) =>
+                                Container(color: placeholder),
                             errorWidget: (_, __, ___) => Container(
                               color: placeholder,
                               child: const Icon(Icons.store, size: 40),
@@ -200,7 +207,9 @@ class _VendorCardState extends State<VendorCard> {
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        _inWishlist ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                        _inWishlist
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
                         size: 20,
                         color: _inWishlist ? Colors.red : Colors.grey,
                       ),
@@ -231,7 +240,10 @@ class _VendorCardState extends State<VendorCard> {
                       ),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.green.shade700,
                           borderRadius: BorderRadius.circular(6),
@@ -248,7 +260,11 @@ class _VendorCardState extends State<VendorCard> {
                               ),
                             ),
                             const SizedBox(width: 2),
-                            const Icon(Icons.star_rounded, size: 14, color: Colors.white),
+                            const Icon(
+                              Icons.star_rounded,
+                              size: 14,
+                              color: Colors.white,
+                            ),
                           ],
                         ),
                       ),
@@ -270,7 +286,11 @@ class _VendorCardState extends State<VendorCard> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Icon(Icons.timer_outlined, size: 14, color: Colors.grey.shade500),
+                      Icon(
+                        Icons.timer_outlined,
+                        size: 14,
+                        color: Colors.grey.shade500,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '20-30 min',
@@ -282,12 +302,92 @@ class _VendorCardState extends State<VendorCard> {
                       ),
                     ],
                   ),
+                  _VendorCardCouponStrip(vendorId: widget.vendorId),
                 ],
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─── Coupon strip shown on vendor cards in home page ─────────────────────────
+
+class _VendorCardCouponStrip extends ConsumerWidget {
+  final String vendorId;
+  const _VendorCardCouponStrip({required this.vendorId});
+
+  String _label(Coupon c) {
+    switch (c.couponType) {
+      case 'free_delivery':
+        return 'FREE delivery';
+      case 'flat_off':
+        return '₹${c.discount.toInt()} off on ₹${c.minAmount.toInt()}+';
+      case 'discount':
+        final cap = c.maxDiscountableAmount > 0
+            ? ' upto ₹${c.maxDiscountableAmount}'
+            : '';
+        return '${c.discount.toInt()}%$cap off';
+      default:
+        return c.couponCode;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final couponsAsync = ref.watch(vendorCouponsProvider(vendorId));
+    return couponsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (coupons) {
+        if (coupons.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: SizedBox(
+            height: 26,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: coupons.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              itemBuilder: (_, i) {
+                final c = coupons[i];
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.local_offer_rounded,
+                        size: 11,
+                        color: Colors.orange.shade700,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _label(c),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.orange.shade800,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -21,6 +21,10 @@ class Coupon with _$Coupon {
     required int currentUsage,
     required bool isActive,
     required DateTime createdAt,
+
+    /// "" = global coupon (applies to entire order)
+    /// "<vendorId>" = vendor-specific (applies only to that vendor's items)
+    @Default('') String vendorId,
   }) = _Coupon;
 
   factory Coupon.fromJson(Map<String, dynamic> json) => _$CouponFromJson(json);
@@ -42,25 +46,29 @@ class Coupon with _$Coupon {
       currentUsage: (d['currentUsage'] as num? ?? 0).toInt(),
       isActive: d['isActive'] ?? true,
       createdAt: (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      vendorId: d['vendorId'] ?? '',
     );
   }
+
+  bool get isGlobal => vendorId.isEmpty;
 
   bool get isUsageLimitReached => maxUsage > 0 && currentUsage >= maxUsage;
 
   bool get isValid => isActive && !isUsageLimitReached;
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'couponCode': couponCode,
-        'couponName': couponName,
-        'couponType': couponType,
-        'description': description,
-        'minAmount': minAmount,
-        'maxDiscountableAmount': maxDiscountableAmount,
-        'discount': discount,
-        'maxUsage': maxUsage,
-        'currentUsage': currentUsage,
-        'isActive': isActive,
-        'createdAt': Timestamp.fromDate(createdAt),
-      };
+    'id': id,
+    'couponCode': couponCode,
+    'couponName': couponName,
+    'couponType': couponType,
+    'description': description,
+    'minAmount': minAmount,
+    'maxDiscountableAmount': maxDiscountableAmount,
+    'discount': discount,
+    'maxUsage': maxUsage,
+    'currentUsage': currentUsage,
+    'isActive': isActive,
+    'createdAt': Timestamp.fromDate(createdAt),
+    'vendorId': vendorId,
+  };
 }

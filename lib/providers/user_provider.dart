@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/app_user.dart';
 import '../services/notification_service.dart';
+import '../core/db_collections.dart';
 import 'cart_provider.dart';
 
 // Single source of truth: AppUser?
@@ -38,7 +39,7 @@ class UserNotifier extends AsyncNotifier<AppUser?> {
 
       _userDocSub?.cancel();
       _userDocSub = FirebaseFirestore.instance
-          .collection('users1')
+          .collection(DbCollections.users)
           .doc(firebaseUser.uid)
           .snapshots()
           .listen((doc) {
@@ -74,7 +75,7 @@ class UserNotifier extends AsyncNotifier<AppUser?> {
     try {
       final token = await NotificationService().getToken();
       if (token != null) {
-        await FirebaseFirestore.instance.collection('users1').doc(uid).update({
+        await FirebaseFirestore.instance.collection(DbCollections.users).doc(uid).update({
           'FCMToken': token,
         });
       }
@@ -85,7 +86,7 @@ class UserNotifier extends AsyncNotifier<AppUser?> {
 
   Future<void> deleteFcmToken(String uid) async {
     try {
-      await FirebaseFirestore.instance.collection('users1').doc(uid).update({
+      await FirebaseFirestore.instance.collection(DbCollections.users).doc(uid).update({
         'FCMToken': FieldValue.delete(),
       });
     } catch (e) {
@@ -100,7 +101,7 @@ class UserNotifier extends AsyncNotifier<AppUser?> {
   Future<void> updateName(String name) async {
     final uid = _uid;
     if (uid == null) return;
-    await FirebaseFirestore.instance.collection('users1').doc(uid).set({
+    await FirebaseFirestore.instance.collection(DbCollections.users).doc(uid).set({
       'name': name,
     }, SetOptions(merge: true));
   }
@@ -108,7 +109,7 @@ class UserNotifier extends AsyncNotifier<AppUser?> {
   Future<void> addAddress(SavedAddress address) async {
     final uid = _uid;
     if (uid == null) return;
-    await FirebaseFirestore.instance.collection('users1').doc(uid).update({
+    await FirebaseFirestore.instance.collection(DbCollections.users).doc(uid).update({
       'savedAddresses': FieldValue.arrayUnion([address.toMap()]),
     });
   }
@@ -118,7 +119,7 @@ class UserNotifier extends AsyncNotifier<AppUser?> {
     if (uid == null) return;
     final current = state.valueOrNull?.savedAddresses ?? [];
     final updated = [...current]..removeAt(index);
-    await FirebaseFirestore.instance.collection('users1').doc(uid).update({
+    await FirebaseFirestore.instance.collection(DbCollections.users).doc(uid).update({
       'savedAddresses': updated.map((a) => a.toMap()).toList(),
     });
   }
@@ -128,7 +129,7 @@ class UserNotifier extends AsyncNotifier<AppUser?> {
     if (uid == null) return;
     final current = state.valueOrNull?.savedAddresses ?? [];
     final updated = [...current]..[index] = address;
-    await FirebaseFirestore.instance.collection('users1').doc(uid).update({
+    await FirebaseFirestore.instance.collection(DbCollections.users).doc(uid).update({
       'savedAddresses': updated.map((a) => a.toMap()).toList(),
     });
   }
@@ -136,7 +137,7 @@ class UserNotifier extends AsyncNotifier<AppUser?> {
   Future<void> replaceAllAddresses(List<SavedAddress> addresses) async {
     final uid = _uid;
     if (uid == null) return;
-    await FirebaseFirestore.instance.collection('users1').doc(uid).update({
+    await FirebaseFirestore.instance.collection(DbCollections.users).doc(uid).update({
       'savedAddresses': addresses.map((a) => a.toMap()).toList(),
     });
   }
@@ -144,7 +145,7 @@ class UserNotifier extends AsyncNotifier<AppUser?> {
   Future<void> markDeleted() async {
     final uid = _uid;
     if (uid == null) return;
-    await FirebaseFirestore.instance.collection('users1').doc(uid).update({
+    await FirebaseFirestore.instance.collection(DbCollections.users).doc(uid).update({
       'status': 'deleted',
       'deletedAt': FieldValue.serverTimestamp(),
     });

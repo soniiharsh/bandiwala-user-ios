@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/user_provider.dart';
 import '../services/analytics_service.dart';
+import '../core/db_collections.dart';
 import 'nav_page.dart';
 import '../core/theme/theme.dart';
 import '../core/navigation/app_page_route.dart';
@@ -90,7 +91,9 @@ class _OtpPageState extends ConsumerState<OtpPage> {
   }
 
   Future<void> _upsertUser(User user) async {
-    final docRef = FirebaseFirestore.instance.collection('users1').doc(user.uid);
+    final docRef = FirebaseFirestore.instance
+        .collection(DbCollections.users)
+        .doc(user.uid);
     final doc = await docRef.get();
     if (!doc.exists) {
       await docRef.set({

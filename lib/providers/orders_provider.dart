@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/order.dart';
 import '../providers/user_provider.dart';
+import '../core/db_collections.dart';
 
 /// Places an order in Firestore and returns the generated document ID.
 /// Pass an [AppOrder] with [id] set to '' — the real ID comes from Firestore.
@@ -13,7 +14,9 @@ Future<String> placeOrder(AppOrder order) async {
     'itemsByVendor': order.itemsByVendor.map(
       (vendorId, vo) => MapEntry(vendorId, {
         'vendorName': vo.vendorName,
-        'items': vo.items.map((itemId, item) => MapEntry(itemId, item.toJson())),
+        'items': vo.items.map(
+          (itemId, item) => MapEntry(itemId, item.toJson()),
+        ),
         'status': vo.status,
         'statusUpdatedAt': FieldValue.serverTimestamp(),
       }),
@@ -31,13 +34,16 @@ Future<String> placeOrder(AppOrder order) async {
     'couponType': order.couponType,
     'couponDiscount': order.couponDiscount,
     'couponMaxDiscountableAmount': order.couponMaxDiscountableAmount,
+    'couponVendorId': order.couponVendorId,
     'grandTotal': order.grandTotal,
     'status': order.status,
     'createdAt': FieldValue.serverTimestamp(),
     'statusUpdatedAt': FieldValue.serverTimestamp(),
   };
 
-  final ref = await FirebaseFirestore.instance.collection('orders1').add(data);
+  final ref = await FirebaseFirestore.instance
+      .collection(DbCollections.orders)
+      .add(data);
   return ref.id;
 }
 
@@ -48,7 +54,7 @@ final userOrdersProvider = StreamProvider<List<AppOrder>>((ref) {
   if (user == null) return Stream.value([]);
 
   return FirebaseFirestore.instance
-      .collection('orders1')
+      .collection(DbCollections.orders)
       .where('userId', isEqualTo: user.uid)
       .snapshots()
       .map((snap) {
