@@ -17,6 +17,16 @@ _$ItemImpl _$$ItemImplFromJson(Map<String, dynamic> json) => _$ItemImpl(
   tags:
       (json['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ??
       const [],
+  options:
+      (json['options'] as List<dynamic>?)
+          ?.map((e) => e as Map<String, dynamic>)
+          .toList() ??
+      const [],
+  addons:
+      (json['addons'] as List<dynamic>?)
+          ?.map((e) => e as Map<String, dynamic>)
+          .toList() ??
+      const [],
   isVeg: json['isVeg'] as bool? ?? true,
   isAvailable: json['isAvailable'] as bool? ?? true,
   createdAt: json['createdAt'] == null
@@ -37,6 +47,8 @@ Map<String, dynamic> _$$ItemImplToJson(_$ItemImpl instance) =>
       'imageUrl': instance.imageUrl,
       'category': instance.category,
       'tags': instance.tags,
+      'options': instance.options,
+      'addons': instance.addons,
       'isVeg': instance.isVeg,
       'isAvailable': instance.isAvailable,
       'createdAt': instance.createdAt?.toIso8601String(),

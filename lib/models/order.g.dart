@@ -29,6 +29,12 @@ _$OrderItemImpl _$$OrderItemImplFromJson(Map<String, dynamic> json) =>
       name: json['name'] as String,
       price: (json['price'] as num).toDouble(),
       quantity: (json['quantity'] as num).toInt(),
+      selectedOption: json['selectedOption'] as Map<String, dynamic>? ?? null,
+      selectedAddons:
+          (json['selectedAddons'] as List<dynamic>?)
+              ?.map((e) => e as Map<String, dynamic>)
+              .toList() ??
+          const [],
     );
 
 Map<String, dynamic> _$$OrderItemImplToJson(_$OrderItemImpl instance) =>
@@ -36,6 +42,8 @@ Map<String, dynamic> _$$OrderItemImplToJson(_$OrderItemImpl instance) =>
       'name': instance.name,
       'price': instance.price,
       'quantity': instance.quantity,
+      'selectedOption': instance.selectedOption,
+      'selectedAddons': instance.selectedAddons,
     };
 
 _$VendorOrderImpl _$$VendorOrderImplFromJson(Map<String, dynamic> json) =>

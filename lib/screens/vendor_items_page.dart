@@ -8,9 +8,11 @@ import '../providers/active_address_provider.dart';
 import '../providers/items_provider.dart';
 import '../providers/coupons_provider.dart';
 import '../models/coupon.dart';
+import '../models/item.dart';
 import '../core/theme/theme.dart';
 import '../widgets/cart_bar.dart';
 import '../widgets/active_order_bar.dart';
+import '../widgets/item_customization_sheet.dart';
 import 'cart_page.dart';
 import 'orders_page.dart';
 import '../widgets/vendor_card.dart'; // WishlistManager + WishlistVendor
@@ -472,15 +474,8 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
           return _ItemCard(
             vendorId: widget.vendorId,
             vendorName: widget.vendorName,
-            itemId: item.id,
-            name: item.name,
-            imageUrl: item.imageUrl,
-            category: item.category,
-            description: item.description,
-            isAvailable: item.isAvailable,
+            item: item,
             isVendorOnline: isVendorOnline,
-            isVeg: item.isVeg,
-            price: item.price,
             rating: 4.2,
           );
         }, childCount: filtered.length),
@@ -812,28 +807,16 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _ItemCard extends StatelessWidget {
-  final String vendorId,
-      vendorName,
-      itemId,
-      name,
-      imageUrl,
-      category,
-      description;
-  final bool isAvailable, isVendorOnline, isVeg;
-  final double price, rating;
+  final String vendorId, vendorName;
+  final Item item;
+  final bool isVendorOnline;
+  final double rating;
 
   const _ItemCard({
     required this.vendorId,
     required this.vendorName,
-    required this.itemId,
-    required this.name,
-    required this.imageUrl,
-    required this.category,
-    required this.description,
-    required this.isAvailable,
+    required this.item,
     required this.isVendorOnline,
-    required this.isVeg,
-    required this.price,
     required this.rating,
   });
 
@@ -841,7 +824,7 @@ class _ItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final canAdd = isAvailable && isVendorOnline;
+    final canAdd = item.isAvailable && isVendorOnline;
 
     return GestureDetector(
       onTap: () => _showProductDetail(context),
@@ -869,9 +852,9 @@ class _ItemCard extends StatelessWidget {
                   ),
                   child: AspectRatio(
                     aspectRatio: 1,
-                    child: imageUrl.trim().isNotEmpty
+                    child: item.imageUrl.trim().isNotEmpty
                         ? CachedNetworkImage(
-                            imageUrl: imageUrl.trim(),
+                            imageUrl: item.imageUrl.trim(),
                             fit: BoxFit.cover,
                             placeholder: (_, __) => Container(
                               color: isDark
@@ -919,6 +902,30 @@ class _ItemCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                // Show customizable badge
+                if (_hasCustomizations)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _kYellow,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'Customizable',
+                        style: TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
             Expanded(
@@ -931,13 +938,13 @@ class _ItemCard extends StatelessWidget {
                       children: [
                         Icon(
                           Icons.radio_button_checked,
-                          color: isVeg ? Colors.green : Colors.red,
+                          color: item.isVeg ? Colors.green : Colors.red,
                           size: 10,
                         ),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            category,
+                            item.category,
                             style: TextStyle(
                               fontSize: 10,
                               color: isDark
@@ -951,7 +958,7 @@ class _ItemCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      name,
+                      item.name,
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
@@ -963,7 +970,7 @@ class _ItemCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Expanded(
                       child: Text(
-                        description,
+                        item.description,
                         style: TextStyle(
                           fontSize: 9,
                           color: isDark
@@ -980,7 +987,7 @@ class _ItemCard extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          "₹${price.toInt()}",
+                          "₹${item.price.toInt()}",
                           style: TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 14,
@@ -990,9 +997,7 @@ class _ItemCard extends StatelessWidget {
                         _AddButton(
                           vendorId: vendorId,
                           vendorName: vendorName,
-                          itemId: itemId,
-                          itemName: name,
-                          price: price,
+                          item: item,
                           isAvailable: canAdd,
                         ),
                       ],
@@ -1007,6 +1012,8 @@ class _ItemCard extends StatelessWidget {
     );
   }
 
+  bool get _hasCustomizations => item.hasCustomizations;
+
   void _showProductDetail(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -1015,16 +1022,9 @@ class _ItemCard extends StatelessWidget {
       builder: (_) => ProductDetailOverlay(
         vendorId: vendorId,
         vendorName: vendorName,
-        itemId: itemId,
-        name: name,
-        imageUrl: imageUrl,
-        category: category,
-        description: description,
-        isVeg: isVeg,
-        price: price,
+        item: item,
         rating: rating,
         ratingCount: 143,
-        isAvailable: isAvailable,
         isVendorOnline: isVendorOnline,
       ),
     );
@@ -1032,17 +1032,17 @@ class _ItemCard extends StatelessWidget {
 }
 
 class _AddButton extends ConsumerWidget {
-  final String vendorId, vendorName, itemId, itemName;
-  final double price;
+  final String vendorId, vendorName;
+  final Item item;
   final bool isAvailable;
   const _AddButton({
     required this.vendorId,
     required this.vendorName,
-    required this.itemId,
-    required this.itemName,
-    required this.price,
+    required this.item,
     required this.isAvailable,
   });
+
+  bool get _hasCustomizations => item.hasCustomizations;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1050,11 +1050,8 @@ class _AddButton extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final qty =
         cart.cartByVendor[vendorId]?.items
-            .firstWhere(
-              (i) => i.id == itemId,
-              orElse: () => CartItem(id: '', name: '', price: 0, quantity: 0),
-            )
-            .quantity ??
+            .where((i) => i.id == item.id)
+            .fold(0, (sum, i) => sum + i.quantity) ??
         0;
 
     if (qty > 0) {
@@ -1073,7 +1070,7 @@ class _AddButton extends ConsumerWidget {
                   .read(cartProvider.notifier)
                   .updateQuantity(
                     vendorId: vendorId,
-                    itemId: itemId,
+                    itemId: item.id,
                     delta: -1,
                   ),
               child: const Icon(Icons.remove, size: 12, color: Colors.white),
@@ -1087,15 +1084,26 @@ class _AddButton extends ConsumerWidget {
               ),
             ),
             GestureDetector(
-              onTap: () => ref
-                  .read(cartProvider.notifier)
-                  .addItem(
+              onTap: () {
+                if (_hasCustomizations) {
+                  showItemCustomizationSheet(
+                    context: context,
                     vendorId: vendorId,
                     vendorName: vendorName,
-                    itemId: itemId,
-                    itemName: itemName,
-                    price: price,
-                  ),
+                    item: item,
+                  );
+                } else {
+                  ref
+                      .read(cartProvider.notifier)
+                      .addItem(
+                        vendorId: vendorId,
+                        vendorName: vendorName,
+                        itemId: item.id,
+                        itemName: item.name,
+                        price: item.price,
+                      );
+                }
+              },
               child: const Icon(Icons.add, size: 12, color: Colors.white),
             ),
           ],
@@ -1105,15 +1113,26 @@ class _AddButton extends ConsumerWidget {
 
     return GestureDetector(
       onTap: isAvailable
-          ? () => ref
-                .read(cartProvider.notifier)
-                .addItem(
+          ? () {
+              if (_hasCustomizations) {
+                showItemCustomizationSheet(
+                  context: context,
                   vendorId: vendorId,
                   vendorName: vendorName,
-                  itemId: itemId,
-                  itemName: itemName,
-                  price: price,
-                )
+                  item: item,
+                );
+              } else {
+                ref
+                    .read(cartProvider.notifier)
+                    .addItem(
+                      vendorId: vendorId,
+                      vendorName: vendorName,
+                      itemId: item.id,
+                      itemName: item.name,
+                      price: item.price,
+                    );
+              }
+            }
           : null,
       child: Container(
         height: 28,
@@ -1201,9 +1220,7 @@ class _MenuSheet extends StatelessWidget {
                   trailing: _AddButton(
                     vendorId: vendorId,
                     vendorName: vendorName,
-                    itemId: items[i].id,
-                    itemName: items[i].name,
-                    price: items[i].price.toDouble(),
+                    item: items[i],
                     isAvailable: isVendorOnline && items[i].isAvailable,
                   ),
                 ),
@@ -1217,38 +1234,29 @@ class _MenuSheet extends StatelessWidget {
 }
 
 class ProductDetailOverlay extends ConsumerWidget {
-  final String vendorId,
-      vendorName,
-      itemId,
-      name,
-      imageUrl,
-      category,
-      description;
-  final bool isVeg, isAvailable, isVendorOnline;
-  final double price, rating;
+  final String vendorId, vendorName;
+  final Item item;
+  final double rating;
   final int ratingCount;
+  final bool isVendorOnline;
 
   const ProductDetailOverlay({
     super.key,
     required this.vendorId,
     required this.vendorName,
-    required this.itemId,
-    required this.name,
-    required this.imageUrl,
-    required this.category,
-    required this.description,
-    required this.isVeg,
-    required this.price,
+    required this.item,
     required this.rating,
     required this.ratingCount,
-    required this.isAvailable,
     required this.isVendorOnline,
   });
+
+  bool get _hasCustomizations => item.hasCustomizations;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final canAdd = item.isAvailable && isVendorOnline;
 
     return Container(
       decoration: BoxDecoration(
@@ -1260,11 +1268,11 @@ class ProductDetailOverlay extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (imageUrl.isNotEmpty)
+          if (item.imageUrl.isNotEmpty)
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: CachedNetworkImage(
-                imageUrl: imageUrl,
+                imageUrl: item.imageUrl,
                 height: 200,
                 width: double.infinity,
                 fit: BoxFit.cover,
@@ -1275,21 +1283,42 @@ class ProductDetailOverlay extends ConsumerWidget {
             children: [
               Icon(
                 Icons.radio_button_checked,
-                color: isVeg ? Colors.green : Colors.red,
+                color: item.isVeg ? Colors.green : Colors.red,
                 size: 16,
               ),
               const SizedBox(width: 8),
               Text(
-                category,
+                item.category,
                 style: TextStyle(
                   color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                 ),
               ),
+              if (_hasCustomizations) ...[
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _kYellow.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'Customizable',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: _kYellow,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 8),
           Text(
-            name,
+            item.name,
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -1298,7 +1327,7 @@ class ProductDetailOverlay extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            description,
+            item.description,
             style: TextStyle(
               color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
               height: 1.4,
@@ -1309,8 +1338,8 @@ class ProductDetailOverlay extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "₹${price.toInt()}",
-                style: TextStyle(
+                "₹${item.price.toInt()}",
+                style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                   color: _kYellow,
@@ -1319,10 +1348,8 @@ class ProductDetailOverlay extends ConsumerWidget {
               _AddButton(
                 vendorId: vendorId,
                 vendorName: vendorName,
-                itemId: itemId,
-                itemName: name,
-                price: price,
-                isAvailable: isAvailable && isVendorOnline,
+                item: item,
+                isAvailable: canAdd,
               ),
             ],
           ),

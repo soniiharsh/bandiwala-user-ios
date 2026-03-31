@@ -386,13 +386,14 @@ class _CartPageState extends ConsumerState<CartPage> {
                             vendorCart: entry.value,
                             itemAvailability: itemAvailability,
                             isVendorOnline: isVendorOnline,
-                            onQuantityChanged: (itemId, delta) {
+                            onQuantityChanged: (itemId, delta, {String? cartKey}) {
                               ref
                                   .read(cartProvider.notifier)
                                   .updateQuantity(
                                     vendorId: entry.key,
                                     itemId: itemId,
                                     delta: delta,
+                                    cartKey: cartKey,
                                   );
                             },
                             vendorTotal: cart.vendorTotal(entry.key),
@@ -1133,7 +1134,7 @@ class VendorCartSection extends ConsumerWidget {
   final VendorCart vendorCart;
   final Map<String, bool> itemAvailability;
   final bool isVendorOnline;
-  final void Function(String itemId, int delta) onQuantityChanged;
+  final void Function(String itemId, int delta, {String? cartKey}) onQuantityChanged;
   final double vendorTotal;
 
   const VendorCartSection({
@@ -1251,9 +1252,29 @@ class VendorCartSection extends ConsumerWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        // Show customization details
+                        if (item.selectedOption != null || item.selectedAddons.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              [
+                                if (item.selectedOption != null) item.selectedOption!['name'],
+                                ...item.selectedAddons.map((a) => a['name']),
+                              ].where((s) => s != null && s.toString().isNotEmpty).join(', '),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDisabled
+                                    ? theme.colorScheme.onSurface.withOpacity(0.2)
+                                    : theme.colorScheme.onSurfaceVariant,
+                                fontStyle: FontStyle.italic,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         const SizedBox(height: 2),
                         Text(
-                          '₹${item.price.toStringAsFixed(0)}',
+                          '₹${item.totalUnitPrice.toStringAsFixed(0)}',
                           style: TextStyle(
                             fontSize: 13,
                             color: isDisabled
@@ -1296,7 +1317,7 @@ class VendorCartSection extends ConsumerWidget {
                         GestureDetector(
                           onTap: isDisabled
                               ? null
-                              : () => onQuantityChanged(item.id, -1),
+                              : () => onQuantityChanged(item.id, -1, cartKey: item.cartKey),
                           child: SizedBox(
                             width: 32,
                             height: 32,
@@ -1324,7 +1345,7 @@ class VendorCartSection extends ConsumerWidget {
                         GestureDetector(
                           onTap: isDisabled
                               ? null
-                              : () => onQuantityChanged(item.id, 1),
+                              : () => onQuantityChanged(item.id, 1, cartKey: item.cartKey),
                           child: SizedBox(
                             width: 32,
                             height: 32,

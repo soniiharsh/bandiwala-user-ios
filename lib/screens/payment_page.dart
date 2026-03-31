@@ -154,8 +154,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           for (final item in entry.value.items)
             item.id: OrderItem(
               name: item.name,
-              price: item.price,
+              price: item.totalUnitPrice,
               quantity: item.quantity,
+              selectedOption: item.selectedOption,
+              selectedAddons: item.selectedAddons,
             ),
         },
       );
@@ -423,38 +425,67 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 ),
               ),
               ...e.value.items.map(
-                (item) => Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        margin: const EdgeInsets.only(right: 8, top: 2),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.grey.shade400,
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          '${item.name}  ×${item.quantity}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.black87,
+                (item) {
+                  // Build customization label
+                  final List<String> parts = [];
+                  if (item.selectedOption != null) {
+                    parts.add(item.selectedOption!['name'] ?? '');
+                  }
+                  for (final addon in item.selectedAddons) {
+                    parts.add(addon['name'] ?? '');
+                  }
+                  final customLabel = parts.where((s) => s.isNotEmpty).join(', ');
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          margin: const EdgeInsets.only(right: 8, top: 5),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.grey.shade400,
                           ),
                         ),
-                      ),
-                      Text(
-                        '₹${(item.price * item.quantity).toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${item.name}  ×${item.quantity}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              if (customLabel.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 1),
+                                  child: Text(
+                                    customLabel,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade500,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
+                        Text(
+                          '₹${(item.totalUnitPrice * item.quantity).toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),

@@ -10,19 +10,47 @@ class CartItem {
   final String name;
   final double price;
   final int quantity;
+  final Map<String, dynamic>? selectedOption;
+  final List<Map<String, dynamic>> selectedAddons;
 
   const CartItem({
     required this.id,
     required this.name,
     required this.price,
     required this.quantity,
+    this.selectedOption,
+    this.selectedAddons = const [],
   });
+
+  /// Composite key that distinguishes the same item with different customizations.
+  String get cartKey {
+    final optPart = selectedOption != null ? '_opt:${selectedOption!['name']}' : '';
+    final addonPart = selectedAddons.isNotEmpty
+        ? '_add:${(selectedAddons.map((a) => a['name'] as String).toList()..sort()).join(',')}'
+        : '';
+    return '$id$optPart$addonPart';
+  }
+
+  double get customizationExtra {
+    double extra = 0;
+    if (selectedOption != null) {
+      extra += ((selectedOption!['price'] ?? 0) as num).toDouble();
+    }
+    for (final addon in selectedAddons) {
+      extra += ((addon['price'] ?? 0) as num).toDouble();
+    }
+    return extra;
+  }
+
+  double get totalUnitPrice => price + customizationExtra;
 
   CartItem copyWith({int? quantity}) => CartItem(
     id: id,
     name: name,
     price: price,
     quantity: quantity ?? this.quantity,
+    selectedOption: selectedOption,
+    selectedAddons: selectedAddons,
   );
 
   Map<String, dynamic> toJson() => {
@@ -30,6 +58,8 @@ class CartItem {
     'name': name,
     'price': price,
     'quantity': quantity,
+    if (selectedOption != null) 'selectedOption': selectedOption,
+    if (selectedAddons.isNotEmpty) 'selectedAddons': selectedAddons,
   };
 
   factory CartItem.fromJson(Map<String, dynamic> j) => CartItem(
@@ -37,6 +67,13 @@ class CartItem {
     name: j['name'],
     price: (j['price'] as num).toDouble(),
     quantity: j['quantity'] as int,
+    selectedOption: j['selectedOption'] != null
+        ? Map<String, dynamic>.from(j['selectedOption'])
+        : null,
+    selectedAddons: j['selectedAddons'] != null
+        ? List<Map<String, dynamic>>.from(
+            (j['selectedAddons'] as List).map((e) => Map<String, dynamic>.from(e)))
+        : [],
   );
 }
 
@@ -75,12 +112,12 @@ class CartState {
 
   double get grandTotal => cartByVendor.values
       .expand((v) => v.items)
-      .fold(0.0, (sum, i) => sum + i.price * i.quantity);
+      .fold(0.0, (sum, i) => sum + i.totalUnitPrice * i.quantity);
 
   double vendorTotal(String vendorId) =>
       cartByVendor[vendorId]?.items.fold<double>(
         0.0,
-        (sum, i) => sum + i.price * i.quantity,
+        (sum, i) => sum + i.totalUnitPrice * i.quantity,
       ) ??
       0.0;
 
@@ -122,16 +159,25 @@ class CartNotifier extends StateNotifier<CartState> {
     required String itemId,
     required String itemName,
     required double price,
+    Map<String, dynamic>? selectedOption,
+    List<Map<String, dynamic>> selectedAddons = const [],
   }) {
     final current = Map<String, VendorCart>.from(state.cartByVendor);
     final vendor =
         current[vendorId] ?? VendorCart(vendorName: vendorName, items: []);
     final items = List<CartItem>.from(vendor.items);
-    final idx = items.indexWhere((i) => i.id == itemId);
+    // Build a temporary CartItem to get its cartKey for lookup
+    final tempItem = CartItem(
+      id: itemId,
+      name: itemName,
+      price: price,
+      quantity: 1,
+      selectedOption: selectedOption,
+      selectedAddons: selectedAddons,
+    );
+    final idx = items.indexWhere((i) => i.cartKey == tempItem.cartKey);
     if (idx == -1) {
-      items.add(
-        CartItem(id: itemId, name: itemName, price: price, quantity: 1),
-      );
+      items.add(tempItem);
     } else {
       items[idx] = items[idx].copyWith(quantity: items[idx].quantity + 1);
     }
@@ -151,12 +197,15 @@ class CartNotifier extends StateNotifier<CartState> {
     required String vendorId,
     required String itemId,
     required int delta,
+    String? cartKey,
   }) {
     final current = Map<String, VendorCart>.from(state.cartByVendor);
     final vendor = current[vendorId];
     if (vendor == null) return;
     final items = List<CartItem>.from(vendor.items);
-    final idx = items.indexWhere((i) => i.id == itemId);
+    final idx = cartKey != null
+        ? items.indexWhere((i) => i.cartKey == cartKey)
+        : items.indexWhere((i) => i.id == itemId);
     if (idx == -1) return;
     final newQty = (items[idx].quantity + delta).clamp(0, 99);
     if (newQty == 0) {

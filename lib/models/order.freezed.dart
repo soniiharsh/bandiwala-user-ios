@@ -259,6 +259,10 @@ mixin _$OrderItem {
   String get name => throw _privateConstructorUsedError;
   double get price => throw _privateConstructorUsedError;
   int get quantity => throw _privateConstructorUsedError;
+  Map<String, dynamic>? get selectedOption =>
+      throw _privateConstructorUsedError;
+  List<Map<String, dynamic>> get selectedAddons =>
+      throw _privateConstructorUsedError;
 
   /// Serializes this OrderItem to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -275,7 +279,13 @@ abstract class $OrderItemCopyWith<$Res> {
   factory $OrderItemCopyWith(OrderItem value, $Res Function(OrderItem) then) =
       _$OrderItemCopyWithImpl<$Res, OrderItem>;
   @useResult
-  $Res call({String name, double price, int quantity});
+  $Res call({
+    String name,
+    double price,
+    int quantity,
+    Map<String, dynamic>? selectedOption,
+    List<Map<String, dynamic>> selectedAddons,
+  });
 }
 
 /// @nodoc
@@ -296,6 +306,8 @@ class _$OrderItemCopyWithImpl<$Res, $Val extends OrderItem>
     Object? name = null,
     Object? price = null,
     Object? quantity = null,
+    Object? selectedOption = freezed,
+    Object? selectedAddons = null,
   }) {
     return _then(
       _value.copyWith(
@@ -311,6 +323,14 @@ class _$OrderItemCopyWithImpl<$Res, $Val extends OrderItem>
                 ? _value.quantity
                 : quantity // ignore: cast_nullable_to_non_nullable
                       as int,
+            selectedOption: freezed == selectedOption
+                ? _value.selectedOption
+                : selectedOption // ignore: cast_nullable_to_non_nullable
+                      as Map<String, dynamic>?,
+            selectedAddons: null == selectedAddons
+                ? _value.selectedAddons
+                : selectedAddons // ignore: cast_nullable_to_non_nullable
+                      as List<Map<String, dynamic>>,
           )
           as $Val,
     );
@@ -326,7 +346,13 @@ abstract class _$$OrderItemImplCopyWith<$Res>
   ) = __$$OrderItemImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({String name, double price, int quantity});
+  $Res call({
+    String name,
+    double price,
+    int quantity,
+    Map<String, dynamic>? selectedOption,
+    List<Map<String, dynamic>> selectedAddons,
+  });
 }
 
 /// @nodoc
@@ -346,6 +372,8 @@ class __$$OrderItemImplCopyWithImpl<$Res>
     Object? name = null,
     Object? price = null,
     Object? quantity = null,
+    Object? selectedOption = freezed,
+    Object? selectedAddons = null,
   }) {
     return _then(
       _$OrderItemImpl(
@@ -361,6 +389,14 @@ class __$$OrderItemImplCopyWithImpl<$Res>
             ? _value.quantity
             : quantity // ignore: cast_nullable_to_non_nullable
                   as int,
+        selectedOption: freezed == selectedOption
+            ? _value._selectedOption
+            : selectedOption // ignore: cast_nullable_to_non_nullable
+                  as Map<String, dynamic>?,
+        selectedAddons: null == selectedAddons
+            ? _value._selectedAddons
+            : selectedAddons // ignore: cast_nullable_to_non_nullable
+                  as List<Map<String, dynamic>>,
       ),
     );
   }
@@ -373,7 +409,11 @@ class _$OrderItemImpl extends _OrderItem {
     required this.name,
     required this.price,
     required this.quantity,
-  }) : super._();
+    final Map<String, dynamic>? selectedOption = null,
+    final List<Map<String, dynamic>> selectedAddons = const [],
+  }) : _selectedOption = selectedOption,
+       _selectedAddons = selectedAddons,
+       super._();
 
   factory _$OrderItemImpl.fromJson(Map<String, dynamic> json) =>
       _$$OrderItemImplFromJson(json);
@@ -384,10 +424,29 @@ class _$OrderItemImpl extends _OrderItem {
   final double price;
   @override
   final int quantity;
+  final Map<String, dynamic>? _selectedOption;
+  @override
+  @JsonKey()
+  Map<String, dynamic>? get selectedOption {
+    final value = _selectedOption;
+    if (value == null) return null;
+    if (_selectedOption is EqualUnmodifiableMapView) return _selectedOption;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(value);
+  }
+
+  final List<Map<String, dynamic>> _selectedAddons;
+  @override
+  @JsonKey()
+  List<Map<String, dynamic>> get selectedAddons {
+    if (_selectedAddons is EqualUnmodifiableListView) return _selectedAddons;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_selectedAddons);
+  }
 
   @override
   String toString() {
-    return 'OrderItem(name: $name, price: $price, quantity: $quantity)';
+    return 'OrderItem(name: $name, price: $price, quantity: $quantity, selectedOption: $selectedOption, selectedAddons: $selectedAddons)';
   }
 
   @override
@@ -398,12 +457,27 @@ class _$OrderItemImpl extends _OrderItem {
             (identical(other.name, name) || other.name == name) &&
             (identical(other.price, price) || other.price == price) &&
             (identical(other.quantity, quantity) ||
-                other.quantity == quantity));
+                other.quantity == quantity) &&
+            const DeepCollectionEquality().equals(
+              other._selectedOption,
+              _selectedOption,
+            ) &&
+            const DeepCollectionEquality().equals(
+              other._selectedAddons,
+              _selectedAddons,
+            ));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, name, price, quantity);
+  int get hashCode => Object.hash(
+    runtimeType,
+    name,
+    price,
+    quantity,
+    const DeepCollectionEquality().hash(_selectedOption),
+    const DeepCollectionEquality().hash(_selectedAddons),
+  );
 
   /// Create a copy of OrderItem
   /// with the given fields replaced by the non-null parameter values.
@@ -424,6 +498,8 @@ abstract class _OrderItem extends OrderItem {
     required final String name,
     required final double price,
     required final int quantity,
+    final Map<String, dynamic>? selectedOption,
+    final List<Map<String, dynamic>> selectedAddons,
   }) = _$OrderItemImpl;
   const _OrderItem._() : super._();
 
@@ -436,6 +512,10 @@ abstract class _OrderItem extends OrderItem {
   double get price;
   @override
   int get quantity;
+  @override
+  Map<String, dynamic>? get selectedOption;
+  @override
+  List<Map<String, dynamic>> get selectedAddons;
 
   /// Create a copy of OrderItem
   /// with the given fields replaced by the non-null parameter values.

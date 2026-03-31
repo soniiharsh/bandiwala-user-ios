@@ -44,6 +44,8 @@ class OrderItem with _$OrderItem {
     required String name,
     required double price,
     required int quantity,
+    @Default(null) Map<String, dynamic>? selectedOption,
+    @Default([]) List<Map<String, dynamic>> selectedAddons,
   }) = _OrderItem;
 
   factory OrderItem.fromJson(Map<String, dynamic> json) =>
@@ -53,6 +55,13 @@ class OrderItem with _$OrderItem {
     name: m['name'] ?? '',
     price: (m['price'] as num? ?? 0).toDouble(),
     quantity: (m['quantity'] as num? ?? 1).toInt(),
+    selectedOption: m['selectedOption'] != null
+        ? Map<String, dynamic>.from(m['selectedOption'])
+        : null,
+    selectedAddons: m['selectedAddons'] != null
+        ? List<Map<String, dynamic>>.from(
+            (m['selectedAddons'] as List).map((e) => Map<String, dynamic>.from(e)))
+        : [],
   );
 }
 

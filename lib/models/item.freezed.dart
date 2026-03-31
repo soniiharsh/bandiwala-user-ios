@@ -29,6 +29,8 @@ mixin _$Item {
   String get imageUrl => throw _privateConstructorUsedError;
   String get category => throw _privateConstructorUsedError;
   List<String> get tags => throw _privateConstructorUsedError;
+  List<Map<String, dynamic>> get options => throw _privateConstructorUsedError;
+  List<Map<String, dynamic>> get addons => throw _privateConstructorUsedError;
   bool get isVeg => throw _privateConstructorUsedError;
   bool get isAvailable => throw _privateConstructorUsedError;
   DateTime? get createdAt => throw _privateConstructorUsedError;
@@ -57,6 +59,8 @@ abstract class $ItemCopyWith<$Res> {
     String imageUrl,
     String category,
     List<String> tags,
+    List<Map<String, dynamic>> options,
+    List<Map<String, dynamic>> addons,
     bool isVeg,
     bool isAvailable,
     DateTime? createdAt,
@@ -87,6 +91,8 @@ class _$ItemCopyWithImpl<$Res, $Val extends Item>
     Object? imageUrl = null,
     Object? category = null,
     Object? tags = null,
+    Object? options = null,
+    Object? addons = null,
     Object? isVeg = null,
     Object? isAvailable = null,
     Object? createdAt = freezed,
@@ -126,6 +132,14 @@ class _$ItemCopyWithImpl<$Res, $Val extends Item>
                 ? _value.tags
                 : tags // ignore: cast_nullable_to_non_nullable
                       as List<String>,
+            options: null == options
+                ? _value.options
+                : options // ignore: cast_nullable_to_non_nullable
+                      as List<Map<String, dynamic>>,
+            addons: null == addons
+                ? _value.addons
+                : addons // ignore: cast_nullable_to_non_nullable
+                      as List<Map<String, dynamic>>,
             isVeg: null == isVeg
                 ? _value.isVeg
                 : isVeg // ignore: cast_nullable_to_non_nullable
@@ -165,6 +179,8 @@ abstract class _$$ItemImplCopyWith<$Res> implements $ItemCopyWith<$Res> {
     String imageUrl,
     String category,
     List<String> tags,
+    List<Map<String, dynamic>> options,
+    List<Map<String, dynamic>> addons,
     bool isVeg,
     bool isAvailable,
     DateTime? createdAt,
@@ -192,6 +208,8 @@ class __$$ItemImplCopyWithImpl<$Res>
     Object? imageUrl = null,
     Object? category = null,
     Object? tags = null,
+    Object? options = null,
+    Object? addons = null,
     Object? isVeg = null,
     Object? isAvailable = null,
     Object? createdAt = freezed,
@@ -231,6 +249,14 @@ class __$$ItemImplCopyWithImpl<$Res>
             ? _value._tags
             : tags // ignore: cast_nullable_to_non_nullable
                   as List<String>,
+        options: null == options
+            ? _value._options
+            : options // ignore: cast_nullable_to_non_nullable
+                  as List<Map<String, dynamic>>,
+        addons: null == addons
+            ? _value._addons
+            : addons // ignore: cast_nullable_to_non_nullable
+                  as List<Map<String, dynamic>>,
         isVeg: null == isVeg
             ? _value.isVeg
             : isVeg // ignore: cast_nullable_to_non_nullable
@@ -264,11 +290,15 @@ class _$ItemImpl implements _Item {
     this.imageUrl = '',
     this.category = '',
     final List<String> tags = const [],
+    final List<Map<String, dynamic>> options = const [],
+    final List<Map<String, dynamic>> addons = const [],
     this.isVeg = true,
     this.isAvailable = true,
     this.createdAt,
     this.updatedAt,
-  }) : _tags = tags;
+  }) : _tags = tags,
+       _options = options,
+       _addons = addons;
 
   factory _$ItemImpl.fromJson(Map<String, dynamic> json) =>
       _$$ItemImplFromJson(json);
@@ -299,6 +329,24 @@ class _$ItemImpl implements _Item {
     return EqualUnmodifiableListView(_tags);
   }
 
+  final List<Map<String, dynamic>> _options;
+  @override
+  @JsonKey()
+  List<Map<String, dynamic>> get options {
+    if (_options is EqualUnmodifiableListView) return _options;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_options);
+  }
+
+  final List<Map<String, dynamic>> _addons;
+  @override
+  @JsonKey()
+  List<Map<String, dynamic>> get addons {
+    if (_addons is EqualUnmodifiableListView) return _addons;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_addons);
+  }
+
   @override
   @JsonKey()
   final bool isVeg;
@@ -312,7 +360,7 @@ class _$ItemImpl implements _Item {
 
   @override
   String toString() {
-    return 'Item(id: $id, vendorId: $vendorId, name: $name, description: $description, price: $price, imageUrl: $imageUrl, category: $category, tags: $tags, isVeg: $isVeg, isAvailable: $isAvailable, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'Item(id: $id, vendorId: $vendorId, name: $name, description: $description, price: $price, imageUrl: $imageUrl, category: $category, tags: $tags, options: $options, addons: $addons, isVeg: $isVeg, isAvailable: $isAvailable, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -332,6 +380,8 @@ class _$ItemImpl implements _Item {
             (identical(other.category, category) ||
                 other.category == category) &&
             const DeepCollectionEquality().equals(other._tags, _tags) &&
+            const DeepCollectionEquality().equals(other._options, _options) &&
+            const DeepCollectionEquality().equals(other._addons, _addons) &&
             (identical(other.isVeg, isVeg) || other.isVeg == isVeg) &&
             (identical(other.isAvailable, isAvailable) ||
                 other.isAvailable == isAvailable) &&
@@ -353,6 +403,8 @@ class _$ItemImpl implements _Item {
     imageUrl,
     category,
     const DeepCollectionEquality().hash(_tags),
+    const DeepCollectionEquality().hash(_options),
+    const DeepCollectionEquality().hash(_addons),
     isVeg,
     isAvailable,
     createdAt,
@@ -383,6 +435,8 @@ abstract class _Item implements Item {
     final String imageUrl,
     final String category,
     final List<String> tags,
+    final List<Map<String, dynamic>> options,
+    final List<Map<String, dynamic>> addons,
     final bool isVeg,
     final bool isAvailable,
     final DateTime? createdAt,
@@ -407,6 +461,10 @@ abstract class _Item implements Item {
   String get category;
   @override
   List<String> get tags;
+  @override
+  List<Map<String, dynamic>> get options;
+  @override
+  List<Map<String, dynamic>> get addons;
   @override
   bool get isVeg;
   @override

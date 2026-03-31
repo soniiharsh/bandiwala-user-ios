@@ -14,7 +14,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../core/theme/theme.dart';
 import '../core/navigation/app_page_route.dart';
+import '../models/item.dart';
 import 'skeletons.dart';
+import 'item_customization_sheet.dart';
 
 const Color _kYellow = AppColors.primary;
 
@@ -378,6 +380,7 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
           'isVeg': item.isVeg,
           'rating': 4.2,
           'ratingCount': 0,
+          'item': item,
         });
       }
 
@@ -811,13 +814,13 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildItemCard(_VendorResult vendor, Map<String, dynamic> item) {
-    final bool isVeg = item['isVeg'] ?? true;
-    final String imageUrl = item['imageUrl'] ?? '';
-    final String name = item['name'] ?? 'Item';
-    final String category = item['category'] ?? '';
-    final double price = (item['price'] ?? 0).toDouble();
-    final String itemId = item['id'] ?? '';
+  Widget _buildItemCard(_VendorResult vendor, Map<String, dynamic> itemMap) {
+    final Item item = itemMap['item'];
+    final bool isVeg = item.isVeg;
+    final String imageUrl = item.imageUrl;
+    final String name = item.name;
+    final String category = item.category;
+    final double price = item.price;
     final Color dot = isVeg ? Colors.green.shade600 : Colors.red.shade600;
 
     return Container(
@@ -838,7 +841,7 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => _openItemSheet(vendor, item),
+        onTap: () => _openItemSheet(vendor, itemMap),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -920,9 +923,7 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
                     _ItemCounter(
                       vendorId: vendor.vendorId,
                       vendorName: vendor.vendorName,
-                      itemId: itemId,
-                      itemName: name,
-                      price: price,
+                      item: item,
                       isAvailable: vendor.isAvailable,
                     ),
                   ],
@@ -954,16 +955,9 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
       builder: (_) => ProductDetailOverlay(
         vendorId: vendor.vendorId,
         vendorName: vendor.vendorName,
-        itemId: item['id'] ?? '',
-        name: item['name'] ?? '',
-        imageUrl: item['imageUrl'] ?? '',
-        category: item['category'] ?? '',
-        description: item['description'] ?? '',
-        isVeg: item['isVeg'] ?? true,
-        price: (item['price'] ?? 0).toDouble(),
+        item: item['item'],
         rating: (item['rating'] ?? vendor.rating).toDouble(),
         ratingCount: (item['ratingCount'] ?? 0).toInt(),
-        isAvailable: item['isAvailable'] ?? true,
         isVendorOnline: vendor.isAvailable,
       ),
     );
@@ -994,16 +988,14 @@ class _TopBarState extends ConsumerState<TopBar> with WidgetsBindingObserver {
 // ─── Item ADD / counter widget ────────────────────────────────────────────────
 
 class _ItemCounter extends ConsumerWidget {
-  final String vendorId, vendorName, itemId, itemName;
-  final double price;
+  final String vendorId, vendorName;
+  final Item item;
   final bool isAvailable;
 
   const _ItemCounter({
     required this.vendorId,
     required this.vendorName,
-    required this.itemId,
-    required this.itemName,
-    required this.price,
+    required this.item,
     required this.isAvailable,
   });
 
@@ -1013,25 +1005,32 @@ class _ItemCounter extends ConsumerWidget {
     final vc = cart.cartByVendor[vendorId];
     final q =
         vc?.items
-            .firstWhere(
-              (i) => i.id == itemId,
-              orElse: () => CartItem(id: '', name: '', price: 0, quantity: 0),
-            )
-            .quantity ??
+            .where((i) => i.id == item.id)
+            .fold(0, (sum, i) => sum + i.quantity) ??
         0;
 
-    void add() => ref
-        .read(cartProvider.notifier)
-        .addItem(
+    void add() {
+      if (item.hasCustomizations) {
+        showItemCustomizationSheet(
+          context: context,
           vendorId: vendorId,
           vendorName: vendorName,
-          itemId: itemId,
-          itemName: itemName,
-          price: price,
+          item: item,
         );
+      } else {
+        ref.read(cartProvider.notifier).addItem(
+              vendorId: vendorId,
+              vendorName: vendorName,
+              itemId: item.id,
+              itemName: item.name,
+              price: item.price,
+            );
+      }
+    }
+
     void delta(int d) => ref
         .read(cartProvider.notifier)
-        .updateQuantity(vendorId: vendorId, itemId: itemId, delta: d);
+        .updateQuantity(vendorId: vendorId, itemId: item.id, delta: d);
 
     if (!isAvailable) {
       return Container(

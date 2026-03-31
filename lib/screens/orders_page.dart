@@ -314,13 +314,24 @@ class _VendorSection extends StatelessWidget {
         ...items.entries.map((entry) {
           final item = entry.value;
           final itemTotal = item.price * item.quantity;
+          // Build customization summary
+          final List<String> customParts = [];
+          if (item.selectedOption != null) {
+            customParts.add(item.selectedOption!['name'] ?? '');
+          }
+          for (final addon in item.selectedAddons) {
+            customParts.add(addon['name'] ?? '');
+          }
+          final customLabel = customParts.where((s) => s.isNotEmpty).join(', ');
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
                   width: 4,
                   height: 4,
+                  margin: const EdgeInsets.only(top: 6),
                   decoration: BoxDecoration(
                     color: cs.onSurfaceVariant,
                     shape: BoxShape.circle,
@@ -328,9 +339,26 @@ class _VendorSection extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    '${item.name} × ${item.quantity}',
-                    style: TextStyle(fontSize: 13, color: cs.onSurface),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${item.name} × ${item.quantity}',
+                        style: TextStyle(fontSize: 13, color: cs.onSurface),
+                      ),
+                      if (customLabel.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            customLabel,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: cs.onSurfaceVariant,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 Text(
