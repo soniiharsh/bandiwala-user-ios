@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../models/order.dart';
+import '../models/order_status.dart';
 import '../providers/orders_provider.dart';
 
 const _razorpayKey = 'rzp_live_SIEw0ZGDGbPgTd';
@@ -62,7 +63,7 @@ class PaymentService {
     final order = buildOrder().copyWith(
       paymentId: 'COD_${DateTime.now().millisecondsSinceEpoch}',
       paymentMethod: 'cod',
-      status: 'order_created',
+      status: OrderStatus.orderCreated,
     );
     try {
       final docId = await placeOrder(order);
@@ -83,7 +84,7 @@ class PaymentService {
     final order = buildOrder().copyWith(
       paymentId: paymentId,
       paymentMethod: 'online',
-      status: 'order_created',
+      status: OrderStatus.orderCreated,
     );
     try {
       final docId = await placeOrder(order);

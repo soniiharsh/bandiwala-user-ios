@@ -21,9 +21,6 @@ class Coupon with _$Coupon {
     required int currentUsage,
     required bool isActive,
     required DateTime createdAt,
-
-    /// "" = global coupon (applies to entire order)
-    /// "<vendorId>" = vendor-specific (applies only to that vendor's items)
     @Default('') String vendorId,
   }) = _Coupon;
 

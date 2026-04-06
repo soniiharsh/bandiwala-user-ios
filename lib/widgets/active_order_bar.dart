@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/orders_provider.dart';
 import '../core/theme/theme.dart';
+import '../models/order_status.dart';
 
 const _kYellow = AppColors.primary;
 const _kYellowDark = Color(0xFFE6AC00);
@@ -72,7 +73,7 @@ class _ActiveOrderBarState extends ConsumerState<ActiveOrderBar>
 
 class _OrderStatusBar extends StatelessWidget {
   final String orderId;
-  final String status;
+  final OrderStatus status;
   final double grandTotal;
   final String paymentMethod;
   final VoidCallback onViewTap;
@@ -92,7 +93,7 @@ class _OrderStatusBar extends StatelessWidget {
     final shortId = orderId.length > 12
         ? orderId.substring(orderId.length - 8)
         : orderId;
-    final config = _statusConfig(status.toLowerCase());
+    final config = _statusConfig(status);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 0, 10, 6),
@@ -262,38 +263,44 @@ class _OrderStatusBar extends StatelessWidget {
     );
   }
 
-  _StatusConfig _statusConfig(String status) {
+  _StatusConfig _statusConfig(OrderStatus status) {
     switch (status) {
-      case 'confirmed':
-      case 'order_created':
+      case OrderStatus.confirmed:
+      case OrderStatus.orderCreated:
         return const _StatusConfig(
           label: 'Order Confirmed',
           subtitle: 'Your order has been placed',
           icon: Icons.check_circle_rounded,
         );
-      case 'preparing':
+      case OrderStatus.preparing:
         return const _StatusConfig(
           label: 'Being Prepared',
           subtitle: 'Your food is being cooked',
           icon: Icons.restaurant_rounded,
         );
-      case 'ready':
+      case OrderStatus.ready:
         return const _StatusConfig(
           label: 'Order Ready',
           subtitle: 'Out for delivery soon',
           icon: Icons.delivery_dining_rounded,
         );
-      case 'accepted':
+      case OrderStatus.outForDelivery:
         return const _StatusConfig(
-          label: 'Order Accepted',
-          subtitle: 'Vendor is getting ready',
-          icon: Icons.thumb_up_rounded,
+          label: 'Out for Delivery',
+          subtitle: 'Your order is on the way',
+          icon: Icons.directions_bike_rounded,
         );
-      default:
+      case OrderStatus.completed:
         return const _StatusConfig(
-          label: 'Order Processing',
-          subtitle: 'Waiting for update',
-          icon: Icons.hourglass_top_rounded,
+          label: 'Order Delivered',
+          subtitle: 'Enjoy your meal',
+          icon: Icons.check_circle_rounded,
+        );
+      case OrderStatus.cancelled:
+        return const _StatusConfig(
+          label: 'Order Cancelled',
+          subtitle: 'Your order was cancelled',
+          icon: Icons.cancel_rounded,
         );
     }
   }

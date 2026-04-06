@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../providers/cart_provider.dart';
 import '../providers/coupons_provider.dart';
 import '../models/order.dart';
+import '../models/order_status.dart';
 import '../models/app_user.dart';
 import '../services/payment_service.dart';
 import 'payment_success_page.dart';
@@ -185,7 +186,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           (_appliedCoupon?['maxDiscountableAmount'] ?? 0).toDouble(),
       couponVendorId: _couponVendorId,
       grandTotal: _grandTotal,
-      status: 'order_created',
+      status: OrderStatus.orderCreated,
     );
   }
 
@@ -424,69 +425,67 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   ],
                 ),
               ),
-              ...e.value.items.map(
-                (item) {
-                  // Build customization label
-                  final List<String> parts = [];
-                  if (item.selectedOption != null) {
-                    parts.add(item.selectedOption!['name'] ?? '');
-                  }
-                  for (final addon in item.selectedAddons) {
-                    parts.add(addon['name'] ?? '');
-                  }
-                  final customLabel = parts.where((s) => s.isNotEmpty).join(', ');
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          margin: const EdgeInsets.only(right: 8, top: 5),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.grey.shade400,
-                          ),
+              ...e.value.items.map((item) {
+                // Build customization label
+                final List<String> parts = [];
+                if (item.selectedOption != null) {
+                  parts.add(item.selectedOption!['name'] ?? '');
+                }
+                for (final addon in item.selectedAddons) {
+                  parts.add(addon['name'] ?? '');
+                }
+                final customLabel = parts.where((s) => s.isNotEmpty).join(', ');
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.only(right: 8, top: 5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.grey.shade400,
                         ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${item.name}  ×${item.quantity}',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.black87,
-                                ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${item.name}  ×${item.quantity}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.black87,
                               ),
-                              if (customLabel.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 1),
-                                  child: Text(
-                                    customLabel,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey.shade500,
-                                      fontStyle: FontStyle.italic,
-                                    ),
+                            ),
+                            if (customLabel.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 1),
+                                child: Text(
+                                  customLabel,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey.shade500,
+                                    fontStyle: FontStyle.italic,
                                   ),
                                 ),
-                            ],
-                          ),
+                              ),
+                          ],
                         ),
-                        Text(
-                          '₹${(item.totalUnitPrice * item.quantity).toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      ),
+                      Text(
+                        '₹${(item.totalUnitPrice * item.quantity).toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                         ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                 child: Align(

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../models/order.dart';
+import '../models/order_status.dart';
 import '../providers/orders_provider.dart';
 import '../core/theme/theme.dart';
 import '../widgets/skeletons.dart';
+import 'track_order_page.dart';
 
 const kBandiwalaYellow = AppColors.primary;
 
@@ -70,10 +72,7 @@ class OrdersPage extends ConsumerWidget {
           const SizedBox(height: 16),
           Text(
             message,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
             textAlign: TextAlign.center,
           ),
         ],
@@ -145,9 +144,14 @@ class _OrderCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         order.createdAt != null
-                            ? DateFormat('dd MMM yyyy, hh:mm a').format(order.createdAt!)
+                            ? DateFormat(
+                                'dd MMM yyyy, hh:mm a',
+                              ).format(order.createdAt!)
                             : 'Date N/A',
-                        style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -175,14 +179,23 @@ class _OrderCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant, width: 1)),
+              border: Border(
+                top: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                  width: 1,
+                ),
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.payments_outlined, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    Icon(
+                      Icons.payments_outlined,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       'Total Amount',
@@ -205,47 +218,78 @@ class _OrderCard extends StatelessWidget {
               ],
             ),
           ),
+          if (order.status == OrderStatus.outForDelivery &&
+              order.deliveryAgentLocation != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TrackOrderPage(
+                        latitude: order.deliveryAgentLocation!['latitude']!,
+                        longitude: order.deliveryAgentLocation!['longitude']!,
+                        orderId: order.id,
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.location_on, size: 16),
+                  label: const Text('Track Order'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kBandiwalaYellow,
+                    side: const BorderSide(color: kBandiwalaYellow),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildStatusBadge(String status) {
+  Widget _buildStatusBadge(OrderStatus status) {
     Color bgColor;
     Color textColor;
     IconData icon;
 
-    switch (status.toLowerCase()) {
-      case 'confirmed':
-      case 'order_created':
+    switch (status) {
+      case OrderStatus.confirmed:
+      case OrderStatus.orderCreated:
         bgColor = Colors.blue.withValues(alpha: 0.1);
         textColor = Colors.blue;
         icon = Icons.check_circle_outline;
         break;
-      case 'preparing':
+      case OrderStatus.preparing:
         bgColor = Colors.orange.withValues(alpha: 0.1);
         textColor = Colors.orange;
         icon = Icons.restaurant;
         break;
-      case 'ready':
+      case OrderStatus.ready:
         bgColor = Colors.purple.withValues(alpha: 0.1);
         textColor = Colors.purple;
         icon = Icons.delivery_dining;
         break;
-      case 'completed':
+      case OrderStatus.outForDelivery:
+        bgColor = Colors.teal.withValues(alpha: 0.1);
+        textColor = Colors.teal;
+        icon = Icons.directions_bike;
+        break;
+      case OrderStatus.completed:
         bgColor = Colors.green.withValues(alpha: 0.1);
         textColor = Colors.green;
         icon = Icons.check_circle;
         break;
-      case 'cancelled':
+      case OrderStatus.cancelled:
         bgColor = Colors.red.withValues(alpha: 0.1);
         textColor = Colors.red;
         icon = Icons.cancel;
         break;
-      default:
-        bgColor = Colors.grey.withValues(alpha: 0.1);
-        textColor = Colors.grey;
-        icon = Icons.info_outline;
     }
 
     return Container(
@@ -260,7 +304,7 @@ class _OrderCard extends StatelessWidget {
           Icon(icon, size: 14, color: textColor),
           const SizedBox(width: 4),
           Text(
-            status.toUpperCase(),
+            status.value.toUpperCase(),
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,

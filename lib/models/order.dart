@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import '../models/app_user.dart';
+import '../models/order_status.dart';
 
 part 'order.freezed.dart';
 part 'order.g.dart';
@@ -60,7 +61,10 @@ class OrderItem with _$OrderItem {
         : null,
     selectedAddons: m['selectedAddons'] != null
         ? List<Map<String, dynamic>>.from(
-            (m['selectedAddons'] as List).map((e) => Map<String, dynamic>.from(e)))
+            (m['selectedAddons'] as List).map(
+              (e) => Map<String, dynamic>.from(e),
+            ),
+          )
         : [],
   );
 }
@@ -72,7 +76,7 @@ class VendorOrder with _$VendorOrder {
   const factory VendorOrder({
     required String vendorName,
     required Map<String, OrderItem> items,
-    @Default('pending') String status,
+    @Default(VendorOrderStatus.pending) VendorOrderStatus status,
     DateTime? statusUpdatedAt,
   }) = _VendorOrder;
 
@@ -100,7 +104,7 @@ class VendorOrder with _$VendorOrder {
     return VendorOrder(
       vendorName: m['vendorName'] ?? '',
       items: items,
-      status: m['status'] ?? 'pending',
+      status: VendorOrderStatus.fromValue(m['status'] ?? 'pending'),
       statusUpdatedAt: (m['statusUpdatedAt'] as Timestamp?)?.toDate(),
     );
   }
@@ -108,7 +112,7 @@ class VendorOrder with _$VendorOrder {
   Map<String, dynamic> toMap() => {
     'vendorName': vendorName,
     'items': items.map((k, v) => MapEntry(k, v.toJson())),
-    'status': status,
+    'status': status.value,
     'statusUpdatedAt': statusUpdatedAt != null
         ? Timestamp.fromDate(statusUpdatedAt!)
         : FieldValue.serverTimestamp(),
@@ -138,13 +142,13 @@ class AppOrder with _$AppOrder {
     @Default('') String couponType,
     @Default(0) double couponDiscount,
     @Default(0) double couponMaxDiscountableAmount,
-
-    /// "" = global coupon was applied; "<vendorId>" = vendor coupon
     @Default('') String couponVendorId,
     required double grandTotal,
-    required String status,
+    required OrderStatus status,
     DateTime? statusUpdatedAt,
     DateTime? createdAt,
+    @Default(null) String? assignedTo,
+    @Default(null) Map<String, double>? deliveryAgentLocation,
   }) = _AppOrder;
 
   factory AppOrder.fromJson(Map<String, dynamic> json) =>
@@ -202,10 +206,18 @@ class AppOrder with _$AppOrder {
           (d['couponMaxDiscountableAmount'] as num? ?? 0).toDouble(),
       couponVendorId: d['couponVendorId'] ?? '',
       grandTotal: (d['grandTotal'] as num? ?? 0).toDouble(),
-      status: d['status'] ?? 'unknown',
+      status: OrderStatus.fromValue(d['status'] ?? 'order_created'),
       statusUpdatedAt: (d['statusUpdatedAt'] as Timestamp?)?.toDate(),
       createdAt: (d['createdAt'] as Timestamp? ?? d['timestamp'] as Timestamp?)
           ?.toDate(),
+      assignedTo: d['assignedTo'] as String?,
+      deliveryAgentLocation: d['deliveryAgentLocation'] != null
+          ? Map<String, double>.from(
+              (d['deliveryAgentLocation'] as Map).map(
+                (k, v) => MapEntry(k.toString(), (v as num).toDouble()),
+              ),
+            )
+          : null,
     );
   }
 }

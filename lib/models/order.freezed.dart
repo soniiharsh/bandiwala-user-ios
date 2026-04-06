@@ -533,7 +533,7 @@ VendorOrder _$VendorOrderFromJson(Map<String, dynamic> json) {
 mixin _$VendorOrder {
   String get vendorName => throw _privateConstructorUsedError;
   Map<String, OrderItem> get items => throw _privateConstructorUsedError;
-  String get status => throw _privateConstructorUsedError;
+  VendorOrderStatus get status => throw _privateConstructorUsedError;
   DateTime? get statusUpdatedAt => throw _privateConstructorUsedError;
 
   /// Serializes this VendorOrder to a JSON map.
@@ -556,7 +556,7 @@ abstract class $VendorOrderCopyWith<$Res> {
   $Res call({
     String vendorName,
     Map<String, OrderItem> items,
-    String status,
+    VendorOrderStatus status,
     DateTime? statusUpdatedAt,
   });
 }
@@ -594,7 +594,7 @@ class _$VendorOrderCopyWithImpl<$Res, $Val extends VendorOrder>
             status: null == status
                 ? _value.status
                 : status // ignore: cast_nullable_to_non_nullable
-                      as String,
+                      as VendorOrderStatus,
             statusUpdatedAt: freezed == statusUpdatedAt
                 ? _value.statusUpdatedAt
                 : statusUpdatedAt // ignore: cast_nullable_to_non_nullable
@@ -617,7 +617,7 @@ abstract class _$$VendorOrderImplCopyWith<$Res>
   $Res call({
     String vendorName,
     Map<String, OrderItem> items,
-    String status,
+    VendorOrderStatus status,
     DateTime? statusUpdatedAt,
   });
 }
@@ -654,7 +654,7 @@ class __$$VendorOrderImplCopyWithImpl<$Res>
         status: null == status
             ? _value.status
             : status // ignore: cast_nullable_to_non_nullable
-                  as String,
+                  as VendorOrderStatus,
         statusUpdatedAt: freezed == statusUpdatedAt
             ? _value.statusUpdatedAt
             : statusUpdatedAt // ignore: cast_nullable_to_non_nullable
@@ -670,7 +670,7 @@ class _$VendorOrderImpl extends _VendorOrder {
   const _$VendorOrderImpl({
     required this.vendorName,
     required final Map<String, OrderItem> items,
-    this.status = 'pending',
+    this.status = VendorOrderStatus.pending,
     this.statusUpdatedAt,
   }) : _items = items,
        super._();
@@ -690,7 +690,7 @@ class _$VendorOrderImpl extends _VendorOrder {
 
   @override
   @JsonKey()
-  final String status;
+  final VendorOrderStatus status;
   @override
   final DateTime? statusUpdatedAt;
 
@@ -740,7 +740,7 @@ abstract class _VendorOrder extends VendorOrder {
   const factory _VendorOrder({
     required final String vendorName,
     required final Map<String, OrderItem> items,
-    final String status,
+    final VendorOrderStatus status,
     final DateTime? statusUpdatedAt,
   }) = _$VendorOrderImpl;
   const _VendorOrder._() : super._();
@@ -753,7 +753,7 @@ abstract class _VendorOrder extends VendorOrder {
   @override
   Map<String, OrderItem> get items;
   @override
-  String get status;
+  VendorOrderStatus get status;
   @override
   DateTime? get statusUpdatedAt;
 
@@ -795,9 +795,12 @@ mixin _$AppOrder {
   /// "" = global coupon was applied; "<vendorId>" = vendor coupon
   String get couponVendorId => throw _privateConstructorUsedError;
   double get grandTotal => throw _privateConstructorUsedError;
-  String get status => throw _privateConstructorUsedError;
+  OrderStatus get status => throw _privateConstructorUsedError;
   DateTime? get statusUpdatedAt => throw _privateConstructorUsedError;
   DateTime? get createdAt => throw _privateConstructorUsedError;
+  String? get assignedTo => throw _privateConstructorUsedError;
+  Map<String, double>? get deliveryAgentLocation =>
+      throw _privateConstructorUsedError;
 
   /// Serializes this AppOrder to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -835,9 +838,11 @@ abstract class $AppOrderCopyWith<$Res> {
     double couponMaxDiscountableAmount,
     String couponVendorId,
     double grandTotal,
-    String status,
+    OrderStatus status,
     DateTime? statusUpdatedAt,
     DateTime? createdAt,
+    String? assignedTo,
+    Map<String, double>? deliveryAgentLocation,
   });
 
   $OrderDeliveryAddressCopyWith<$Res> get deliveryAddress;
@@ -881,6 +886,8 @@ class _$AppOrderCopyWithImpl<$Res, $Val extends AppOrder>
     Object? status = null,
     Object? statusUpdatedAt = freezed,
     Object? createdAt = freezed,
+    Object? assignedTo = freezed,
+    Object? deliveryAgentLocation = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -967,7 +974,7 @@ class _$AppOrderCopyWithImpl<$Res, $Val extends AppOrder>
             status: null == status
                 ? _value.status
                 : status // ignore: cast_nullable_to_non_nullable
-                      as String,
+                      as OrderStatus,
             statusUpdatedAt: freezed == statusUpdatedAt
                 ? _value.statusUpdatedAt
                 : statusUpdatedAt // ignore: cast_nullable_to_non_nullable
@@ -976,6 +983,14 @@ class _$AppOrderCopyWithImpl<$Res, $Val extends AppOrder>
                 ? _value.createdAt
                 : createdAt // ignore: cast_nullable_to_non_nullable
                       as DateTime?,
+            assignedTo: freezed == assignedTo
+                ? _value.assignedTo
+                : assignedTo // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            deliveryAgentLocation: freezed == deliveryAgentLocation
+                ? _value.deliveryAgentLocation
+                : deliveryAgentLocation // ignore: cast_nullable_to_non_nullable
+                      as Map<String, double>?,
           )
           as $Val,
     );
@@ -1022,9 +1037,11 @@ abstract class _$$AppOrderImplCopyWith<$Res>
     double couponMaxDiscountableAmount,
     String couponVendorId,
     double grandTotal,
-    String status,
+    OrderStatus status,
     DateTime? statusUpdatedAt,
     DateTime? createdAt,
+    String? assignedTo,
+    Map<String, double>? deliveryAgentLocation,
   });
 
   @override
@@ -1068,6 +1085,8 @@ class __$$AppOrderImplCopyWithImpl<$Res>
     Object? status = null,
     Object? statusUpdatedAt = freezed,
     Object? createdAt = freezed,
+    Object? assignedTo = freezed,
+    Object? deliveryAgentLocation = freezed,
   }) {
     return _then(
       _$AppOrderImpl(
@@ -1154,7 +1173,7 @@ class __$$AppOrderImplCopyWithImpl<$Res>
         status: null == status
             ? _value.status
             : status // ignore: cast_nullable_to_non_nullable
-                  as String,
+                  as OrderStatus,
         statusUpdatedAt: freezed == statusUpdatedAt
             ? _value.statusUpdatedAt
             : statusUpdatedAt // ignore: cast_nullable_to_non_nullable
@@ -1163,6 +1182,14 @@ class __$$AppOrderImplCopyWithImpl<$Res>
             ? _value.createdAt
             : createdAt // ignore: cast_nullable_to_non_nullable
                   as DateTime?,
+        assignedTo: freezed == assignedTo
+            ? _value.assignedTo
+            : assignedTo // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        deliveryAgentLocation: freezed == deliveryAgentLocation
+            ? _value._deliveryAgentLocation
+            : deliveryAgentLocation // ignore: cast_nullable_to_non_nullable
+                  as Map<String, double>?,
       ),
     );
   }
@@ -1195,8 +1222,11 @@ class _$AppOrderImpl extends _AppOrder {
     required this.status,
     this.statusUpdatedAt,
     this.createdAt,
+    this.assignedTo = null,
+    final Map<String, double>? deliveryAgentLocation = null,
   }) : _itemsByVendor = itemsByVendor,
        _vendorIds = vendorIds,
+       _deliveryAgentLocation = deliveryAgentLocation,
        super._();
 
   factory _$AppOrderImpl.fromJson(Map<String, dynamic> json) =>
@@ -1263,15 +1293,29 @@ class _$AppOrderImpl extends _AppOrder {
   @override
   final double grandTotal;
   @override
-  final String status;
+  final OrderStatus status;
   @override
   final DateTime? statusUpdatedAt;
   @override
   final DateTime? createdAt;
+  @override
+  @JsonKey()
+  final String? assignedTo;
+  final Map<String, double>? _deliveryAgentLocation;
+  @override
+  @JsonKey()
+  Map<String, double>? get deliveryAgentLocation {
+    final value = _deliveryAgentLocation;
+    if (value == null) return null;
+    if (_deliveryAgentLocation is EqualUnmodifiableMapView)
+      return _deliveryAgentLocation;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(value);
+  }
 
   @override
   String toString() {
-    return 'AppOrder(id: $id, userId: $userId, customerPhone: $customerPhone, deliveryAddress: $deliveryAddress, itemsByVendor: $itemsByVendor, vendorIds: $vendorIds, paymentMethod: $paymentMethod, paymentId: $paymentId, deliveryFee: $deliveryFee, platformFee: $platformFee, foodTax: $foodTax, deliveryTax: $deliveryTax, platformTax: $platformTax, couponApplied: $couponApplied, couponCode: $couponCode, couponType: $couponType, couponDiscount: $couponDiscount, couponMaxDiscountableAmount: $couponMaxDiscountableAmount, couponVendorId: $couponVendorId, grandTotal: $grandTotal, status: $status, statusUpdatedAt: $statusUpdatedAt, createdAt: $createdAt)';
+    return 'AppOrder(id: $id, userId: $userId, customerPhone: $customerPhone, deliveryAddress: $deliveryAddress, itemsByVendor: $itemsByVendor, vendorIds: $vendorIds, paymentMethod: $paymentMethod, paymentId: $paymentId, deliveryFee: $deliveryFee, platformFee: $platformFee, foodTax: $foodTax, deliveryTax: $deliveryTax, platformTax: $platformTax, couponApplied: $couponApplied, couponCode: $couponCode, couponType: $couponType, couponDiscount: $couponDiscount, couponMaxDiscountableAmount: $couponMaxDiscountableAmount, couponVendorId: $couponVendorId, grandTotal: $grandTotal, status: $status, statusUpdatedAt: $statusUpdatedAt, createdAt: $createdAt, assignedTo: $assignedTo, deliveryAgentLocation: $deliveryAgentLocation)';
   }
 
   @override
@@ -1328,7 +1372,13 @@ class _$AppOrderImpl extends _AppOrder {
             (identical(other.statusUpdatedAt, statusUpdatedAt) ||
                 other.statusUpdatedAt == statusUpdatedAt) &&
             (identical(other.createdAt, createdAt) ||
-                other.createdAt == createdAt));
+                other.createdAt == createdAt) &&
+            (identical(other.assignedTo, assignedTo) ||
+                other.assignedTo == assignedTo) &&
+            const DeepCollectionEquality().equals(
+              other._deliveryAgentLocation,
+              _deliveryAgentLocation,
+            ));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1358,6 +1408,8 @@ class _$AppOrderImpl extends _AppOrder {
     status,
     statusUpdatedAt,
     createdAt,
+    assignedTo,
+    const DeepCollectionEquality().hash(_deliveryAgentLocation),
   ]);
 
   /// Create a copy of AppOrder
@@ -1396,9 +1448,11 @@ abstract class _AppOrder extends AppOrder {
     final double couponMaxDiscountableAmount,
     final String couponVendorId,
     required final double grandTotal,
-    required final String status,
+    required final OrderStatus status,
     final DateTime? statusUpdatedAt,
     final DateTime? createdAt,
+    final String? assignedTo,
+    final Map<String, double>? deliveryAgentLocation,
   }) = _$AppOrderImpl;
   const _AppOrder._() : super._();
 
@@ -1448,11 +1502,15 @@ abstract class _AppOrder extends AppOrder {
   @override
   double get grandTotal;
   @override
-  String get status;
+  OrderStatus get status;
   @override
   DateTime? get statusUpdatedAt;
   @override
   DateTime? get createdAt;
+  @override
+  String? get assignedTo;
+  @override
+  Map<String, double>? get deliveryAgentLocation;
 
   /// Create a copy of AppOrder
   /// with the given fields replaced by the non-null parameter values.

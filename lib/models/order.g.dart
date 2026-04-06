@@ -52,7 +52,9 @@ _$VendorOrderImpl _$$VendorOrderImplFromJson(Map<String, dynamic> json) =>
       items: (json['items'] as Map<String, dynamic>).map(
         (k, e) => MapEntry(k, OrderItem.fromJson(e as Map<String, dynamic>)),
       ),
-      status: json['status'] as String? ?? 'pending',
+      status:
+          $enumDecodeNullable(_$VendorOrderStatusEnumMap, json['status']) ??
+          VendorOrderStatus.pending,
       statusUpdatedAt: json['statusUpdatedAt'] == null
           ? null
           : DateTime.parse(json['statusUpdatedAt'] as String),
@@ -62,9 +64,15 @@ Map<String, dynamic> _$$VendorOrderImplToJson(_$VendorOrderImpl instance) =>
     <String, dynamic>{
       'vendorName': instance.vendorName,
       'items': instance.items,
-      'status': instance.status,
+      'status': _$VendorOrderStatusEnumMap[instance.status]!,
       'statusUpdatedAt': instance.statusUpdatedAt?.toIso8601String(),
     };
+
+const _$VendorOrderStatusEnumMap = {
+  VendorOrderStatus.pending: 'pending',
+  VendorOrderStatus.accepted: 'accepted',
+  VendorOrderStatus.rejected: 'rejected',
+};
 
 _$AppOrderImpl _$$AppOrderImplFromJson(Map<String, dynamic> json) =>
     _$AppOrderImpl(
@@ -95,13 +103,19 @@ _$AppOrderImpl _$$AppOrderImplFromJson(Map<String, dynamic> json) =>
           (json['couponMaxDiscountableAmount'] as num?)?.toDouble() ?? 0,
       couponVendorId: json['couponVendorId'] as String? ?? '',
       grandTotal: (json['grandTotal'] as num).toDouble(),
-      status: json['status'] as String,
+      status: $enumDecode(_$OrderStatusEnumMap, json['status']),
       statusUpdatedAt: json['statusUpdatedAt'] == null
           ? null
           : DateTime.parse(json['statusUpdatedAt'] as String),
       createdAt: json['createdAt'] == null
           ? null
           : DateTime.parse(json['createdAt'] as String),
+      assignedTo: json['assignedTo'] as String? ?? null,
+      deliveryAgentLocation:
+          (json['deliveryAgentLocation'] as Map<String, dynamic>?)?.map(
+            (k, e) => MapEntry(k, (e as num).toDouble()),
+          ) ??
+          null,
     );
 
 Map<String, dynamic> _$$AppOrderImplToJson(_$AppOrderImpl instance) =>
@@ -126,7 +140,19 @@ Map<String, dynamic> _$$AppOrderImplToJson(_$AppOrderImpl instance) =>
       'couponMaxDiscountableAmount': instance.couponMaxDiscountableAmount,
       'couponVendorId': instance.couponVendorId,
       'grandTotal': instance.grandTotal,
-      'status': instance.status,
+      'status': _$OrderStatusEnumMap[instance.status]!,
       'statusUpdatedAt': instance.statusUpdatedAt?.toIso8601String(),
       'createdAt': instance.createdAt?.toIso8601String(),
+      'assignedTo': instance.assignedTo,
+      'deliveryAgentLocation': instance.deliveryAgentLocation,
     };
+
+const _$OrderStatusEnumMap = {
+  OrderStatus.orderCreated: 'orderCreated',
+  OrderStatus.confirmed: 'confirmed',
+  OrderStatus.preparing: 'preparing',
+  OrderStatus.ready: 'ready',
+  OrderStatus.outForDelivery: 'outForDelivery',
+  OrderStatus.completed: 'completed',
+  OrderStatus.cancelled: 'cancelled',
+};

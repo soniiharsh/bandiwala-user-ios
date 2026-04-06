@@ -90,7 +90,7 @@ flutter:
 
   assets:
     - assets/images/splash.png
-    - assets/videos/splash.mov
+    - assets/videos/splash.mp4
 
   # To add assets to your application, add an assets section, like this:
   # assets:

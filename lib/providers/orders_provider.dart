@@ -1,3 +1,4 @@
+import 'package:BandiWala/models/order_status.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/order.dart';
@@ -36,7 +37,7 @@ Future<String> placeOrder(AppOrder order) async {
     'couponMaxDiscountableAmount': order.couponMaxDiscountableAmount,
     'couponVendorId': order.couponVendorId,
     'grandTotal': order.grandTotal,
-    'status': order.status,
+    'status': order.status.value,
     'createdAt': FieldValue.serverTimestamp(),
     'statusUpdatedAt': FieldValue.serverTimestamp(),
   };
@@ -74,7 +75,9 @@ final activeOrderProvider = Provider<AppOrder?>((ref) {
   final orders = ref.watch(userOrdersProvider).valueOrNull ?? [];
   try {
     return orders.firstWhere(
-      (o) => o.status != 'completed' && o.status != 'cancelled',
+      (o) =>
+          o.status != OrderStatus.completed &&
+          o.status != OrderStatus.cancelled,
     );
   } catch (_) {
     return null;
