@@ -14,10 +14,6 @@ import '../core/theme/theme.dart';
 import '../core/navigation/app_page_route.dart';
 
 const kBandiwalaYellow = AppColors.primary;
-const kWhite = Colors.white;
-const kBorderGrey = Color(0xFFE5E7EB);
-const kTextGrey = Color(0xFF6B7280);
-const kBgGrey = Color(0xFFF9FAFB);
 
 // ─── Pricing Config Model ─────────────────────────────────────────────────────
 
@@ -313,19 +309,26 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final kBgGrey = isDark ? cs.surface : const Color(0xFFF9FAFB);
+    final kWhite = isDark ? cs.surfaceContainerHighest : Colors.white;
+    final kBorderGrey = isDark ? cs.outlineVariant : const Color(0xFFE5E7EB);
+    final kTextGrey = isDark ? cs.onSurfaceVariant : const Color(0xFF6B7280);
+
     return Scaffold(
       backgroundColor: kBgGrey,
       appBar: AppBar(
         backgroundColor: kWhite,
         elevation: 0,
-        foregroundColor: Colors.black87,
+        foregroundColor: cs.onSurface,
         centerTitle: false,
-        title: const Text(
+        title: Text(
           'Checkout',
           style: TextStyle(
             fontSize: 19,
             fontWeight: FontWeight.w700,
-            color: Colors.black87,
+            color: cs.onSurface,
           ),
         ),
         bottom: PreferredSize(
@@ -343,51 +346,54 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                     children: [
-                      _sectionLabel('Order Summary'),
+                      _sectionLabel(kTextGrey, 'Order Summary'),
                       const SizedBox(height: 8),
-                      _orderSummaryCard(),
+                      _orderSummaryCard(kWhite, kBorderGrey),
                       const SizedBox(height: 16),
                       if (widget.deliveryLocation != null) ...[
-                        _sectionLabel('Delivery To'),
+                        _sectionLabel(kTextGrey, 'Delivery To'),
                         const SizedBox(height: 8),
-                        _addressCard(),
+                        _addressCard(kWhite, kBorderGrey, kTextGrey),
                         const SizedBox(height: 16),
                       ],
-                      _sectionLabel('Bill Details'),
+                      _sectionLabel(kTextGrey, 'Bill Details'),
                       const SizedBox(height: 8),
-                      _billDetailsCard(),
+                      _billDetailsCard(kWhite, kBorderGrey, kTextGrey, isDark),
                       const SizedBox(height: 16),
-                      _sectionLabel('Offers & Coupons'),
+                      _sectionLabel(kTextGrey, 'Offers & Coupons'),
                       const SizedBox(height: 8),
-                      _couponSection(),
+                      _couponSection(kWhite, kBorderGrey),
                       const SizedBox(height: 16),
-                      _sectionLabel('Payment Method'),
+                      _sectionLabel(kTextGrey, 'Payment Method'),
                       const SizedBox(height: 8),
-                      _paymentMethodCard(),
+                      _paymentMethodCard(kWhite, kBorderGrey, kTextGrey),
                       const SizedBox(height: 100),
                     ],
                   ),
                 ),
-                _bottomBar(),
+                _bottomBar(kWhite, kBorderGrey, cs),
               ],
             ),
     );
   }
 
-  Widget _sectionLabel(String text) => Text(
+  Widget _sectionLabel(Color textGrey, String text) => Text(
     text,
-    style: const TextStyle(
+    style: TextStyle(
       fontSize: 13,
       fontWeight: FontWeight.w700,
-      color: kTextGrey,
+      color: textGrey,
       letterSpacing: 0.5,
     ),
   );
 
-  Widget _orderSummaryCard() {
+  Widget _orderSummaryCard(Color kWhite, Color kBorderGrey) {
+    final cs = Theme.of(context).colorScheme;
     final cart = ref.watch(cartProvider);
     final vendors = cart.cartByVendor.entries.toList();
     return _card(
+      kWhite,
+      kBorderGrey,
       child: Column(
         children: vendors.asMap().entries.map((entry) {
           final idx = entry.key;
@@ -446,7 +452,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         margin: const EdgeInsets.only(right: 8, top: 5),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: Colors.grey.shade400,
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.5),
                         ),
                       ),
                       Expanded(
@@ -455,9 +461,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                           children: [
                             Text(
                               '${item.name}  ×${item.quantity}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
-                                color: Colors.black87,
+                                color: cs.onSurface,
                               ),
                             ),
                             if (customLabel.isNotEmpty)
@@ -467,7 +473,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                                   customLabel,
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.grey.shade500,
+                                    color: cs.onSurfaceVariant,
                                     fontStyle: FontStyle.italic,
                                   ),
                                 ),
@@ -494,13 +500,13 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     'Subtotal: ₹${cart.vendorTotal(e.key).toStringAsFixed(0)}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey.shade600,
+                      color: cs.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
               ),
-              if (!isLast) Divider(height: 1, color: Colors.grey.shade100),
+              if (!isLast) Divider(height: 1, color: cs.outlineVariant),
             ],
           );
         }).toList(),
@@ -508,9 +514,12 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     );
   }
 
-  Widget _addressCard() {
+  Widget _addressCard(Color kWhite, Color kBorderGrey, Color kTextGrey) {
+    final cs = Theme.of(context).colorScheme;
     final loc = widget.deliveryLocation!;
     return _card(
+      kWhite,
+      kBorderGrey,
       padding: const EdgeInsets.all(14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -518,12 +527,12 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.green.shade50,
+              color: Colors.green.shade900.withValues(alpha: 0.3),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.location_on,
-              color: Colors.green.shade600,
+              color: Colors.green.shade400,
               size: 18,
             ),
           ),
@@ -532,7 +541,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Delivering to',
                   style: TextStyle(
                     fontSize: 12,
@@ -543,10 +552,11 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 const SizedBox(height: 3),
                 Text(
                   loc.fullDisplay,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     height: 1.4,
+                    color: cs.onSurface,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -555,14 +565,14 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     Icon(
                       Icons.my_location,
                       size: 11,
-                      color: Colors.grey.shade500,
+                      color: cs.onSurfaceVariant,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       '${loc.latitude.toStringAsFixed(6)}, ${loc.longitude.toStringAsFixed(6)}',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.grey.shade500,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -575,7 +585,13 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     );
   }
 
-  Widget _billDetailsCard() {
+  Widget _billDetailsCard(
+    Color kWhite,
+    Color kBorderGrey,
+    Color kTextGrey,
+    bool isDark,
+  ) {
+    final cs = Theme.of(context).colorScheme;
     final hasCouponDiscount =
         _couponDiscount > 0 &&
         _appliedCoupon != null &&
@@ -585,11 +601,17 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         : _couponDiscount;
 
     return _card(
+      kWhite,
+      kBorderGrey,
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _billRow('Items Total', '₹${widget.itemsTotal.toStringAsFixed(0)}'),
+          _billRow(
+            'Items Total',
+            '₹${widget.itemsTotal.toStringAsFixed(0)}',
+            cs: cs,
+          ),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -598,7 +620,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 children: [
                   Text(
                     'Delivery Charge',
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                    style: TextStyle(fontSize: 13, color: kTextGrey),
                   ),
                   if (_isFreeDelivery) ...[
                     const SizedBox(width: 6),
@@ -608,14 +630,14 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50,
+                        color: Colors.green.shade900.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         'FREE via ${_appliedCoupon?['couponCode'] ?? 'coupon'}',
                         style: TextStyle(
                           fontSize: 10,
-                          color: Colors.green.shade700,
+                          color: Colors.green.shade400,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -630,7 +652,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                           '₹${_pricing.deliveryCharge.toStringAsFixed(0)}',
                           style: TextStyle(
                             fontSize: 13,
-                            color: Colors.grey.shade400,
+                            color: cs.onSurfaceVariant,
                             decoration: TextDecoration.lineThrough,
                           ),
                         ),
@@ -640,16 +662,17 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: Colors.green.shade700,
+                            color: Colors.green.shade400,
                           ),
                         ),
                       ],
                     )
                   : Text(
                       '₹${_pricing.deliveryCharge.toStringAsFixed(0)}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
+                        color: cs.onSurface,
                       ),
                     ),
             ],
@@ -658,7 +681,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           _billRow(
             'Platform Fee',
             '₹${_platformFee.toStringAsFixed(0)}',
-            labelColor: Colors.grey.shade700,
+            labelColor: kTextGrey,
+            cs: cs,
           ),
           const SizedBox(height: 10),
           GestureDetector(
@@ -671,10 +695,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   children: [
                     Text(
                       'Taxes & Charges',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade700,
-                      ),
+                      style: TextStyle(fontSize: 13, color: kTextGrey),
                     ),
                     const SizedBox(width: 4),
                     Icon(
@@ -682,15 +703,16 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                           ? Icons.keyboard_arrow_up
                           : Icons.keyboard_arrow_down,
                       size: 16,
-                      color: Colors.grey.shade500,
+                      color: cs.onSurfaceVariant,
                     ),
                   ],
                 ),
                 Text(
                   '₹${_totalTaxAmount.toStringAsFixed(0)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
                   ),
                 ),
               ],
@@ -705,19 +727,20 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
               margin: const EdgeInsets.only(top: 8),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: isDark ? cs.surface : Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: cs.outlineVariant),
               ),
               child: Column(
                 children: [
-                  _taxRow('GST on Food', _pricing.foodTaxPercent, _foodTax),
+                  _taxRow('GST on Food', _pricing.foodTaxPercent, _foodTax, cs),
                   if (!_isFreeDelivery) ...[
                     const SizedBox(height: 6),
                     _taxRow(
                       'GST on Delivery',
                       _pricing.deliveryTaxPercent,
                       _deliveryTax,
+                      cs,
                     ),
                   ],
                   const SizedBox(height: 6),
@@ -725,6 +748,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     'GST on Platform Fee',
                     _pricing.platformFeeTaxPercent,
                     _platformFeeTax,
+                    cs,
                   ),
                 ],
               ),
@@ -741,14 +765,14 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     Icon(
                       Icons.local_offer_outlined,
                       size: 13,
-                      color: Colors.green.shade600,
+                      color: Colors.green.shade400,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       _appliedCoupon!['couponCode'] ?? 'Coupon',
                       style: TextStyle(
                         fontSize: 13,
-                        color: Colors.green.shade700,
+                        color: Colors.green.shade400,
                       ),
                     ),
                   ],
@@ -758,7 +782,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: Colors.green.shade700,
+                    color: Colors.green.shade400,
                   ),
                 ),
               ],
@@ -766,14 +790,18 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           ],
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Divider(height: 1, color: Colors.grey.shade200),
+            child: Divider(height: 1, color: cs.outlineVariant),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'To Pay',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: cs.onSurface,
+                ),
               ),
               Text(
                 '₹${_grandTotal.toStringAsFixed(0)}',
@@ -791,7 +819,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: Colors.green.shade900.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -799,7 +827,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   Icon(
                     Icons.celebration,
                     size: 14,
-                    color: Colors.green.shade700,
+                    color: Colors.green.shade400,
                   ),
                   const SizedBox(width: 6),
                   Expanded(
@@ -809,7 +837,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                           : 'Total savings: ₹${totalSavings.toStringAsFixed(0)} on this order',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.green.shade800,
+                        color: Colors.green.shade400,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -823,7 +851,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     );
   }
 
-  Widget _couponSection() {
+  Widget _couponSection(Color kWhite, Color kBorderGrey) {
+    final cs = Theme.of(context).colorScheme;
     final hasApplied = _appliedCoupon != null;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -831,7 +860,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         color: kWhite,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: hasApplied ? Colors.green.shade300 : kBorderGrey,
+          color: hasApplied ? Colors.green.shade600 : kBorderGrey,
           width: hasApplied ? 1.5 : 1,
         ),
       ),
@@ -852,8 +881,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: hasApplied
-                            ? [Colors.green.shade400, Colors.green.shade600]
-                            : [Colors.orange.shade300, Colors.orange.shade500],
+                            ? [Colors.green.shade500, Colors.green.shade700]
+                            : [Colors.orange.shade400, Colors.orange.shade600],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -875,8 +904,8 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: hasApplied
-                            ? Colors.green.shade700
-                            : Colors.black87,
+                            ? Colors.green.shade400
+                            : cs.onSurface,
                       ),
                     ),
                   ),
@@ -887,7 +916,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: kBandiwalaYellow.withOpacity(0.15),
+                        color: kBandiwalaYellow.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -897,14 +926,14 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: Colors.orange.shade700,
+                              color: Colors.orange.shade400,
                             ),
                           ),
                           const SizedBox(width: 3),
                           Icon(
                             Icons.arrow_forward_ios,
                             size: 11,
-                            color: Colors.orange.shade700,
+                            color: Colors.orange.shade400,
                           ),
                         ],
                       ),
@@ -915,13 +944,13 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
+                          color: cs.surfaceContainerHighest,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           Icons.close,
                           size: 16,
-                          color: Colors.grey.shade600,
+                          color: cs.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -934,7 +963,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: Colors.green.shade900.withValues(alpha: 0.3),
                 borderRadius: const BorderRadius.vertical(
                   bottom: Radius.circular(14),
                 ),
@@ -969,7 +998,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: Colors.green.shade800,
+                        color: Colors.green.shade400,
                       ),
                     ),
                   ),
@@ -979,7 +1008,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade600,
+                      color: Colors.green.shade700,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
@@ -1002,26 +1031,32 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     );
   }
 
-  Widget _paymentMethodCard() {
+  Widget _paymentMethodCard(Color kWhite, Color kBorderGrey, Color kTextGrey) {
     return _card(
+      kWhite,
+      kBorderGrey,
       child: Column(
         children: [
           _methodTile(
             method: _PaymentMethod.online,
             icon: Icons.payment_rounded,
-            iconBg: Colors.blue.shade50,
-            iconColor: Colors.blue.shade600,
+            iconBg: Colors.blue.shade900.withValues(alpha: 0.3),
+            iconColor: Colors.blue.shade300,
             title: 'Pay Online',
             subtitle: 'UPI, Cards, Net Banking, Wallets',
+            kTextGrey: kTextGrey,
+            kWhite: kWhite,
           ),
-          Divider(height: 1, color: Colors.grey.shade100),
+          Divider(height: 1, color: kBorderGrey),
           _methodTile(
             method: _PaymentMethod.cod,
             icon: Icons.money_rounded,
-            iconBg: Colors.green.shade50,
-            iconColor: Colors.green.shade600,
+            iconBg: Colors.green.shade900.withValues(alpha: 0.3),
+            iconColor: Colors.green.shade400,
             title: 'Cash on Delivery',
             subtitle: 'Pay in cash when your order arrives',
+            kTextGrey: kTextGrey,
+            kWhite: kWhite,
           ),
         ],
       ),
@@ -1035,7 +1070,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     required Color iconColor,
     required String title,
     required String subtitle,
+    required Color kTextGrey,
+    required Color kWhite,
   }) {
+    final cs = Theme.of(context).colorScheme;
     final isSelected = _selectedMethod == method;
     return InkWell(
       onTap: () => setState(() => _selectedMethod = method),
@@ -1044,7 +1082,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? kBandiwalaYellow.withOpacity(0.06) : kWhite,
+          color: isSelected ? kBandiwalaYellow.withValues(alpha: 0.08) : kWhite,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
@@ -1052,7 +1090,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: isSelected ? kBandiwalaYellow.withOpacity(0.2) : iconBg,
+                color: isSelected
+                    ? kBandiwalaYellow.withValues(alpha: 0.2)
+                    : iconBg,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
@@ -1068,16 +1108,16 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: Colors.black87,
+                      color: cs.onSurface,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontSize: 12, color: kTextGrey),
+                    style: TextStyle(fontSize: 12, color: kTextGrey),
                   ),
                 ],
               ),
@@ -1089,7 +1129,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? kBandiwalaYellow : Colors.grey.shade300,
+                  color: isSelected ? kBandiwalaYellow : cs.outline,
                   width: 2,
                 ),
                 color: isSelected ? kBandiwalaYellow : Colors.transparent,
@@ -1104,7 +1144,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     );
   }
 
-  Widget _bottomBar() {
+  Widget _bottomBar(Color kWhite, Color kBorderGrey, ColorScheme cs) {
     final isCod = _selectedMethod == _PaymentMethod.cod;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -1135,16 +1175,17 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         isCod ? 'Amount to Pay' : 'Total Payable',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade600,
+                          color: cs.onSurfaceVariant,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '₹${_grandTotal.toStringAsFixed(0)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
+                          color: cs.onSurface,
                         ),
                       ),
                     ],
@@ -1188,23 +1229,23 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50,
+                        color: Colors.green.shade900.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.green.shade200),
+                        border: Border.all(color: Colors.green.shade700),
                       ),
                       child: Row(
                         children: [
                           Icon(
                             Icons.money,
                             size: 12,
-                            color: Colors.green.shade700,
+                            color: Colors.green.shade400,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             'Pay on Delivery',
                             style: TextStyle(
                               fontSize: 10,
-                              color: Colors.green.shade700,
+                              color: Colors.green.shade400,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1265,7 +1306,12 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  Widget _card({required Widget child, EdgeInsets? padding}) => Container(
+  Widget _card(
+    Color kWhite,
+    Color kBorderGrey, {
+    required Widget child,
+    EdgeInsets? padding,
+  }) => Container(
     padding: padding,
     decoration: BoxDecoration(
       color: kWhite,
@@ -1273,7 +1319,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       border: Border.all(color: kBorderGrey),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.03),
+          color: Colors.black.withValues(alpha: 0.04),
           blurRadius: 8,
           offset: const Offset(0, 2),
         ),
@@ -1282,42 +1328,52 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     child: child,
   );
 
-  Widget _billRow(String label, String value, {Color? labelColor}) => Row(
+  Widget _billRow(
+    String label,
+    String value, {
+    Color? labelColor,
+    ColorScheme? cs,
+  }) => Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
       Text(
         label,
         style: TextStyle(
           fontSize: 13,
-          color: labelColor ?? Colors.grey.shade700,
+          color: labelColor ?? cs?.onSurfaceVariant,
         ),
       ),
       Text(
         value,
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: cs?.onSurface,
+        ),
       ),
     ],
   );
 
-  Widget _taxRow(String label, double percent, double amount) => Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      Expanded(
-        child: Text(
-          '$label (${percent.toStringAsFixed(0)}%)',
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-        ),
-      ),
-      Text(
-        '₹${amount.toStringAsFixed(2)}',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: Colors.grey.shade700,
-        ),
-      ),
-    ],
-  );
+  Widget _taxRow(String label, double percent, double amount, ColorScheme cs) =>
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              '$label (${percent.toStringAsFixed(0)}%)',
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+            ),
+          ),
+          Text(
+            '₹${amount.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+        ],
+      );
 }
 
 // ─── COD Confirmation Dialog ──────────────────────────────────────────────────

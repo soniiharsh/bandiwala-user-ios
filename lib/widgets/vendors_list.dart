@@ -60,21 +60,27 @@ class VendorsList extends ConsumerWidget {
             return a.isAvailable ? -1 : 1;
           });
 
-        return Column(
-          children: sorted.map((v) => RepaintBoundary(
-            child: VendorCard(
-              vendorId: v.id,
-              name: v.name,
-              imageUrl: v.imageUrl,
-              address: v.address,
-              category: v.category,
-              rating: v.rating,
-              isAvailable: v.isAvailable,
-            ),
-          )).toList(),
+        return Container(
+          padding: EdgeInsets.fromLTRB(15, 0, 15, 0),
+          child: Column(
+            children: sorted
+                .map(
+                  (v) => RepaintBoundary(
+                    child: VendorCard(
+                      vendorId: v.id,
+                      name: v.name,
+                      imageUrl: v.imageUrl,
+                      address: v.address,
+                      category: v.category,
+                      rating: v.rating,
+                      isAvailable: v.isAvailable,
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
         );
       },
     );
   }
-
 }

@@ -34,7 +34,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   void _onScroll() {
-    final hidden = _scrollController.offset > 8;
+    final hidden = _scrollController.offset > 20;
     if (hidden != _marqueeHidden) {
       setState(() => _marqueeHidden = hidden);
     }
@@ -141,14 +141,18 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ref.read(activeAddressProvider.notifier).setAddress(loc),
           ),
           AnimatedSize(
-            duration: const Duration(milliseconds: 150),
-            curve: Curves.easeOut,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOutCubic,
             child: SizedBox(
               height: _marqueeHidden ? 0 : null,
               child: ClipRect(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: const ScrollingAnnouncement(),
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 250),
+                  opacity: _marqueeHidden ? 0.0 : 1.0,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: const ScrollingAnnouncement(),
+                  ),
                 ),
               ),
             ),
@@ -342,9 +346,7 @@ class _LiveBadge extends StatefulWidget {
 class _LiveBadgeState extends State<_LiveBadge> {
   @override
   Widget build(BuildContext context) {
-    return const RepaintBoundary(
-      child: _LiveBadgeBody(),
-    );
+    return const RepaintBoundary(child: _LiveBadgeBody());
   }
 }
 

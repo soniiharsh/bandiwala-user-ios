@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/cart_provider.dart';
-import '../providers/vendors_provider.dart';
 
 class CartBar extends ConsumerWidget {
   final VoidCallback onTap;
@@ -49,7 +48,11 @@ class CartBar extends ConsumerWidget {
                     color: Colors.white.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.shopping_bag_outlined, color: Colors.white, size: 20),
+                  child: const Icon(
+                    Icons.shopping_bag_outlined,
+                    color: Colors.white,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -67,13 +70,8 @@ class CartBar extends ConsumerWidget {
                       ),
                       Consumer(
                         builder: (context, ref, _) {
-                          final vendorId = cart.cartByVendor.keys.first;
-                          final vendorAsync = ref.watch(vendorStreamProvider(vendorId));
-                          final vendor = vendorAsync.valueOrNull;
-                          final area = vendor?.address.split(',').first ?? "";
-                          
                           return Text(
-                            "From ${cart.cartByVendor.values.first.vendorName}${area.isNotEmpty ? ' • $area' : ''}",
+                            "From ${cart.cartByVendor.values.first.vendorName}",
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.8),
                               fontSize: 11,
@@ -98,7 +96,11 @@ class CartBar extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 14),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: Colors.white,
+                      size: 14,
+                    ),
                   ],
                 ),
               ],

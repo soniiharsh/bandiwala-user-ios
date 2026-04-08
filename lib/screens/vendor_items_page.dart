@@ -4,7 +4,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/cart_provider.dart';
 import '../providers/vendors_provider.dart';
-import '../providers/active_address_provider.dart';
 import '../providers/items_provider.dart';
 import '../providers/coupons_provider.dart';
 import '../models/coupon.dart';
@@ -93,11 +92,11 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text(
-          "This vendor is not accepting orders at the moment. It should re-open",
+          "This vendor is not accepting orders at the moment.",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
         ),
         backgroundColor: Colors.red.shade800,
-        behavior: SnackBarBehavior.floating,
+        behavior: SnackBarBehavior.fixed,
         duration: const Duration(seconds: 4),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
@@ -222,47 +221,6 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
               },
             ),
             const SizedBox(height: 8),
-            Consumer(
-              builder: (context, ref, _) {
-                final activeAddress = ref.watch(activeAddressProvider);
-                if (activeAddress == null) return const SizedBox.shrink();
-                final area = activeAddress.geolocation.split(',').first.trim();
-                final isInZone = activeAddress.isInServiceZone;
-                final cs = Theme.of(context).colorScheme;
-
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        isInZone
-                            ? Icons.location_on
-                            : Icons.error_outline_rounded,
-                        size: 11,
-                        color: isInZone
-                            ? cs.onSurfaceVariant.withValues(alpha: 0.6)
-                            : Colors.red.shade600,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        isInZone
-                            ? "Delivering to $area"
-                            : "Not available at this address",
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: isInZone
-                              ? cs.onSurfaceVariant.withValues(alpha: 0.7)
-                              : Colors.red.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 4),
           ],
         ),
       ),

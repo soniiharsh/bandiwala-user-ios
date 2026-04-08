@@ -386,16 +386,17 @@ class _CartPageState extends ConsumerState<CartPage> {
                             vendorCart: entry.value,
                             itemAvailability: itemAvailability,
                             isVendorOnline: isVendorOnline,
-                            onQuantityChanged: (itemId, delta, {String? cartKey}) {
-                              ref
-                                  .read(cartProvider.notifier)
-                                  .updateQuantity(
-                                    vendorId: entry.key,
-                                    itemId: itemId,
-                                    delta: delta,
-                                    cartKey: cartKey,
-                                  );
-                            },
+                            onQuantityChanged:
+                                (itemId, delta, {String? cartKey}) {
+                                  ref
+                                      .read(cartProvider.notifier)
+                                      .updateQuantity(
+                                        vendorId: entry.key,
+                                        itemId: itemId,
+                                        delta: delta,
+                                        cartKey: cartKey,
+                                      );
+                                },
                             vendorTotal: cart.vendorTotal(entry.key),
                           );
                         }),
@@ -589,6 +590,38 @@ class _CartPageState extends ConsumerState<CartPage> {
 
           const SizedBox(height: 12),
 
+          // Delivering to indicator
+          if (_selectedAddress != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.location_on_rounded,
+                    size: 13,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Delivering to ${_selectedAddress!.geolocation.split(',').first.trim()}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           SizedBox(
             width: double.infinity,
             height: 52,
@@ -721,99 +754,97 @@ class AddressSection extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              hasAddress ? 'Delivery Address' : 'Add Address',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: theme.colorScheme.onSurface,
-                              ),
-                              overflow: TextOverflow.ellipsis,
+                      // Title row — never truncates
+                      Text(
+                        hasAddress ? 'Delivery Address' : 'Add Address',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      // Label / Required badge
+                      if (!hasAddress)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.red.withOpacity(0.15)
+                                : Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'Required',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                  ? Colors.red.shade300
+                                  : Colors.red.shade700,
                             ),
                           ),
-                          if (!hasAddress) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? Colors.red.withOpacity(0.15)
-                                    : Colors.red.shade50,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'Required',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark
-                                      ? Colors.red.shade300
-                                      : Colors.red.shade700,
-                                ),
-                              ),
-                            ),
-                          ],
-                          if (hasAddress && selectedAddress!.label != null) ...[
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: kBandiwalaYellow.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  selectedAddress!.label!.toUpperCase(),
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: theme.colorScheme.onSurface,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        hasAddress
-                            ? selectedAddress!.geolocation
-                            : 'Tap to select location',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: hasAddress
-                              ? theme.colorScheme.onSurface
-                              : theme.colorScheme.onSurfaceVariant,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      if (hasAddress && selectedAddress!.label != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: kBandiwalaYellow.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            selectedAddress!.label!.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ),
+                      // Address (door/flat)
                       if (hasAddress &&
                           selectedAddress!.address != null &&
-                          selectedAddress!.address!.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            selectedAddress!.address!,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                          selectedAddress!.address!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          selectedAddress!.address!,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      // Geolocation (area)
+                      if (hasAddress) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          selectedAddress!.geolocation,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ] else ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Tap to select location',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
+                      ],
                     ],
                   ),
                 ),
@@ -1134,7 +1165,8 @@ class VendorCartSection extends ConsumerWidget {
   final VendorCart vendorCart;
   final Map<String, bool> itemAvailability;
   final bool isVendorOnline;
-  final void Function(String itemId, int delta, {String? cartKey}) onQuantityChanged;
+  final void Function(String itemId, int delta, {String? cartKey})
+  onQuantityChanged;
   final double vendorTotal;
 
   const VendorCartSection({
@@ -1253,18 +1285,28 @@ class VendorCartSection extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         // Show customization details
-                        if (item.selectedOption != null || item.selectedAddons.isNotEmpty)
+                        if (item.selectedOption != null ||
+                            item.selectedAddons.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(top: 2),
                             child: Text(
                               [
-                                if (item.selectedOption != null) item.selectedOption!['name'],
-                                ...item.selectedAddons.map((a) => a['name']),
-                              ].where((s) => s != null && s.toString().isNotEmpty).join(', '),
+                                    if (item.selectedOption != null)
+                                      item.selectedOption!['name'],
+                                    ...item.selectedAddons.map(
+                                      (a) => a['name'],
+                                    ),
+                                  ]
+                                  .where(
+                                    (s) => s != null && s.toString().isNotEmpty,
+                                  )
+                                  .join(', '),
                               style: TextStyle(
                                 fontSize: 11,
                                 color: isDisabled
-                                    ? theme.colorScheme.onSurface.withOpacity(0.2)
+                                    ? theme.colorScheme.onSurface.withOpacity(
+                                        0.2,
+                                      )
                                     : theme.colorScheme.onSurfaceVariant,
                                 fontStyle: FontStyle.italic,
                               ),
@@ -1317,7 +1359,11 @@ class VendorCartSection extends ConsumerWidget {
                         GestureDetector(
                           onTap: isDisabled
                               ? null
-                              : () => onQuantityChanged(item.id, -1, cartKey: item.cartKey),
+                              : () => onQuantityChanged(
+                                  item.id,
+                                  -1,
+                                  cartKey: item.cartKey,
+                                ),
                           child: SizedBox(
                             width: 32,
                             height: 32,
@@ -1345,7 +1391,11 @@ class VendorCartSection extends ConsumerWidget {
                         GestureDetector(
                           onTap: isDisabled
                               ? null
-                              : () => onQuantityChanged(item.id, 1, cartKey: item.cartKey),
+                              : () => onQuantityChanged(
+                                  item.id,
+                                  1,
+                                  cartKey: item.cartKey,
+                                ),
                           child: SizedBox(
                             width: 32,
                             height: 32,

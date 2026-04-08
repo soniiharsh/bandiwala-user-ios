@@ -105,12 +105,7 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
 
     if (result != null) {
       try {
-        await ref
-            .read(userProvider.notifier)
-            .updateAddress(
-              index,
-              result,
-            );
+        await ref.read(userProvider.notifier).updateAddress(index, result);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -161,7 +156,9 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? theme.scaffoldBackgroundColor : const Color(0xFFF9FAFB),
+      backgroundColor: isDark
+          ? theme.scaffoldBackgroundColor
+          : const Color(0xFFF9FAFB),
       appBar: AppBar(
         title: Text(
           'Saved Addresses',
@@ -293,141 +290,80 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
         border: Border.all(color: theme.dividerColor, width: 1),
         boxShadow: [
           BoxShadow(
-            color: (isDark ? Colors.white : Colors.black).withOpacity(0.04),
+            color: (isDark ? Colors.white : Colors.black).withValues(
+              alpha: 0.04,
+            ),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Header with label and actions
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: _getLabelColor(location.label).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    _getLabelIcon(location.label),
-                    color: _getLabelColor(location.label),
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                        Text(
-                          location.label ?? 'Other',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                      if (location.phone.isNotEmpty)
-                        Text(
-                          location.phone,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => _editLocation(index, location),
-                  icon: const Icon(Icons.edit_outlined),
-                  color: kBandiwalaYellow,
-                  tooltip: 'Edit',
-                ),
-                IconButton(
-                  onPressed: () => _deleteLocation(index),
-                  icon: const Icon(Icons.delete_outline),
-                  color: Colors.red.shade400,
-                  tooltip: 'Delete',
-                ),
-              ],
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: _getLabelColor(location.label).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                _getLabelIcon(location.label),
+                color: _getLabelColor(location.label),
+                size: 22,
+              ),
             ),
-            const SizedBox(height: 12),
-            Divider(height: 1, thickness: 1, color: theme.dividerColor),
-            const SizedBox(height: 12),
-
-            // House number/Landmark
-            if (location.address != null && location.address!.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.home_outlined,
-                      size: 16,
-                      color: Colors.grey.shade600,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    location.label ?? 'Other',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: theme.colorScheme.onSurface,
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        location.address!,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
+                  ),
+                  if (location.address != null &&
+                      location.address!.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      location.address!,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurfaceVariant,
+                        height: 1.3,
                       ),
                     ),
                   ],
-                ),
-              ),
-
-            // Full area geolocation
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.location_on_outlined,
-                  size: 16,
-                  color: Colors.grey.shade600,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    location.geolocation,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade700,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            // Coordinates (optional, for debugging)
-            const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  Icon(Icons.map_outlined, size: 14, color: Colors.grey.shade500),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade500,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
                 ],
               ),
+            ),
+            IconButton(
+              onPressed: () => _editLocation(index, location),
+              icon: const Icon(Icons.edit_outlined, size: 20),
+              color: kBandiwalaYellow,
+              tooltip: 'Edit',
+              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              onPressed: () => _deleteLocation(index),
+              icon: const Icon(Icons.delete_outline, size: 20),
+              color: Colors.red.shade400,
+              tooltip: 'Delete',
+              padding: const EdgeInsets.all(6),
+              constraints: const BoxConstraints(),
             ),
           ],
         ),
@@ -448,10 +384,12 @@ class LocationPickerEditMode extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<LocationPickerEditMode> createState() => _LocationPickerEditModeState();
+  ConsumerState<LocationPickerEditMode> createState() =>
+      _LocationPickerEditModeState();
 }
 
-class _LocationPickerEditModeState extends ConsumerState<LocationPickerEditMode> {
+class _LocationPickerEditModeState
+    extends ConsumerState<LocationPickerEditMode> {
   late LatLng _selectedPosition;
   late TextEditingController _searchController;
   late TextEditingController _addressController;
@@ -478,7 +416,7 @@ class _LocationPickerEditModeState extends ConsumerState<LocationPickerEditMode>
       text: widget.existingLocation.phone,
     );
     _customLabelController = TextEditingController();
-    
+
     final label = widget.existingLocation.label ?? 'Other';
     if (label != 'Home' && label != 'Work') {
       _selectedLabel = 'Other';
@@ -512,7 +450,9 @@ class _LocationPickerEditModeState extends ConsumerState<LocationPickerEditMode>
         longitude: _selectedPosition.longitude,
         address: _addressController.text.trim(),
         phone: _phoneController.text.trim(),
-        label: _selectedLabel == 'Other' ? _customLabelController.text.trim() : _selectedLabel,
+        label: _selectedLabel == 'Other'
+            ? _customLabelController.text.trim()
+            : _selectedLabel,
       );
 
       if (updatedLocation.phone.isEmpty) {
@@ -607,7 +547,9 @@ class _LocationPickerEditModeState extends ConsumerState<LocationPickerEditMode>
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (isDark ? Colors.white : Colors.black).withOpacity(0.1),
+                    color: (isDark ? Colors.white : Colors.black).withOpacity(
+                      0.1,
+                    ),
                     blurRadius: 20,
                     offset: const Offset(0, -5),
                   ),
@@ -631,7 +573,7 @@ class _LocationPickerEditModeState extends ConsumerState<LocationPickerEditMode>
                   Text(
                     'Update Address Details',
                     style: TextStyle(
-                      fontSize: 18, 
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Theme.of(context).colorScheme.onSurface,
                     ),

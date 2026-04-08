@@ -27,13 +27,15 @@ class _NavPageState extends ConsumerState<NavPage> {
 
     return authAsync.when(
       loading: () => const AppBootSkeleton(),
-      error: (_, __) => const Scaffold(body: Center(child: Text('Something went wrong'))),
+      error: (_, __) =>
+          const Scaffold(body: Center(child: Text('Something went wrong'))),
       data: (appUser) {
         if (appUser == null) return const HomePage();
 
         if (appUser.savedAddresses.isEmpty) {
           return _ForceAddAddressScreen(
-            onAddressAdded: (loc) => ref.read(activeAddressProvider.notifier).setAddress(loc),
+            onAddressAdded: (loc) =>
+                ref.read(activeAddressProvider.notifier).setAddress(loc),
           );
         }
 
@@ -45,52 +47,23 @@ class _NavPageState extends ConsumerState<NavPage> {
               children: [
                 ActiveOrderBar(
                   onViewTap: () {
-                    Navigator.of(context).push(
-                      AppPageRoute(builder: (_) => const OrdersPage()),
-                    );
+                    Navigator.of(
+                      context,
+                    ).push(AppPageRoute(builder: (_) => const OrdersPage()));
                   },
                 ),
                 CartBar(
                   onTap: () {
                     Navigator.of(context).push(
-                      AppPageRoute(builder: (_) => CartPage(onBackToHome: () => Navigator.pop(context))),
-                    );
-                  },
-                ),
-                const SizedBox(height: 8),
-                Consumer(
-                  builder: (context, ref, _) {
-                    final activeAddress = ref.watch(activeAddressProvider);
-                    if (activeAddress == null) return const SizedBox.shrink();
-                    final area = activeAddress.geolocation.split(',').first.trim();
-                    final isInZone = activeAddress.isInServiceZone;
-                    final cs = Theme.of(context).colorScheme;
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            isInZone ? Icons.location_on : Icons.error_outline_rounded, 
-                            size: 11, 
-                            color: isInZone ? cs.onSurfaceVariant.withValues(alpha: 0.6) : Colors.red.shade600
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            isInZone ? "Delivering to $area" : "Not available at this address",
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: isInZone ? cs.onSurfaceVariant.withValues(alpha: 0.7) : Colors.red.shade700,
-                            ),
-                          ),
-                        ],
+                      AppPageRoute(
+                        builder: (_) => CartPage(
+                          onBackToHome: () => Navigator.pop(context),
+                        ),
                       ),
                     );
                   },
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
               ],
             ),
           ),

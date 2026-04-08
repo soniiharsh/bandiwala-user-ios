@@ -90,9 +90,6 @@ class _OrderStatusBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shortId = orderId.length > 12
-        ? orderId.substring(orderId.length - 8)
-        : orderId;
     final config = _statusConfig(status);
 
     return Container(
@@ -130,65 +127,29 @@ class _OrderStatusBar extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      // Row 1: status label ↔ amount
                       Row(
                         children: [
-                          Text(
-                            config.label,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: _kDark,
-                              letterSpacing: 0.1,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 1,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
+                          Expanded(
                             child: Text(
-                              '#$shortId',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: _kDark.withValues(alpha: 0.85),
+                              config.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: _kDark,
+                                letterSpacing: 0.1,
                               ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Text(
-                            config.subtitle,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: _kDark.withValues(alpha: 0.72),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            width: 3,
-                            height: 3,
-                            decoration: BoxDecoration(
-                              color: _kDark.withValues(alpha: 0.45),
-                              shape: BoxShape.circle,
                             ),
                           ),
                           const SizedBox(width: 6),
                           Text(
                             '₹${grandTotal.toStringAsFixed(0)}',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 13,
                               color: _kDark.withValues(alpha: 0.85),
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                           if (paymentMethod == 'cod') ...[
@@ -214,9 +175,22 @@ class _OrderStatusBar extends StatelessWidget {
                           ],
                         ],
                       ),
+                      const SizedBox(height: 2),
+                      // Row 2: subtitle
+                      Text(
+                        config.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: _kDark.withValues(alpha: 0.72),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
                 GestureDetector(
                   onTap: onViewTap,
                   child: Container(

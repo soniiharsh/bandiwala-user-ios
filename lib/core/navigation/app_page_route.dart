@@ -21,20 +21,20 @@ class AppPageRoute<T> extends PageRouteBuilder<T> {
     super.settings,
     super.fullscreenDialog,
   }) : super(
-          opaque: true,
-          transitionDuration: const Duration(milliseconds: 400),
-          reverseTransitionDuration: const Duration(milliseconds: 350),
-          pageBuilder: (context, animation, secondaryAnimation) =>
-              builder(context),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return _buildTransition(
-              type: type,
-              animation: animation,
-              secondaryAnimation: secondaryAnimation,
-              child: child,
-            );
-          },
-        );
+         opaque: true,
+         transitionDuration: const Duration(milliseconds: 400),
+         reverseTransitionDuration: const Duration(milliseconds: 150),
+         pageBuilder: (context, animation, secondaryAnimation) =>
+             builder(context),
+         transitionsBuilder: (context, animation, secondaryAnimation, child) {
+           return _buildTransition(
+             type: type,
+             animation: animation,
+             secondaryAnimation: secondaryAnimation,
+             child: child,
+           );
+         },
+       );
 
   static Widget _buildTransition({
     required PageTransitionType type,
@@ -53,7 +53,6 @@ class AppPageRoute<T> extends PageRouteBuilder<T> {
   }
 
   /// Slide from right — only the incoming page animates; the page below stays
-  /// fixed so no black gap is ever revealed behind it.
   static Widget _slideRightTransition(
     Animation<double> animation,
     Animation<double> secondaryAnimation,
@@ -66,39 +65,26 @@ class AppPageRoute<T> extends PageRouteBuilder<T> {
       end: Offset.zero,
     ).chain(CurveTween(curve: curve));
 
-    return SlideTransition(
-      position: inTween.animate(animation),
-      child: child,
-    );
+    return SlideTransition(position: inTween.animate(animation), child: child);
   }
 
   /// Slide up from bottom (modal feel).
-  static Widget _slideUpTransition(
-    Animation<double> animation,
-    Widget child,
-  ) {
+  static Widget _slideUpTransition(Animation<double> animation, Widget child) {
     final inTween = Tween<Offset>(
       begin: const Offset(0.0, 1.0),
       end: Offset.zero,
     ).chain(CurveTween(curve: Curves.easeOutExpo));
 
-    return SlideTransition(
-      position: inTween.animate(animation),
-      child: child,
-    );
+    return SlideTransition(position: inTween.animate(animation), child: child);
   }
 
   /// Subtle scale up from center (for root-level replacements).
-  static Widget _scaleTransition(
-    Animation<double> animation,
-    Widget child,
-  ) {
-    final scaleTween = Tween<double>(begin: 0.92, end: 1.0)
-        .chain(CurveTween(curve: Curves.easeOutExpo));
+  static Widget _scaleTransition(Animation<double> animation, Widget child) {
+    final scaleTween = Tween<double>(
+      begin: 0.92,
+      end: 1.0,
+    ).chain(CurveTween(curve: Curves.easeOutExpo));
 
-    return ScaleTransition(
-      scale: scaleTween.animate(animation),
-      child: child,
-    );
+    return ScaleTransition(scale: scaleTween.animate(animation), child: child);
   }
 }
