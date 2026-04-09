@@ -10,7 +10,7 @@ abstract class DbCollections {
   static const String coupons = 'coupons1';
   static const String serviceZones = 'serviceLocations1';
   static const String pricingConfig = 'pricing_config';
-  static const String announcements = 'announcements1';
+  static const String announcements = 'announcements';
   static const String logs = 'logs';
   static const String admins = 'admins';
   static const String statusUpdates = 'status_updates';

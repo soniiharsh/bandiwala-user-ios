@@ -18,7 +18,7 @@ Future<String> placeOrder(AppOrder order) async {
         'items': vo.items.map(
           (itemId, item) => MapEntry(itemId, item.toJson()),
         ),
-        'status': vo.status,
+        'status': vo.status.value,
         'statusUpdatedAt': FieldValue.serverTimestamp(),
       }),
     ),

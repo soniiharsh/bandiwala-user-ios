@@ -197,8 +197,9 @@ class VendorCardSkeleton extends StatelessWidget {
               height: 160,
               decoration: BoxDecoration(
                 color: color,
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
               ),
             ),
             Padding(
@@ -283,8 +284,7 @@ class VendorItemsSkeleton extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              SkeletonBox(
-                                  height: 14, width: double.infinity),
+                              SkeletonBox(height: 14, width: double.infinity),
                               const SizedBox(height: 6),
                               SkeletonBox(height: 11, width: 120),
                               const SizedBox(height: 10),
@@ -402,8 +402,8 @@ class CouponsListSkeleton extends StatelessWidget {
                   SkeletonBox(height: 36, width: 36, radius: 8),
                   const SizedBox(width: 12),
                   Expanded(
-                      child:
-                          SkeletonBox(height: 14, width: double.infinity)),
+                    child: SkeletonBox(height: 14, width: double.infinity),
+                  ),
                   const SizedBox(width: 12),
                   SkeletonBox(height: 28, width: 70, radius: 6),
                 ],
@@ -472,8 +472,8 @@ class ProfilePageSkeleton extends StatelessWidget {
                     SkeletonBox(height: 40, width: 40, radius: 10),
                     const SizedBox(width: 14),
                     Expanded(
-                        child:
-                            SkeletonBox(height: 14, width: double.infinity)),
+                      child: SkeletonBox(height: 14, width: double.infinity),
+                    ),
                     const SizedBox(width: 12),
                     SkeletonBox(height: 14, width: 20),
                   ],
@@ -513,7 +513,8 @@ class WishlistPageSkeleton extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: color,
                   borderRadius: const BorderRadius.horizontal(
-                      left: Radius.circular(14)),
+                    left: Radius.circular(14),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),

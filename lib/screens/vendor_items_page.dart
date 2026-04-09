@@ -425,7 +425,7 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
           crossAxisCount: 2,
           crossAxisSpacing: 16,
           mainAxisSpacing: 24,
-          childAspectRatio: 0.62,
+          childAspectRatio: 0.58,
         ),
         delegate: SliverChildBuilderDelegate((context, index) {
           final item = filtered[index];
@@ -931,12 +931,10 @@ class _ItemCard extends StatelessWidget {
                         item.description,
                         style: TextStyle(
                           fontSize: 9,
-                          color: isDark
-                              ? Colors.grey.shade500
-                              : Colors.grey.shade500,
+                          color: Colors.grey.shade500,
                           height: 1.1,
                         ),
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),

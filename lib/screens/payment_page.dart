@@ -106,10 +106,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
   double get _foodTax => widget.itemsTotal * (_pricing.foodTaxPercent / 100);
 
-  double get _deliveryTax =>
-      _selectedOrderType == 'pickup'
-          ? 0.0
-          : _deliveryCharge * (_pricing.deliveryTaxPercent / 100);
+  double get _deliveryTax => _selectedOrderType == 'pickup'
+      ? 0.0
+      : _deliveryCharge * (_pricing.deliveryTaxPercent / 100);
 
   double get _platformFeeTax =>
       _platformFee * (_pricing.platformFeeTaxPercent / 100);
@@ -200,6 +199,17 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   // ── Payment callbacks ─────────────────────────────────────────────────────
 
   void _onOrderSuccess(String orderId) {
+    // Record coupon usage on successful order
+    if (_appliedCoupon != null) {
+      final couponId = _appliedCoupon!['id'] as String?;
+      if (couponId != null && couponId.isNotEmpty) {
+        incrementCouponUsage(couponId);
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid != null) {
+          recordCouponRedemption(userId: uid, couponId: couponId);
+        }
+      }
+    }
     ref.read(cartProvider.notifier).clear();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -281,7 +291,6 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         _couponVendorId = selected['vendorId'] ?? '';
         _couponDiscount = _calculateCouponDiscount();
       });
-      if (selected['id'] != null) incrementCouponUsage(selected['id']);
     }
   }
 
@@ -321,7 +330,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
     final cart = ref.read(cartProvider);
     final cartVendorIds = cart.cartByVendor.keys.toSet();
-    final cartVendors = vendors.where((v) => cartVendorIds.contains(v.id)).toList();
+    final cartVendors = vendors
+        .where((v) => cartVendorIds.contains(v.id))
+        .toList();
 
     if (cartVendors.length == cartVendorIds.length &&
         cartVendors.every((v) => v.isPickupAvailable)) {
@@ -367,14 +378,17 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     final vendorsAsync = ref.watch(vendorsStreamProvider);
     vendorsAsync.whenData((vendors) {
       _checkPickupSupport(vendors);
-      
+
       // Ensure we revert to delivery if any vendor no longer supports pickup
       final cart = ref.read(cartProvider);
       final cartVendorIds = cart.cartByVendor.keys.toSet();
-      final cartVendors = vendors.where((v) => cartVendorIds.contains(v.id)).toList();
-      final allSupportPickup = cartVendors.length == cartVendorIds.length &&
+      final cartVendors = vendors
+          .where((v) => cartVendorIds.contains(v.id))
+          .toList();
+      final allSupportPickup =
+          cartVendors.length == cartVendorIds.length &&
           cartVendors.every((v) => v.isPickupAvailable);
-      
+
       if (!allSupportPickup && _selectedOrderType == 'pickup') {
         Future.microtask(() => setState(() => _selectedOrderType = 'delivery'));
       }
@@ -422,10 +436,15 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                       _orderSummaryCard(kWhite, kBorderGrey),
                       const SizedBox(height: 16),
                       if (vendorsAsync.hasValue) ...[
-                        _pickupOptionToggle(kWhite, kBorderGrey, vendorsAsync.value!),
+                        _pickupOptionToggle(
+                          kWhite,
+                          kBorderGrey,
+                          vendorsAsync.value!,
+                        ),
                         const SizedBox(height: 16),
                       ],
-                      if (_selectedOrderType == 'delivery' && widget.deliveryLocation != null) ...[
+                      if (_selectedOrderType == 'delivery' &&
+                          widget.deliveryLocation != null) ...[
                         _sectionLabel(kTextGrey, 'Delivery To'),
                         const SizedBox(height: 8),
                         _addressCard(kWhite, kBorderGrey, kTextGrey),
@@ -462,10 +481,16 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     ),
   );
 
-  Widget _pickupOptionToggle(Color kWhite, Color kBorderGrey, List<Vendor> vendors) {
+  Widget _pickupOptionToggle(
+    Color kWhite,
+    Color kBorderGrey,
+    List<Vendor> vendors,
+  ) {
     final cart = ref.read(cartProvider);
     final cartVendorIds = cart.cartByVendor.keys.toSet();
-    final cartVendors = vendors.where((v) => cartVendorIds.contains(v.id)).toList();
+    final cartVendors = vendors
+        .where((v) => cartVendorIds.contains(v.id))
+        .toList();
 
     if (cartVendors.length != cartVendorIds.length ||
         !cartVendors.every((v) => v.isPickupAvailable)) {
@@ -1609,14 +1634,17 @@ class _CodConfirmDialog extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Amount to pay on delivery',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                const Flexible(
+                  child: Text(
+                    'Amount to pay on delivery',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color.fromARGB(221, 255, 255, 255),
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Text(
                   '₹${grandTotal.toStringAsFixed(0)}',
                   style: const TextStyle(
@@ -1666,7 +1694,7 @@ class _CodConfirmDialog extends StatelessWidget {
                 child: const Text(
                   'Cancel',
                   style: TextStyle(
-                    color: Colors.black54,
+                    color: Color.fromARGB(255, 255, 255, 255),
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
