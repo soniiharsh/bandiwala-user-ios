@@ -34,9 +34,6 @@ mixin _$Coupon {
   int get currentUsage => throw _privateConstructorUsedError;
   bool get isActive => throw _privateConstructorUsedError;
   DateTime get createdAt => throw _privateConstructorUsedError;
-
-  /// "" = global coupon (applies to entire order)
-  /// "<vendorId>" = vendor-specific (applies only to that vendor's items)
   String get vendorId => throw _privateConstructorUsedError;
 
   /// Serializes this Coupon to a JSON map.
@@ -318,9 +315,6 @@ class _$CouponImpl extends _Coupon {
   final bool isActive;
   @override
   final DateTime createdAt;
-
-  /// "" = global coupon (applies to entire order)
-  /// "<vendorId>" = vendor-specific (applies only to that vendor's items)
   @override
   @JsonKey()
   final String vendorId;
@@ -439,9 +433,6 @@ abstract class _Coupon extends Coupon {
   bool get isActive;
   @override
   DateTime get createdAt;
-
-  /// "" = global coupon (applies to entire order)
-  /// "<vendorId>" = vendor-specific (applies only to that vendor's items)
   @override
   String get vendorId;
 

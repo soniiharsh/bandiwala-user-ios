@@ -13,6 +13,9 @@ import 'coupons_page.dart';
 import '../core/theme/theme.dart';
 import '../core/navigation/app_page_route.dart';
 
+import '../models/vendor.dart';
+import '../providers/vendors_provider.dart';
+
 const kBandiwalaYellow = AppColors.primary;
 
 // ─── Pricing Config Model ─────────────────────────────────────────────────────
@@ -79,6 +82,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   // vendorId of the applied coupon — "" means global
   String _couponVendorId = '';
 
+  String _selectedOrderType = 'delivery';
+  bool _pickupDialogShown = false;
+
   // ── Pricing ───────────────────────────────────────────────────────────────
 
   PricingConfig get _pricing {
@@ -90,7 +96,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
   // ── Computed values ───────────────────────────────────────────────────────
 
-  bool get _isFreeDelivery => _appliedCoupon?['couponType'] == 'free_delivery';
+  bool get _isFreeDelivery =>
+      _appliedCoupon?['couponType'] == 'free_delivery' ||
+      _selectedOrderType == 'pickup';
 
   double get _deliveryCharge => _isFreeDelivery ? 0.0 : _pricing.deliveryCharge;
 
@@ -99,7 +107,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   double get _foodTax => widget.itemsTotal * (_pricing.foodTaxPercent / 100);
 
   double get _deliveryTax =>
-      _deliveryCharge * (_pricing.deliveryTaxPercent / 100);
+      _selectedOrderType == 'pickup'
+          ? 0.0
+          : _deliveryCharge * (_pricing.deliveryTaxPercent / 100);
 
   double get _platformFeeTax =>
       _platformFee * (_pricing.platformFeeTaxPercent / 100);
@@ -183,6 +193,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       couponVendorId: _couponVendorId,
       grandTotal: _grandTotal,
       status: OrderStatus.orderCreated,
+      orderType: _selectedOrderType,
     );
   }
 
@@ -305,10 +316,70 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     }
   }
 
+  void _checkPickupSupport(List<Vendor> vendors) {
+    if (_pickupDialogShown) return;
+
+    final cart = ref.read(cartProvider);
+    final cartVendorIds = cart.cartByVendor.keys.toSet();
+    final cartVendors = vendors.where((v) => cartVendorIds.contains(v.id)).toList();
+
+    if (cartVendors.length == cartVendorIds.length &&
+        cartVendors.every((v) => v.isPickupAvailable)) {
+      _pickupDialogShown = true;
+      Future.microtask(() => _showOrderTypeDialog());
+    }
+  }
+
+  Future<void> _showOrderTypeDialog() async {
+    final type = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Choose Delivery Option'),
+        content: const Text(
+          'All items in your cart are available for pickup. Would you like to pick up your order or have it delivered?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'delivery'),
+            child: const Text('Delivery'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, 'pickup'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kBandiwalaYellow,
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Pickup'),
+          ),
+        ],
+      ),
+    );
+    if (type != null && mounted) {
+      setState(() => _selectedOrderType = type);
+    }
+  }
+
   // ─── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
+    final vendorsAsync = ref.watch(vendorsStreamProvider);
+    vendorsAsync.whenData((vendors) {
+      _checkPickupSupport(vendors);
+      
+      // Ensure we revert to delivery if any vendor no longer supports pickup
+      final cart = ref.read(cartProvider);
+      final cartVendorIds = cart.cartByVendor.keys.toSet();
+      final cartVendors = vendors.where((v) => cartVendorIds.contains(v.id)).toList();
+      final allSupportPickup = cartVendors.length == cartVendorIds.length &&
+          cartVendors.every((v) => v.isPickupAvailable);
+      
+      if (!allSupportPickup && _selectedOrderType == 'pickup') {
+        Future.microtask(() => setState(() => _selectedOrderType = 'delivery'));
+      }
+    });
+
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final kBgGrey = isDark ? cs.surface : const Color(0xFFF9FAFB);
@@ -350,7 +421,11 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                       const SizedBox(height: 8),
                       _orderSummaryCard(kWhite, kBorderGrey),
                       const SizedBox(height: 16),
-                      if (widget.deliveryLocation != null) ...[
+                      if (vendorsAsync.hasValue) ...[
+                        _pickupOptionToggle(kWhite, kBorderGrey, vendorsAsync.value!),
+                        const SizedBox(height: 16),
+                      ],
+                      if (_selectedOrderType == 'delivery' && widget.deliveryLocation != null) ...[
                         _sectionLabel(kTextGrey, 'Delivery To'),
                         const SizedBox(height: 8),
                         _addressCard(kWhite, kBorderGrey, kTextGrey),
@@ -386,6 +461,109 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       letterSpacing: 0.5,
     ),
   );
+
+  Widget _pickupOptionToggle(Color kWhite, Color kBorderGrey, List<Vendor> vendors) {
+    final cart = ref.read(cartProvider);
+    final cartVendorIds = cart.cartByVendor.keys.toSet();
+    final cartVendors = vendors.where((v) => cartVendorIds.contains(v.id)).toList();
+
+    if (cartVendors.length != cartVendorIds.length ||
+        !cartVendors.every((v) => v.isPickupAvailable)) {
+      return const SizedBox.shrink();
+    }
+
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionLabel(cs.onSurfaceVariant, 'Order Type'),
+        const SizedBox(height: 8),
+        _card(
+          kWhite,
+          kBorderGrey,
+          child: Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _selectedOrderType = 'delivery'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: _selectedOrderType == 'delivery'
+                          ? kBandiwalaYellow.withValues(alpha: 0.1)
+                          : null,
+                      borderRadius: const BorderRadius.horizontal(
+                        left: Radius.circular(12),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.delivery_dining,
+                          color: _selectedOrderType == 'delivery'
+                              ? kBandiwalaYellow
+                              : cs.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Delivery',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _selectedOrderType == 'delivery'
+                                ? kBandiwalaYellow
+                                : cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Container(width: 1, height: 40, color: kBorderGrey),
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _selectedOrderType = 'pickup'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: _selectedOrderType == 'pickup'
+                          ? kBandiwalaYellow.withValues(alpha: 0.1)
+                          : null,
+                      borderRadius: const BorderRadius.horizontal(
+                        right: Radius.circular(12),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.shopping_bag_outlined,
+                          color: _selectedOrderType == 'pickup'
+                              ? kBandiwalaYellow
+                              : cs.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Pickup',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _selectedOrderType == 'pickup'
+                                ? kBandiwalaYellow
+                                : cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _orderSummaryCard(Color kWhite, Color kBorderGrey) {
     final cs = Theme.of(context).colorScheme;

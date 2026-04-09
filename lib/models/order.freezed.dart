@@ -791,11 +791,10 @@ mixin _$AppOrder {
   String get couponType => throw _privateConstructorUsedError;
   double get couponDiscount => throw _privateConstructorUsedError;
   double get couponMaxDiscountableAmount => throw _privateConstructorUsedError;
-
-  /// "" = global coupon was applied; "<vendorId>" = vendor coupon
   String get couponVendorId => throw _privateConstructorUsedError;
   double get grandTotal => throw _privateConstructorUsedError;
   OrderStatus get status => throw _privateConstructorUsedError;
+  String get orderType => throw _privateConstructorUsedError;
   DateTime? get statusUpdatedAt => throw _privateConstructorUsedError;
   DateTime? get createdAt => throw _privateConstructorUsedError;
   String? get assignedTo => throw _privateConstructorUsedError;
@@ -839,6 +838,7 @@ abstract class $AppOrderCopyWith<$Res> {
     String couponVendorId,
     double grandTotal,
     OrderStatus status,
+    String orderType,
     DateTime? statusUpdatedAt,
     DateTime? createdAt,
     String? assignedTo,
@@ -884,6 +884,7 @@ class _$AppOrderCopyWithImpl<$Res, $Val extends AppOrder>
     Object? couponVendorId = null,
     Object? grandTotal = null,
     Object? status = null,
+    Object? orderType = null,
     Object? statusUpdatedAt = freezed,
     Object? createdAt = freezed,
     Object? assignedTo = freezed,
@@ -975,6 +976,10 @@ class _$AppOrderCopyWithImpl<$Res, $Val extends AppOrder>
                 ? _value.status
                 : status // ignore: cast_nullable_to_non_nullable
                       as OrderStatus,
+            orderType: null == orderType
+                ? _value.orderType
+                : orderType // ignore: cast_nullable_to_non_nullable
+                      as String,
             statusUpdatedAt: freezed == statusUpdatedAt
                 ? _value.statusUpdatedAt
                 : statusUpdatedAt // ignore: cast_nullable_to_non_nullable
@@ -1038,6 +1043,7 @@ abstract class _$$AppOrderImplCopyWith<$Res>
     String couponVendorId,
     double grandTotal,
     OrderStatus status,
+    String orderType,
     DateTime? statusUpdatedAt,
     DateTime? createdAt,
     String? assignedTo,
@@ -1083,6 +1089,7 @@ class __$$AppOrderImplCopyWithImpl<$Res>
     Object? couponVendorId = null,
     Object? grandTotal = null,
     Object? status = null,
+    Object? orderType = null,
     Object? statusUpdatedAt = freezed,
     Object? createdAt = freezed,
     Object? assignedTo = freezed,
@@ -1174,6 +1181,10 @@ class __$$AppOrderImplCopyWithImpl<$Res>
             ? _value.status
             : status // ignore: cast_nullable_to_non_nullable
                   as OrderStatus,
+        orderType: null == orderType
+            ? _value.orderType
+            : orderType // ignore: cast_nullable_to_non_nullable
+                  as String,
         statusUpdatedAt: freezed == statusUpdatedAt
             ? _value.statusUpdatedAt
             : statusUpdatedAt // ignore: cast_nullable_to_non_nullable
@@ -1219,7 +1230,8 @@ class _$AppOrderImpl extends _AppOrder {
     this.couponMaxDiscountableAmount = 0,
     this.couponVendorId = '',
     required this.grandTotal,
-    required this.status,
+    this.status = OrderStatus.orderCreated,
+    this.orderType = 'delivery',
     this.statusUpdatedAt,
     this.createdAt,
     this.assignedTo = null,
@@ -1285,15 +1297,17 @@ class _$AppOrderImpl extends _AppOrder {
   @override
   @JsonKey()
   final double couponMaxDiscountableAmount;
-
-  /// "" = global coupon was applied; "<vendorId>" = vendor coupon
   @override
   @JsonKey()
   final String couponVendorId;
   @override
   final double grandTotal;
   @override
+  @JsonKey()
   final OrderStatus status;
+  @override
+  @JsonKey()
+  final String orderType;
   @override
   final DateTime? statusUpdatedAt;
   @override
@@ -1315,7 +1329,7 @@ class _$AppOrderImpl extends _AppOrder {
 
   @override
   String toString() {
-    return 'AppOrder(id: $id, userId: $userId, customerPhone: $customerPhone, deliveryAddress: $deliveryAddress, itemsByVendor: $itemsByVendor, vendorIds: $vendorIds, paymentMethod: $paymentMethod, paymentId: $paymentId, deliveryFee: $deliveryFee, platformFee: $platformFee, foodTax: $foodTax, deliveryTax: $deliveryTax, platformTax: $platformTax, couponApplied: $couponApplied, couponCode: $couponCode, couponType: $couponType, couponDiscount: $couponDiscount, couponMaxDiscountableAmount: $couponMaxDiscountableAmount, couponVendorId: $couponVendorId, grandTotal: $grandTotal, status: $status, statusUpdatedAt: $statusUpdatedAt, createdAt: $createdAt, assignedTo: $assignedTo, deliveryAgentLocation: $deliveryAgentLocation)';
+    return 'AppOrder(id: $id, userId: $userId, customerPhone: $customerPhone, deliveryAddress: $deliveryAddress, itemsByVendor: $itemsByVendor, vendorIds: $vendorIds, paymentMethod: $paymentMethod, paymentId: $paymentId, deliveryFee: $deliveryFee, platformFee: $platformFee, foodTax: $foodTax, deliveryTax: $deliveryTax, platformTax: $platformTax, couponApplied: $couponApplied, couponCode: $couponCode, couponType: $couponType, couponDiscount: $couponDiscount, couponMaxDiscountableAmount: $couponMaxDiscountableAmount, couponVendorId: $couponVendorId, grandTotal: $grandTotal, status: $status, orderType: $orderType, statusUpdatedAt: $statusUpdatedAt, createdAt: $createdAt, assignedTo: $assignedTo, deliveryAgentLocation: $deliveryAgentLocation)';
   }
 
   @override
@@ -1369,6 +1383,8 @@ class _$AppOrderImpl extends _AppOrder {
             (identical(other.grandTotal, grandTotal) ||
                 other.grandTotal == grandTotal) &&
             (identical(other.status, status) || other.status == status) &&
+            (identical(other.orderType, orderType) ||
+                other.orderType == orderType) &&
             (identical(other.statusUpdatedAt, statusUpdatedAt) ||
                 other.statusUpdatedAt == statusUpdatedAt) &&
             (identical(other.createdAt, createdAt) ||
@@ -1406,6 +1422,7 @@ class _$AppOrderImpl extends _AppOrder {
     couponVendorId,
     grandTotal,
     status,
+    orderType,
     statusUpdatedAt,
     createdAt,
     assignedTo,
@@ -1448,7 +1465,8 @@ abstract class _AppOrder extends AppOrder {
     final double couponMaxDiscountableAmount,
     final String couponVendorId,
     required final double grandTotal,
-    required final OrderStatus status,
+    final OrderStatus status,
+    final String orderType,
     final DateTime? statusUpdatedAt,
     final DateTime? createdAt,
     final String? assignedTo,
@@ -1495,14 +1513,14 @@ abstract class _AppOrder extends AppOrder {
   double get couponDiscount;
   @override
   double get couponMaxDiscountableAmount;
-
-  /// "" = global coupon was applied; "<vendorId>" = vendor coupon
   @override
   String get couponVendorId;
   @override
   double get grandTotal;
   @override
   OrderStatus get status;
+  @override
+  String get orderType;
   @override
   DateTime? get statusUpdatedAt;
   @override

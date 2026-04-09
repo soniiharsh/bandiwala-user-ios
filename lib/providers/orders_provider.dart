@@ -38,6 +38,7 @@ Future<String> placeOrder(AppOrder order) async {
     'couponVendorId': order.couponVendorId,
     'grandTotal': order.grandTotal,
     'status': order.status.value,
+    'orderType': order.orderType,
     'createdAt': FieldValue.serverTimestamp(),
     'statusUpdatedAt': FieldValue.serverTimestamp(),
   };

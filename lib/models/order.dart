@@ -144,7 +144,8 @@ class AppOrder with _$AppOrder {
     @Default(0) double couponMaxDiscountableAmount,
     @Default('') String couponVendorId,
     required double grandTotal,
-    required OrderStatus status,
+    @Default(OrderStatus.orderCreated) OrderStatus status,
+    @Default('delivery') String orderType,
     DateTime? statusUpdatedAt,
     DateTime? createdAt,
     @Default(null) String? assignedTo,
@@ -207,6 +208,7 @@ class AppOrder with _$AppOrder {
       couponVendorId: d['couponVendorId'] ?? '',
       grandTotal: (d['grandTotal'] as num? ?? 0).toDouble(),
       status: OrderStatus.fromValue(d['status'] ?? 'order_created'),
+      orderType: d['orderType'] ?? 'delivery',
       statusUpdatedAt: (d['statusUpdatedAt'] as Timestamp?)?.toDate(),
       createdAt: (d['createdAt'] as Timestamp? ?? d['timestamp'] as Timestamp?)
           ?.toDate(),

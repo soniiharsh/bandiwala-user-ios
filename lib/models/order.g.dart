@@ -103,7 +103,10 @@ _$AppOrderImpl _$$AppOrderImplFromJson(Map<String, dynamic> json) =>
           (json['couponMaxDiscountableAmount'] as num?)?.toDouble() ?? 0,
       couponVendorId: json['couponVendorId'] as String? ?? '',
       grandTotal: (json['grandTotal'] as num).toDouble(),
-      status: $enumDecode(_$OrderStatusEnumMap, json['status']),
+      status:
+          $enumDecodeNullable(_$OrderStatusEnumMap, json['status']) ??
+          OrderStatus.orderCreated,
+      orderType: json['orderType'] as String? ?? 'delivery',
       statusUpdatedAt: json['statusUpdatedAt'] == null
           ? null
           : DateTime.parse(json['statusUpdatedAt'] as String),
@@ -141,6 +144,7 @@ Map<String, dynamic> _$$AppOrderImplToJson(_$AppOrderImpl instance) =>
       'couponVendorId': instance.couponVendorId,
       'grandTotal': instance.grandTotal,
       'status': _$OrderStatusEnumMap[instance.status]!,
+      'orderType': instance.orderType,
       'statusUpdatedAt': instance.statusUpdatedAt?.toIso8601String(),
       'createdAt': instance.createdAt?.toIso8601String(),
       'assignedTo': instance.assignedTo,
