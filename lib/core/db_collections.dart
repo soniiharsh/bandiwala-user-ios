@@ -5,9 +5,9 @@ abstract class DbCollections {
   static const String vendors = 'vendors1';
   static const String items = 'items1';
   static const String orders = 'orders1';
-  static const String foodCategories = 'food_categories1';
-  static const String promotions = 'promotions1';
-  static const String coupons = 'coupons1';
+  static const String foodCategories = 'food_categories';
+  static const String promotions = 'promotions';
+  static const String coupons = 'coupons';
   static const String serviceZones = 'serviceLocations1';
   static const String pricingConfig = 'pricing_config';
   static const String announcements = 'announcements';
