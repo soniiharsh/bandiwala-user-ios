@@ -35,6 +35,7 @@ mixin _$Coupon {
   bool get isActive => throw _privateConstructorUsedError;
   DateTime get createdAt => throw _privateConstructorUsedError;
   String get vendorId => throw _privateConstructorUsedError;
+  int get perUserLimit => throw _privateConstructorUsedError;
 
   /// Serializes this Coupon to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -64,6 +65,7 @@ abstract class $CouponCopyWith<$Res> {
     bool isActive,
     DateTime createdAt,
     String vendorId,
+    int perUserLimit,
   });
 }
 
@@ -95,6 +97,7 @@ class _$CouponCopyWithImpl<$Res, $Val extends Coupon>
     Object? isActive = null,
     Object? createdAt = null,
     Object? vendorId = null,
+    Object? perUserLimit = null,
   }) {
     return _then(
       _value.copyWith(
@@ -150,6 +153,10 @@ class _$CouponCopyWithImpl<$Res, $Val extends Coupon>
                 ? _value.vendorId
                 : vendorId // ignore: cast_nullable_to_non_nullable
                       as String,
+            perUserLimit: null == perUserLimit
+                ? _value.perUserLimit
+                : perUserLimit // ignore: cast_nullable_to_non_nullable
+                      as int,
           )
           as $Val,
     );
@@ -178,6 +185,7 @@ abstract class _$$CouponImplCopyWith<$Res> implements $CouponCopyWith<$Res> {
     bool isActive,
     DateTime createdAt,
     String vendorId,
+    int perUserLimit,
   });
 }
 
@@ -208,6 +216,7 @@ class __$$CouponImplCopyWithImpl<$Res>
     Object? isActive = null,
     Object? createdAt = null,
     Object? vendorId = null,
+    Object? perUserLimit = null,
   }) {
     return _then(
       _$CouponImpl(
@@ -263,6 +272,10 @@ class __$$CouponImplCopyWithImpl<$Res>
             ? _value.vendorId
             : vendorId // ignore: cast_nullable_to_non_nullable
                   as String,
+        perUserLimit: null == perUserLimit
+            ? _value.perUserLimit
+            : perUserLimit // ignore: cast_nullable_to_non_nullable
+                  as int,
       ),
     );
   }
@@ -285,6 +298,7 @@ class _$CouponImpl extends _Coupon {
     required this.isActive,
     required this.createdAt,
     this.vendorId = '',
+    this.perUserLimit = 0,
   }) : super._();
 
   factory _$CouponImpl.fromJson(Map<String, dynamic> json) =>
@@ -318,10 +332,13 @@ class _$CouponImpl extends _Coupon {
   @override
   @JsonKey()
   final String vendorId;
+  @override
+  @JsonKey()
+  final int perUserLimit;
 
   @override
   String toString() {
-    return 'Coupon(id: $id, couponCode: $couponCode, couponName: $couponName, couponType: $couponType, description: $description, minAmount: $minAmount, maxDiscountableAmount: $maxDiscountableAmount, discount: $discount, maxUsage: $maxUsage, currentUsage: $currentUsage, isActive: $isActive, createdAt: $createdAt, vendorId: $vendorId)';
+    return 'Coupon(id: $id, couponCode: $couponCode, couponName: $couponName, couponType: $couponType, description: $description, minAmount: $minAmount, maxDiscountableAmount: $maxDiscountableAmount, discount: $discount, maxUsage: $maxUsage, currentUsage: $currentUsage, isActive: $isActive, createdAt: $createdAt, vendorId: $vendorId, perUserLimit: $perUserLimit)';
   }
 
   @override
@@ -353,7 +370,9 @@ class _$CouponImpl extends _Coupon {
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.vendorId, vendorId) ||
-                other.vendorId == vendorId));
+                other.vendorId == vendorId) &&
+            (identical(other.perUserLimit, perUserLimit) ||
+                other.perUserLimit == perUserLimit));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -373,6 +392,7 @@ class _$CouponImpl extends _Coupon {
     isActive,
     createdAt,
     vendorId,
+    perUserLimit,
   );
 
   /// Create a copy of Coupon
@@ -404,6 +424,7 @@ abstract class _Coupon extends Coupon {
     required final bool isActive,
     required final DateTime createdAt,
     final String vendorId,
+    final int perUserLimit,
   }) = _$CouponImpl;
   const _Coupon._() : super._();
 
@@ -435,6 +456,8 @@ abstract class _Coupon extends Coupon {
   DateTime get createdAt;
   @override
   String get vendorId;
+  @override
+  int get perUserLimit;
 
   /// Create a copy of Coupon
   /// with the given fields replaced by the non-null parameter values.

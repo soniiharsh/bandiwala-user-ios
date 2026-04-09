@@ -9,8 +9,6 @@ const kBandiwalaYellow = AppColors.primary;
 
 class CouponsPage extends ConsumerWidget {
   final double cartAmount;
-
-  /// Map of vendorId → vendor subtotal, for vendor-specific minAmount checks
   final Map<String, double> vendorSubtotals;
 
   const CouponsPage({
@@ -22,13 +20,15 @@ class CouponsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final globalAsync = ref.watch(activeCouponsProvider);
-    // Watch vendor coupons for each vendor in cart
     final vendorCouponAsyncList = vendorSubtotals.keys
         .map((id) => ref.watch(vendorCouponsProvider(id)))
         .toList();
+    final redemptionsAsync = ref.watch(couponRedemptionsProvider);
 
     final isLoading =
-        globalAsync.isLoading || vendorCouponAsyncList.any((a) => a.isLoading);
+        globalAsync.isLoading ||
+        vendorCouponAsyncList.any((a) => a.isLoading) ||
+        redemptionsAsync.isLoading;
     final hasError =
         globalAsync.hasError || vendorCouponAsyncList.any((a) => a.hasError);
 
@@ -63,8 +63,8 @@ class CouponsPage extends ConsumerWidget {
     }
 
     final globalCoupons = globalAsync.valueOrNull ?? [];
+    final redemptions = redemptionsAsync.valueOrNull ?? {};
 
-    // Collect all vendor coupons, deduplicated by id
     final Map<String, Coupon> vendorCouponMap = {};
     for (final async in vendorCouponAsyncList) {
       for (final c in (async.valueOrNull ?? [])) {
@@ -72,35 +72,32 @@ class CouponsPage extends ConsumerWidget {
       }
     }
     final vendorCoupons = vendorCouponMap.values.toList();
-
     final allEmpty = globalCoupons.isEmpty && vendorCoupons.isEmpty;
 
     return Scaffold(
       appBar: _buildAppBar(),
       body: allEmpty
           ? _buildEmptyState()
-          : Column(
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               children: [
-                _buildManualEntry(),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    children: [
-                      if (vendorCoupons.isNotEmpty) ...[
-                        _sectionHeader('Vendor Offers'),
-                        ..._buildVendorCouponCards(context, vendorCoupons),
-                      ],
-                      if (globalCoupons.isNotEmpty) ...[
-                        _sectionHeader('App-wide Offers'),
-                        ..._buildCouponCards(
-                          context,
-                          globalCoupons,
-                          cartAmount,
-                        ),
-                      ],
-                    ],
+                if (vendorCoupons.isNotEmpty) ...[
+                  _sectionHeader('Vendor Offers'),
+                  ..._buildVendorCouponCards(
+                    context,
+                    vendorCoupons,
+                    redemptions,
                   ),
-                ),
+                ],
+                if (globalCoupons.isNotEmpty) ...[
+                  _sectionHeader('App-wide Offers'),
+                  ..._buildCouponCards(
+                    context,
+                    globalCoupons,
+                    cartAmount,
+                    redemptions,
+                  ),
+                ],
               ],
             ),
     );
@@ -120,158 +117,121 @@ class CouponsPage extends ConsumerWidget {
     centerTitle: false,
   );
 
-  Widget _buildManualEntry() {
-    return Builder(
-      builder: (context) {
-        final cs = Theme.of(context).colorScheme;
-        return Container(
-          margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: cs.surface,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: cs.outlineVariant),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.local_offer, color: kBandiwalaYellow, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Enter a valid coupon code',
-                    hintStyle: TextStyle(
-                      color: Colors.grey.shade400,
-                      fontSize: 14,
-                    ),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  style: const TextStyle(fontSize: 14),
-                ),
-              ),
-              TextButton(
-                onPressed: () {},
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: const Size(50, 30),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'Apply',
-                  style: TextStyle(
-                    color: kBandiwalaYellow,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _sectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 20, 0, 12),
-      child: Text(
-        title,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-      ),
-    );
-  }
+  Widget _sectionHeader(String title) => Padding(
+    padding: const EdgeInsets.fromLTRB(0, 20, 0, 12),
+    child: Text(
+      title,
+      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+    ),
+  );
 
   List<Widget> _buildCouponCards(
     BuildContext context,
     List<Coupon> coupons,
     double base,
+    Map<String, int> redemptions,
   ) {
-    final applicable = coupons.where((c) => base >= c.minAmount).toList();
-    final notApplicable = coupons.where((c) => base < c.minAmount).toList();
-    final sorted = [...applicable, ...notApplicable];
+    bool isApplicable(Coupon c) {
+      if (base < c.minAmount) return false;
+      if (c.perUserLimit > 0 && (redemptions[c.id] ?? 0) >= c.perUserLimit) {
+        return false;
+      }
+      return true;
+    }
+
+    final sorted = [...coupons]
+      ..sort((a, b) {
+        final aOk = isApplicable(a) ? 0 : 1;
+        final bOk = isApplicable(b) ? 0 : 1;
+        return aOk.compareTo(bOk);
+      });
 
     return sorted.map((coupon) {
-      final isApplicable = base >= coupon.minAmount;
+      final applicable = isApplicable(coupon);
       return _CouponCard(
         coupon: coupon,
-        isApplicable: isApplicable,
+        isApplicable: applicable,
         remainingAmount: coupon.minAmount - base,
+        userUsageCount: redemptions[coupon.id] ?? 0,
         onApply: () {
-          if (isApplicable) Navigator.pop(context, coupon.toMap());
+          if (applicable) Navigator.pop(context, coupon.toMap());
         },
       );
     }).toList();
   }
 
-  /// For vendor coupons, minAmount is checked against that vendor's subtotal only
   List<Widget> _buildVendorCouponCards(
     BuildContext context,
     List<Coupon> coupons,
+    Map<String, int> redemptions,
   ) {
     return coupons.map((coupon) {
       final base = vendorSubtotals[coupon.vendorId] ?? 0.0;
-      final isApplicable = base >= coupon.minAmount;
+      final userCount = redemptions[coupon.id] ?? 0;
+      final applicable =
+          base >= coupon.minAmount &&
+          (coupon.perUserLimit == 0 || userCount < coupon.perUserLimit);
       return _CouponCard(
         coupon: coupon,
-        isApplicable: isApplicable,
+        isApplicable: applicable,
         remainingAmount: coupon.minAmount - base,
+        userUsageCount: userCount,
         onApply: () {
-          if (isApplicable) Navigator.pop(context, coupon.toMap());
+          if (applicable) Navigator.pop(context, coupon.toMap());
         },
       );
     }).toList();
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.local_offer_outlined,
-              size: 64,
-              color: Colors.grey[400],
-            ),
+  Widget _buildEmptyState() => Center(
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            shape: BoxShape.circle,
           ),
-          const SizedBox(height: 20),
-          Text(
-            'No coupons available',
-            style: TextStyle(
-              fontSize: 18,
-              color: Colors.grey[800],
-              fontWeight: FontWeight.w700,
-            ),
+          child: Icon(
+            Icons.local_offer_outlined,
+            size: 64,
+            color: Colors.grey[400],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Check back later for exciting offers',
-            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'No coupons available',
+          style: TextStyle(
+            fontSize: 18,
+            color: Colors.grey[800],
+            fontWeight: FontWeight.w700,
           ),
-        ],
-      ),
-    );
-  }
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Check back later for exciting offers',
+          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+        ),
+      ],
+    ),
+  );
 }
+
+// ─── Coupon card ──────────────────────────────────────────────────────────────
 
 class _CouponCard extends StatelessWidget {
   final Coupon coupon;
   final bool isApplicable;
   final double remainingAmount;
+  final int userUsageCount;
   final VoidCallback onApply;
 
   const _CouponCard({
     required this.coupon,
     required this.isApplicable,
     required this.remainingAmount,
+    required this.userUsageCount,
     required this.onApply,
   });
 
@@ -301,6 +261,8 @@ class _CouponCard extends StatelessWidget {
     final addMoreMsg = !isApplicable && remainingAmount > 0
         ? 'Shop for ₹${remainingAmount.toStringAsFixed(0)} more to apply offer'
         : '';
+    final limitReached =
+        coupon.perUserLimit > 0 && userUsageCount >= coupon.perUserLimit;
 
     return GestureDetector(
       onTap: isApplicable ? onApply : null,
@@ -353,6 +315,32 @@ class _CouponCard extends StatelessWidget {
                             color: Colors.grey.shade700,
                           ),
                         ),
+                        // Per-user usage indicator
+                        if (coupon.perUserLimit > 0) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.person_outline,
+                                size: 12,
+                                color: limitReached
+                                    ? Colors.red.shade400
+                                    : Colors.grey.shade500,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Used $userUsageCount / ${coupon.perUserLimit} times',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: limitReached
+                                      ? Colors.red.shade400
+                                      : Colors.grey.shade500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -370,7 +358,7 @@ class _CouponCard extends StatelessWidget {
                           : Colors.grey.shade100,
                     ),
                     child: Text(
-                      'Apply',
+                      limitReached ? 'Limit reached' : 'Apply',
                       style: TextStyle(
                         color: isApplicable
                             ? kBandiwalaYellow
@@ -409,6 +397,17 @@ class _CouponCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 12,
                         color: kBandiwalaYellow,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                  if (limitReached) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'You\'ve reached the usage limit for this coupon',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red.shade400,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

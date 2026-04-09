@@ -46,6 +46,8 @@ class UserNotifier extends AsyncNotifier<AppUser?> {
             final appUser = doc.exists ? AppUser.fromDoc(doc) : null;
             if (!completer.isCompleted) {
               completer.complete(appUser);
+              // Update FCM token on first resolution (app start)
+              if (appUser != null) updateFcmToken(firebaseUser.uid);
             } else {
               state = AsyncData(appUser);
             }
@@ -75,9 +77,10 @@ class UserNotifier extends AsyncNotifier<AppUser?> {
     try {
       final token = await NotificationService().getToken();
       if (token != null) {
-        await FirebaseFirestore.instance.collection(DbCollections.users).doc(uid).update({
-          'FCMToken': token,
-        });
+        await FirebaseFirestore.instance
+            .collection(DbCollections.users)
+            .doc(uid)
+            .update({'FCMToken': token});
       }
     } catch (e) {
       if (kDebugMode) print('Error updating FCM token: $e');
@@ -86,9 +89,10 @@ class UserNotifier extends AsyncNotifier<AppUser?> {
 
   Future<void> deleteFcmToken(String uid) async {
     try {
-      await FirebaseFirestore.instance.collection(DbCollections.users).doc(uid).update({
-        'FCMToken': FieldValue.delete(),
-      });
+      await FirebaseFirestore.instance
+          .collection(DbCollections.users)
+          .doc(uid)
+          .update({'FCMToken': FieldValue.delete()});
     } catch (e) {
       if (kDebugMode) print('Error deleting FCM token: $e');
     }
@@ -101,17 +105,21 @@ class UserNotifier extends AsyncNotifier<AppUser?> {
   Future<void> updateName(String name) async {
     final uid = _uid;
     if (uid == null) return;
-    await FirebaseFirestore.instance.collection(DbCollections.users).doc(uid).set({
-      'name': name,
-    }, SetOptions(merge: true));
+    await FirebaseFirestore.instance
+        .collection(DbCollections.users)
+        .doc(uid)
+        .set({'name': name}, SetOptions(merge: true));
   }
 
   Future<void> addAddress(SavedAddress address) async {
     final uid = _uid;
     if (uid == null) return;
-    await FirebaseFirestore.instance.collection(DbCollections.users).doc(uid).update({
-      'savedAddresses': FieldValue.arrayUnion([address.toMap()]),
-    });
+    await FirebaseFirestore.instance
+        .collection(DbCollections.users)
+        .doc(uid)
+        .update({
+          'savedAddresses': FieldValue.arrayUnion([address.toMap()]),
+        });
   }
 
   Future<void> deleteAddress(int index) async {
@@ -119,9 +127,10 @@ class UserNotifier extends AsyncNotifier<AppUser?> {
     if (uid == null) return;
     final current = state.valueOrNull?.savedAddresses ?? [];
     final updated = [...current]..removeAt(index);
-    await FirebaseFirestore.instance.collection(DbCollections.users).doc(uid).update({
-      'savedAddresses': updated.map((a) => a.toMap()).toList(),
-    });
+    await FirebaseFirestore.instance
+        .collection(DbCollections.users)
+        .doc(uid)
+        .update({'savedAddresses': updated.map((a) => a.toMap()).toList()});
   }
 
   Future<void> updateAddress(int index, SavedAddress address) async {
@@ -129,26 +138,31 @@ class UserNotifier extends AsyncNotifier<AppUser?> {
     if (uid == null) return;
     final current = state.valueOrNull?.savedAddresses ?? [];
     final updated = [...current]..[index] = address;
-    await FirebaseFirestore.instance.collection(DbCollections.users).doc(uid).update({
-      'savedAddresses': updated.map((a) => a.toMap()).toList(),
-    });
+    await FirebaseFirestore.instance
+        .collection(DbCollections.users)
+        .doc(uid)
+        .update({'savedAddresses': updated.map((a) => a.toMap()).toList()});
   }
 
   Future<void> replaceAllAddresses(List<SavedAddress> addresses) async {
     final uid = _uid;
     if (uid == null) return;
-    await FirebaseFirestore.instance.collection(DbCollections.users).doc(uid).update({
-      'savedAddresses': addresses.map((a) => a.toMap()).toList(),
-    });
+    await FirebaseFirestore.instance
+        .collection(DbCollections.users)
+        .doc(uid)
+        .update({'savedAddresses': addresses.map((a) => a.toMap()).toList()});
   }
 
   Future<void> markDeleted() async {
     final uid = _uid;
     if (uid == null) return;
-    await FirebaseFirestore.instance.collection(DbCollections.users).doc(uid).update({
-      'status': 'deleted',
-      'deletedAt': FieldValue.serverTimestamp(),
-    });
+    await FirebaseFirestore.instance
+        .collection(DbCollections.users)
+        .doc(uid)
+        .update({
+          'status': 'deleted',
+          'deletedAt': FieldValue.serverTimestamp(),
+        });
   }
 }
 

@@ -15,4 +15,5 @@ abstract class DbCollections {
   static const String admins = 'admins';
   static const String statusUpdates = 'status_updates';
   static const String latestVersion = 'latest_version';
+  static const String couponRedemptions = 'coupon_redemptions';
 }
