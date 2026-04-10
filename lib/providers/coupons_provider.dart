@@ -6,11 +6,13 @@ import '../core/db_collections.dart';
 import 'user_provider.dart';
 
 // Global coupons — vendorId == "" — fetched once and cached
+// Secret coupons are excluded; they can only be found via direct code search.
 final activeCouponsProvider = FutureProvider<List<Coupon>>((ref) async {
   final snap = await FirebaseFirestore.instance
       .collection(DbCollections.coupons)
       .where('vendorId', isEqualTo: '')
       .where('isActive', isEqualTo: true)
+      .where('secret', isEqualTo: false)
       .get();
   return snap.docs.map(Coupon.fromDoc).where((c) => c.isValid).toList();
 });
@@ -55,6 +57,21 @@ final couponRedemptionsProvider = StreamProvider<Map<String, int>>((ref) {
         };
       });
 });
+
+/// Fetches a single coupon by exact coupon code — includes secret coupons.
+/// Returns null if not found or not valid.
+Future<Coupon?> fetchCouponByCode(String code) async {
+  if (code.trim().isEmpty) return null;
+  final snap = await FirebaseFirestore.instance
+      .collection(DbCollections.coupons)
+      .where('couponCode', isEqualTo: code.trim())
+      .where('isActive', isEqualTo: true)
+      .limit(1)
+      .get();
+  if (snap.docs.isEmpty) return null;
+  final coupon = Coupon.fromDoc(snap.docs.first);
+  return coupon.isValid ? coupon : null;
+}
 
 /// Call this after a successful order to record the per-user redemption.
 Future<void> recordCouponRedemption({

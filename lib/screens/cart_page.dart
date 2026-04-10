@@ -1263,6 +1263,9 @@ class VendorCartSection extends ConsumerWidget {
           ...vendorCart.items.map((item) {
             final isAvailable = itemAvailability[item.id] ?? true;
             final isDisabled = !isVendorOnline || !isAvailable;
+            // Always allow decrement so the user can remove unavailable/offline vendor items.
+            // Only block increment when the vendor/item is unavailable.
+            final blockIncrement = isDisabled;
 
             return Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -1357,24 +1360,18 @@ class VendorCartSection extends ConsumerWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         GestureDetector(
-                          onTap: isDisabled
-                              ? null
-                              : () => onQuantityChanged(
-                                  item.id,
-                                  -1,
-                                  cartKey: item.cartKey,
-                                ),
+                          onTap: () => onQuantityChanged(
+                            item.id,
+                            -1,
+                            cartKey: item.cartKey,
+                          ),
                           child: SizedBox(
                             width: 32,
                             height: 32,
                             child: Icon(
                               Icons.remove,
                               size: 16,
-                              color: isDisabled
-                                  ? theme.colorScheme.onSurface.withOpacity(0.3)
-                                  : (isDark
-                                        ? kBandiwalaYellow
-                                        : Colors.black87),
+                              color: isDark ? kBandiwalaYellow : Colors.black87,
                             ),
                           ),
                         ),
@@ -1389,7 +1386,7 @@ class VendorCartSection extends ConsumerWidget {
                           ),
                         ),
                         GestureDetector(
-                          onTap: isDisabled
+                          onTap: blockIncrement
                               ? null
                               : () => onQuantityChanged(
                                   item.id,
@@ -1402,7 +1399,7 @@ class VendorCartSection extends ConsumerWidget {
                             child: Icon(
                               Icons.add,
                               size: 16,
-                              color: isDisabled
+                              color: blockIncrement
                                   ? theme.colorScheme.onSurface.withOpacity(0.3)
                                   : (isDark
                                         ? kBandiwalaYellow

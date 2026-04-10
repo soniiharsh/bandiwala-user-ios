@@ -7,7 +7,7 @@ import '../widgets/skeletons.dart';
 
 const kBandiwalaYellow = AppColors.primary;
 
-class CouponsPage extends ConsumerWidget {
+class CouponsPage extends ConsumerStatefulWidget {
   final double cartAmount;
   final Map<String, double> vendorSubtotals;
 
@@ -18,9 +18,43 @@ class CouponsPage extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CouponsPage> createState() => _CouponsPageState();
+}
+
+class _CouponsPageState extends ConsumerState<CouponsPage> {
+  final _searchController = TextEditingController();
+  bool _searching = false;
+  Coupon? _searchResult;
+  // null = not searched yet, true = found, false = not found/invalid
+  bool? _searchFound;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onSearch() async {
+    final code = _searchController.text.trim();
+    if (code.isEmpty) return;
+    setState(() {
+      _searching = true;
+      _searchResult = null;
+      _searchFound = null;
+    });
+    final coupon = await fetchCouponByCode(code);
+    if (!mounted) return;
+    setState(() {
+      _searching = false;
+      _searchResult = coupon;
+      _searchFound = coupon != null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final globalAsync = ref.watch(activeCouponsProvider);
-    final vendorCouponAsyncList = vendorSubtotals.keys
+    final vendorCouponAsyncList = widget.vendorSubtotals.keys
         .map((id) => ref.watch(vendorCouponsProvider(id)))
         .toList();
     final redemptionsAsync = ref.watch(couponRedemptionsProvider);
@@ -76,32 +110,115 @@ class CouponsPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: _buildAppBar(),
-      body: allEmpty
-          ? _buildEmptyState()
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              children: [
-                if (vendorCoupons.isNotEmpty) ...[
-                  _sectionHeader('Vendor Offers'),
-                  ..._buildVendorCouponCards(
-                    context,
-                    vendorCoupons,
-                    redemptions,
-                  ),
-                ],
-                if (globalCoupons.isNotEmpty) ...[
-                  _sectionHeader('App-wide Offers'),
-                  ..._buildCouponCards(
-                    context,
-                    globalCoupons,
-                    cartAmount,
-                    redemptions,
-                  ),
-                ],
-              ],
+      body: Column(
+        children: [
+          _buildSearchBar(),
+          if (_searching)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: CircularProgressIndicator(),
+            )
+          else if (_searchFound == true && _searchResult != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: _CouponCard(
+                coupon: _searchResult!,
+                isApplicable: _isSearchResultApplicable(
+                  _searchResult!,
+                  redemptions,
+                ),
+                remainingAmount:
+                    _searchResult!.minAmount - _amountForCoupon(_searchResult!),
+                userUsageCount: redemptions[_searchResult!.id] ?? 0,
+                onApply: () {
+                  if (_isSearchResultApplicable(_searchResult!, redemptions)) {
+                    Navigator.pop(context, _searchResult!.toMap());
+                  }
+                },
+              ),
+            )
+          else if (_searchFound == false)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No valid coupon found',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+              ),
             ),
+          Expanded(
+            child: allEmpty && _searchFound == null
+                ? _buildEmptyState()
+                : ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    children: [
+                      if (vendorCoupons.isNotEmpty) ...[
+                        _sectionHeader('Vendor Offers'),
+                        ..._buildVendorCouponCards(
+                          context,
+                          vendorCoupons,
+                          redemptions,
+                        ),
+                      ],
+                      if (globalCoupons.isNotEmpty) ...[
+                        _sectionHeader('App-wide Offers'),
+                        ..._buildCouponCards(
+                          context,
+                          globalCoupons,
+                          widget.cartAmount,
+                          redemptions,
+                        ),
+                      ],
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
+
+  bool _isSearchResultApplicable(Coupon c, Map<String, int> redemptions) {
+    final base = _amountForCoupon(c);
+    if (base < c.minAmount) return false;
+    if (c.perUserLimit > 0 && (redemptions[c.id] ?? 0) >= c.perUserLimit)
+      return false;
+    return true;
+  }
+
+  double _amountForCoupon(Coupon c) => c.isGlobal
+      ? widget.cartAmount
+      : (widget.vendorSubtotals[c.vendorId] ?? 0.0);
+
+  Widget _buildSearchBar() => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+    child: TextField(
+      controller: _searchController,
+      textCapitalization: TextCapitalization.characters,
+      textInputAction: TextInputAction.search,
+      onSubmitted: (_) => _onSearch(),
+      decoration: InputDecoration(
+        hintText: 'Enter coupon code',
+        prefixIcon: const Icon(Icons.local_offer_outlined),
+        suffixIcon: _searching
+            ? const Padding(
+                padding: EdgeInsets.all(12),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            : IconButton(
+                icon: const Icon(Icons.arrow_forward),
+                onPressed: _onSearch,
+              ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 14,
+        ),
+      ),
+    ),
+  );
 
   AppBar _buildAppBar() => AppBar(
     leading: Builder(
@@ -133,9 +250,8 @@ class CouponsPage extends ConsumerWidget {
   ) {
     bool isApplicable(Coupon c) {
       if (base < c.minAmount) return false;
-      if (c.perUserLimit > 0 && (redemptions[c.id] ?? 0) >= c.perUserLimit) {
+      if (c.perUserLimit > 0 && (redemptions[c.id] ?? 0) >= c.perUserLimit)
         return false;
-      }
       return true;
     }
 
@@ -166,7 +282,7 @@ class CouponsPage extends ConsumerWidget {
     Map<String, int> redemptions,
   ) {
     return coupons.map((coupon) {
-      final base = vendorSubtotals[coupon.vendorId] ?? 0.0;
+      final base = widget.vendorSubtotals[coupon.vendorId] ?? 0.0;
       final userCount = redemptions[coupon.id] ?? 0;
       final applicable =
           base >= coupon.minAmount &&

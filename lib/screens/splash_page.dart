@@ -1,11 +1,15 @@
+import 'package:BandiWala/core/db_collections.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../providers/user_provider.dart';
 import '../providers/active_address_provider.dart';
 import '../models/app_user.dart';
 import 'nav_page.dart';
 import 'login_page.dart';
+import 'update_required_page.dart';
 import '../core/theme/theme.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
@@ -21,11 +25,8 @@ class _SplashPageState extends ConsumerState<SplashPage> {
   @override
   void initState() {
     super.initState();
-
     ref.read(activeAddressProvider.notifier).loadFromPrefs();
-
     _controller = VideoPlayerController.asset('assets/videos/splash.mp4');
-
     _start();
   }
 
@@ -36,19 +37,76 @@ class _SplashPageState extends ConsumerState<SplashPage> {
       setState(() {});
       await _controller.play();
 
-      // wait for video to finish
-      await Future.delayed(_controller.value.duration);
-
-      // wait for auth state
-      final authAsync = ref.read(userProvider);
+      // Run video wait, auth resolution, and version check all in parallel.
+      // Auth uses .future so we wait for the actual resolved value, not
+      // AsyncLoading (which would give us a false null → LoginPage redirect).
+      final results = await Future.wait([
+        Future.delayed(_controller.value.duration),
+        ref.read(userProvider.future),
+        _checkVersion(),
+      ]);
 
       if (!mounted) return;
 
-      _navigate(authAsync.valueOrNull);
+      final appUser = results[1] as AppUser?;
+      final versionResult = results[2] as _VersionResult;
+
+      if (versionResult.isOutdated) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => UpdateRequiredPage(
+              currentVersion: versionResult.currentVersion,
+              minimumVersion: versionResult.minimumVersion,
+            ),
+          ),
+        );
+        return;
+      }
+
+      _navigate(appUser);
     } catch (e) {
-      debugPrint("Splash error: $e");
+      debugPrint('Splash error: $e');
       _navigate(null);
     }
+  }
+
+  /// Checks Firestore for the minimum required version.
+  /// Never throws — returns a non-outdated result on any failure.
+  Future<_VersionResult> _checkVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      final current = packageInfo.version;
+
+      final snap = await FirebaseFirestore.instance
+          .collection(DbCollections.latestVersion)
+          .limit(1)
+          .get();
+
+      if (snap.docs.isEmpty) return _VersionResult.upToDate(current);
+
+      final minimum =
+          snap.docs.first.data()['minimum-version'] as String? ?? '0.0.0';
+
+      return _VersionResult(
+        currentVersion: current,
+        minimumVersion: minimum,
+        isOutdated: _isOlderVersion(current, minimum),
+      );
+    } catch (_) {
+      return _VersionResult.upToDate('');
+    }
+  }
+
+  bool _isOlderVersion(String current, String minimum) {
+    final c = current.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+    final m = minimum.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+    for (var i = 0; i < 3; i++) {
+      final cv = i < c.length ? c[i] : 0;
+      final mv = i < m.length ? m[i] : 0;
+      if (cv < mv) return true;
+      if (cv > mv) return false;
+    }
+    return false;
   }
 
   void _navigate(AppUser? user) {
@@ -85,4 +143,22 @@ class _SplashPageState extends ConsumerState<SplashPage> {
           : const SizedBox.expand(),
     );
   }
+}
+
+class _VersionResult {
+  final String currentVersion;
+  final String minimumVersion;
+  final bool isOutdated;
+
+  const _VersionResult({
+    required this.currentVersion,
+    required this.minimumVersion,
+    required this.isOutdated,
+  });
+
+  factory _VersionResult.upToDate(String current) => _VersionResult(
+    currentVersion: current,
+    minimumVersion: '',
+    isOutdated: false,
+  );
 }

@@ -23,6 +23,7 @@ class Coupon with _$Coupon {
     required DateTime createdAt,
     @Default('') String vendorId,
     @Default(0) int perUserLimit,
+    @Default(false) bool secret,
   }) = _Coupon;
 
   factory Coupon.fromJson(Map<String, dynamic> json) => _$CouponFromJson(json);
@@ -46,6 +47,7 @@ class Coupon with _$Coupon {
       createdAt: (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       vendorId: d['vendorId'] ?? '',
       perUserLimit: (d['perUserLimit'] as num? ?? 0).toInt(),
+      secret: d['secret'] ?? false,
     );
   }
 
@@ -70,5 +72,6 @@ class Coupon with _$Coupon {
     'createdAt': Timestamp.fromDate(createdAt),
     'vendorId': vendorId,
     'perUserLimit': perUserLimit,
+    'secret': secret,
   };
 }

@@ -21,6 +21,7 @@ _$CouponImpl _$$CouponImplFromJson(Map<String, dynamic> json) => _$CouponImpl(
   createdAt: DateTime.parse(json['createdAt'] as String),
   vendorId: json['vendorId'] as String? ?? '',
   perUserLimit: (json['perUserLimit'] as num?)?.toInt() ?? 0,
+  secret: json['secret'] as bool? ?? false,
 );
 
 Map<String, dynamic> _$$CouponImplToJson(_$CouponImpl instance) =>
@@ -39,4 +40,5 @@ Map<String, dynamic> _$$CouponImplToJson(_$CouponImpl instance) =>
       'createdAt': instance.createdAt.toIso8601String(),
       'vendorId': instance.vendorId,
       'perUserLimit': instance.perUserLimit,
+      'secret': instance.secret,
     };
