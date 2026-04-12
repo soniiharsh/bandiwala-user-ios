@@ -133,6 +133,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final activeAddress = ref.watch(activeAddressProvider);
 
     return SafeArea(
+      bottom: false,
       child: Column(
         children: [
           TopBar(

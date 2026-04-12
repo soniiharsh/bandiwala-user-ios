@@ -93,7 +93,7 @@ class _OrderStatusBar extends StatelessWidget {
     final config = _statusConfig(status);
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(10, 0, 10, 6),
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 4),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [_kYellow, _kYellowDark],

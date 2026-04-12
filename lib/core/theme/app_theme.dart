@@ -11,7 +11,8 @@ abstract final class AppTheme {
     final isDark = brightness == Brightness.dark;
     return SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark, // Android
+      statusBarBrightness: isDark ? Brightness.dark : Brightness.light, // iOS
       systemNavigationBarColor: isDark
           ? AppColors.dark.surface
           : AppColors.light.surface,

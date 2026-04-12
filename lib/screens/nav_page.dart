@@ -41,7 +41,10 @@ class _NavPageState extends ConsumerState<NavPage> {
 
         return Scaffold(
           body: const HomePage(),
-          bottomNavigationBar: SafeArea(
+          bottomNavigationBar: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).padding.bottom * 0.7 + 6,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -63,7 +66,6 @@ class _NavPageState extends ConsumerState<NavPage> {
                     );
                   },
                 ),
-                const SizedBox(height: 8),
               ],
             ),
           ),

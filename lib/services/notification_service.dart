@@ -89,10 +89,25 @@ class NotificationService {
     // Subscribe to admin topic
     await subscribeToAdminTopic();
 
-    // Get FCM token
-    String? token = await _messaging.getToken();
-    if (kDebugMode) {
-      print('📱 FCM Token: $token');
+    // Get FCM token — with safety for iOS APNS token
+    try {
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        // Give it a moment to receive APNS token
+        await Future.delayed(const Duration(seconds: 1));
+        String? apnsToken = await _messaging.getAPNSToken();
+        if (apnsToken == null && kDebugMode) {
+          print('⚠️ APNS Token not ready yet. FCM token may fail.');
+        }
+      }
+
+      String? token = await _messaging.getToken();
+      if (kDebugMode) {
+        print('📱 FCM Token: $token');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Error getting FCM token: $e');
+      }
     }
 
     _initialized = true;
@@ -117,9 +132,8 @@ class NotificationService {
     }
 
     RemoteNotification? notification = message.notification;
-    AndroidNotification? android = message.notification?.android;
 
-    if (notification != null && android != null) {
+    if (notification != null) {
       _localNotifications.show(
         id: notification.hashCode,
         title: notification.title,
@@ -132,6 +146,11 @@ class NotificationService {
             importance: Importance.high,
             priority: Priority.high,
             icon: '@mipmap/ic_launcher',
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
           ),
         ),
       );

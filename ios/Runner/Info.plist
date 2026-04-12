@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Bandiwala User</string>
+	<string>BandiWala</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -49,5 +49,43 @@
     <string>This app requires microphone access to search for street food using voice commands.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>This app requires speech recognition access to convert your voice into search queries.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>This app needs access to location when open to show nearby street food vendors and deliver orders to your address.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>This app needs access to location to provide a better delivery experience and show nearby vendors.</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>This app needs access to location to show nearby street food vendors.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>This app requires photo library access to upload profile pictures or report issues with photos.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>This app requires camera access to take photos of issues or profile pictures.</string>
+    <key>NSUserNotificationUsageDescription</key>
+    <string>This app needs to send you notifications about your order status and updates.</string>
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+        <string>sms</string>
+        <string>tel</string>
+        <string>whatsapp</string>
+        <string>razorpay</string>
+    </array>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>fetch</string>
+        <string>remote-notification</string>
+    </array>
+    <key>FirebaseAppDelegateProxyEnabled</key>
+    <true/>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>com.googleusercontent.apps.905053340668-placeholder</string>
+                <string>com.bandiwala.user</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>

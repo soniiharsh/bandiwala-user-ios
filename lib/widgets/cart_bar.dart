@@ -16,7 +16,7 @@ class CartBar extends ConsumerWidget {
     final total = cart.grandTotal;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(10, 0, 10, 6),
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 4),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Colors.green, Color(0xFF1B5E20)], // Green theme for cart

@@ -182,6 +182,7 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
           SliverPersistentHeader(
             pinned: true,
             delegate: _StickySearchHeaderDelegate(
+              topPadding: MediaQuery.of(context).padding.top,
               searchCtrl: _searchCtrl,
               activeFilter: _activeFilter,
               activeSort: _activeSort,
@@ -485,6 +486,7 @@ class _StickySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
   final String activeSort;
   final Function(String) onFilterChanged;
   final Function(String) onSortChanged;
+  final double topPadding;
 
   _StickySearchHeaderDelegate({
     required this.searchCtrl,
@@ -492,12 +494,13 @@ class _StickySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
     required this.activeSort,
     required this.onFilterChanged,
     required this.onSortChanged,
+    required this.topPadding,
   });
 
   @override
-  double get minExtent => 140.0;
+  double get minExtent => 140.0 + topPadding;
   @override
-  double get maxExtent => 140.0;
+  double get maxExtent => 140.0 + topPadding;
 
   @override
   Widget build(
@@ -510,23 +513,29 @@ class _StickySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
     final bool isPinned = shrinkOffset > 0;
 
     return Container(
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        boxShadow: isPinned
-            ? [
-                BoxShadow(
-                  color: (isDark ? Colors.white : Colors.black).withValues(
-                    alpha: 0.1,
-                  ),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
-      ),
-      padding: const EdgeInsets.only(top: 10),
-      child: Column(
-        children: [_buildSearchBar(context), _buildFilterChips(context)],
+      color: theme.scaffoldBackgroundColor,
+      child: SafeArea(
+        bottom: false,
+        child: Container(
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            boxShadow: isPinned
+                ? [
+                    BoxShadow(
+                      color: (isDark ? Colors.white : Colors.black).withValues(
+                        alpha: 0.1,
+                      ),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
+          ),
+          padding: const EdgeInsets.only(top: 10),
+          child: Column(
+            children: [_buildSearchBar(context), _buildFilterChips(context)],
+          ),
+        ),
       ),
     );
   }

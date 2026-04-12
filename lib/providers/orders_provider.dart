@@ -1,4 +1,4 @@
-import 'package:BandiWala/models/order_status.dart';
+import 'package:bandiwala_user/models/order_status.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/order.dart';

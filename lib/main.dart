@@ -34,6 +34,7 @@ Future<void> main() async {
   // appVerificationDisabledForTesting set.
   if (!kDebugMode) {
     try {
+      print('DEBUG: Activating Firebase App Check');
       await FirebaseAppCheck.instance.activate(
         providerAndroid: AndroidPlayIntegrityProvider(),
         providerApple: AppleDeviceCheckProvider(),

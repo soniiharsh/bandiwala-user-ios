@@ -828,7 +828,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
           border: Border.all(color: theme.dividerColor),
           boxShadow: [
             BoxShadow(
-              color: (isDark ? Colors.white : Colors.black).withOpacity(
+              color: (isDark ? Colors.white : Colors.black).withValues(alpha: 
                 isDark ? 0.08 : 0.04,
               ),
               blurRadius: 8,
@@ -842,7 +842,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: bandiwalaYellow.withOpacity(0.15),
+                color: bandiwalaYellow.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: bandiwalaYellow, size: 24),
