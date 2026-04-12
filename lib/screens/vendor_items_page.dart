@@ -1266,7 +1266,7 @@ class ProductDetailOverlay extends ConsumerWidget {
                     vertical: 3,
                   ),
                   decoration: BoxDecoration(
-                    color: _kYellow.withOpacity(0.15),
+                    color: _kYellow.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Text(

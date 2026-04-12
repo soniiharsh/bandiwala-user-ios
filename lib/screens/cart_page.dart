@@ -355,7 +355,7 @@ class _CartPageState extends ConsumerState<CartPage> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: kBandiwalaYellow.withOpacity(0.2),
+                        color: kBandiwalaYellow.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -449,7 +449,7 @@ class _CartPageState extends ConsumerState<CartPage> {
         color: theme.colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: (isDark ? Colors.white : Colors.black).withOpacity(0.08),
+            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.08),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -540,7 +540,7 @@ class _CartPageState extends ConsumerState<CartPage> {
                 ),
                 decoration: BoxDecoration(
                   color: isDark
-                      ? Colors.red.withOpacity(0.15)
+                      ? Colors.red.withValues(alpha: 0.15)
                       : Colors.red.shade50,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
@@ -734,10 +734,10 @@ class AddressSection extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: hasAddress
                         ? (isDark
-                              ? Colors.green.withOpacity(0.15)
+                              ? Colors.green.withValues(alpha: 0.15)
                               : Colors.green.shade50)
                         : (isDark
-                              ? theme.colorScheme.surfaceVariant
+                              ? theme.colorScheme.surfaceContainerHighest
                               : Colors.grey.shade100),
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -773,7 +773,7 @@ class AddressSection extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             color: isDark
-                                ? Colors.red.withOpacity(0.15)
+                                ? Colors.red.withValues(alpha: 0.15)
                                 : Colors.red.shade50,
                             borderRadius: BorderRadius.circular(4),
                           ),
@@ -795,7 +795,7 @@ class AddressSection extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: kBandiwalaYellow.withOpacity(0.15),
+                            color: kBandiwalaYellow.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -895,7 +895,7 @@ class YouMayLikeSection extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceVariant,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(7),
                 ),
                 child: Icon(
@@ -990,7 +990,7 @@ class SuggestionCard extends ConsumerWidget {
         border: Border.all(color: theme.colorScheme.outlineVariant, width: 1),
         boxShadow: [
           BoxShadow(
-            color: (isDark ? Colors.white : Colors.black).withOpacity(0.03),
+            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.03),
             blurRadius: 3,
             offset: const Offset(0, 1),
           ),
@@ -1016,12 +1016,12 @@ class SuggestionCard extends ConsumerWidget {
                         placeholder: (_, __) => Container(
                           width: 140,
                           height: 110,
-                          color: theme.colorScheme.surfaceVariant,
+                          color: theme.colorScheme.surfaceContainerHighest,
                         ),
                         errorWidget: (_, __, ___) => Container(
                           width: 140,
                           height: 110,
-                          color: theme.colorScheme.surfaceVariant,
+                          color: theme.colorScheme.surfaceContainerHighest,
                           child: Icon(
                             Icons.restaurant,
                             size: 28,
@@ -1032,7 +1032,7 @@ class SuggestionCard extends ConsumerWidget {
                     : Container(
                         width: 140,
                         height: 110,
-                        color: theme.colorScheme.surfaceVariant,
+                        color: theme.colorScheme.surfaceContainerHighest,
                         child: Icon(
                           Icons.restaurant,
                           size: 28,
@@ -1080,13 +1080,13 @@ class SuggestionCard extends ConsumerWidget {
                   height: 32,
                   decoration: BoxDecoration(
                     color: isDark
-                        ? Colors.white.withOpacity(0.9)
+                        ? Colors.white.withValues(alpha: 0.9)
                         : Colors.white,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
                         color: (isDark ? Colors.white : Colors.black)
-                            .withOpacity(0.12),
+                            .withValues(alpha: 0.12),
                         blurRadius: 5,
                         offset: const Offset(0, 1),
                       ),
@@ -1192,7 +1192,7 @@ class VendorCartSection extends ConsumerWidget {
         border: Border.all(color: theme.colorScheme.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: (isDark ? Colors.white : Colors.black).withOpacity(0.04),
+            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1238,7 +1238,7 @@ class VendorCartSection extends ConsumerWidget {
                     ),
                     decoration: BoxDecoration(
                       color: isDark
-                          ? Colors.deepOrange.withOpacity(0.15)
+                          ? Colors.deepOrange.withValues(alpha: 0.15)
                           : Colors.deepOrange.shade50,
                       borderRadius: BorderRadius.circular(6),
                     ),
@@ -1281,7 +1281,7 @@ class VendorCartSection extends ConsumerWidget {
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: isDisabled
-                                ? theme.colorScheme.onSurface.withOpacity(0.3)
+                                ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
                                 : theme.colorScheme.onSurface,
                           ),
                           maxLines: 1,
@@ -1307,8 +1307,8 @@ class VendorCartSection extends ConsumerWidget {
                               style: TextStyle(
                                 fontSize: 11,
                                 color: isDisabled
-                                    ? theme.colorScheme.onSurface.withOpacity(
-                                        0.2,
+                                    ? theme.colorScheme.onSurface.withValues(
+                                        alpha: 0.2,
                                       )
                                     : theme.colorScheme.onSurfaceVariant,
                                 fontStyle: FontStyle.italic,
@@ -1323,7 +1323,7 @@ class VendorCartSection extends ConsumerWidget {
                           style: TextStyle(
                             fontSize: 13,
                             color: isDisabled
-                                ? theme.colorScheme.onSurface.withOpacity(0.3)
+                                ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
                                 : theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
@@ -1349,7 +1349,7 @@ class VendorCartSection extends ConsumerWidget {
                     decoration: BoxDecoration(
                       color: isDisabled
                           ? (isDark
-                                ? theme.colorScheme.surfaceVariant
+                                ? theme.colorScheme.surfaceContainerHighest
                                 : Colors.grey.shade100)
                           : (isDark
                                 ? const Color(0xFF423B22)
@@ -1381,7 +1381,7 @@ class VendorCartSection extends ConsumerWidget {
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: isDisabled
-                                ? theme.colorScheme.onSurface.withOpacity(0.3)
+                                ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
                                 : (isDark ? Colors.white : Colors.black87),
                           ),
                         ),
@@ -1400,7 +1400,7 @@ class VendorCartSection extends ConsumerWidget {
                               Icons.add,
                               size: 16,
                               color: blockIncrement
-                                  ? theme.colorScheme.onSurface.withOpacity(0.3)
+                                  ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
                                   : (isDark
                                         ? kBandiwalaYellow
                                         : Colors.black87),

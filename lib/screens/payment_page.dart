@@ -612,7 +612,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: kBandiwalaYellow.withOpacity(0.15),
+                        color: kBandiwalaYellow.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
@@ -1356,7 +1356,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         border: Border(top: BorderSide(color: kBorderGrey)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 10,
             offset: const Offset(0, -3),
           ),
@@ -1400,10 +1400,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: kBandiwalaYellow.withOpacity(0.12),
+                        color: kBandiwalaYellow.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: kBandiwalaYellow.withOpacity(0.4),
+                          color: kBandiwalaYellow.withValues(alpha: 0.4),
                         ),
                       ),
                       child: const Row(
@@ -1493,7 +1493,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   backgroundColor: kBandiwalaYellow,
                   foregroundColor: Colors.black87,
                   elevation: 0,
-                  disabledBackgroundColor: kBandiwalaYellow.withOpacity(0.5),
+                  disabledBackgroundColor: kBandiwalaYellow.withValues(alpha: 0.5),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -1627,9 +1627,9 @@ class _CodConfirmDialog extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: kBandiwalaYellow.withOpacity(0.10),
+              color: kBandiwalaYellow.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: kBandiwalaYellow.withOpacity(0.3)),
+              border: Border.all(color: kBandiwalaYellow.withValues(alpha: 0.3)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

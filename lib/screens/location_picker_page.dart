@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -7,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import '../providers/service_zones_provider.dart';
+import '../models/service_zone.dart';
 import '../providers/user_provider.dart';
 import '../models/app_user.dart';
 import '../core/theme/theme.dart';
@@ -63,6 +65,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
   LatLng? _currentPosition;
   LatLng? _selectedPosition;
   bool _isOutsideHyderabad = false;
+  bool _isOutsideServiceZone = false;
 
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -319,10 +322,10 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
     _sessionToken = null; // Reset session token after selection
 
     if (!mounted) return;
+    _validateLocation(pos);
     setState(() {
       _selectedPosition = pos;
       _fetchedAddress = address.isNotEmpty ? address : suggestion.displayName;
-      _isOutsideHyderabad = !_isInHyderabad(pos);
     });
     if (_mapController != null) {
       _mapController!.animateCamera(CameraUpdate.newLatLng(pos));
@@ -413,6 +416,20 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
       pos.longitude >= _minLng &&
       pos.longitude <= _maxLng;
 
+  void _validateLocation(LatLng pos) {
+    final zones = ref.read(serviceZonesProvider).valueOrNull ?? [];
+    _isOutsideHyderabad = !_isInHyderabad(pos);
+
+    // If already outside Hyderabad, no need to check specific zones
+    if (_isOutsideHyderabad) {
+      _isOutsideServiceZone = true;
+      return;
+    }
+
+    final zoneName = matchZone(zones, pos.latitude, pos.longitude);
+    _isOutsideServiceZone = zoneName == null;
+  }
+
   Future<void> _enterCurrentLocationMode() async {
     setState(() {
       _showModeSelection = false;
@@ -470,10 +487,25 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
         }
       }
 
-      // ✅ bestForNavigation = maximum GPS precision
+      // Settings for maximum GPS precision across platforms
+      late final LocationSettings locationSettings;
+
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        locationSettings = AndroidSettings(
+          accuracy: LocationAccuracy.best,
+          distanceFilter: 0,
+          forceLocationManager: true,
+          intervalDuration: const Duration(seconds: 10),
+        );
+      } else {
+        locationSettings = AppleSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+          timeLimit: const Duration(seconds: 15),
+        );
+      }
+
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation,
-        timeLimit: const Duration(seconds: 15),
+        locationSettings: locationSettings,
       );
 
       // ✅ Raw full-precision coordinates — no rounding
@@ -486,12 +518,13 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
         _selectedPosition = pos;
         _fetchedAddress = address.isNotEmpty ? address : 'Current Location';
         _searchController.text = _fetchedAddress;
-        _isOutsideHyderabad = !_isInHyderabad(pos);
+        _validateLocation(pos);
         _isFetchingLocation = false;
       });
 
-      if (_mapController != null)
+      if (_mapController != null) {
         _mapController!.animateCamera(CameraUpdate.newLatLngZoom(pos, 17.0));
+      }
     } catch (e) {
       debugPrint('Fetch current location error: $e');
       if (!mounted) return;
@@ -549,7 +582,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
       _selectedPosition = point;
       _fetchedAddress = address.isNotEmpty ? address : 'Selected Location';
       _searchController.text = _fetchedAddress;
-      _isOutsideHyderabad = !_isInHyderabad(point);
+      _validateLocation(point);
       _isMapIdleUpdating = false;
     });
   }
@@ -712,11 +745,25 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: _showModeSelection
-          ? _buildModeSelection(context)
-          : _buildMapView(context),
+    return PopScope(
+      canPop: _showModeSelection,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (!_showModeSelection) {
+          setState(() {
+            _showModeSelection = true;
+            _isNewAddressMode = false;
+            _isCurrentLocationMode = false;
+            _isMapReady = false;
+          });
+        }
+      },
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: _showModeSelection
+            ? _buildModeSelection(context)
+            : _buildMapView(context),
+      ),
     );
   }
 
@@ -886,7 +933,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: isSelected ? bandiwalaYellow.withOpacity(0.12) : theme.cardColor,
+        color: isSelected ? bandiwalaYellow.withValues(alpha: 0.12) : theme.cardColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isSelected ? bandiwalaYellow : theme.dividerColor,
@@ -903,7 +950,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: bandiwalaYellow.withOpacity(0.15),
+                  color: bandiwalaYellow.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -1233,7 +1280,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
         circleId: CircleId(zone.name),
         center: LatLng(zone.lat, zone.lng),
         radius: zone.radiusMeters,
-        fillColor: bandiwalaYellow.withOpacity(0.15),
+        fillColor: bandiwalaYellow.withValues(alpha: 0.15),
         strokeColor: bandiwalaYellow,
         strokeWidth: 2,
       );
@@ -1305,7 +1352,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
                         boxShadow: [
                           BoxShadow(
                             color: (isDark ? Colors.white : Colors.black)
-                                .withOpacity(0.12),
+                                .withValues(alpha: 0.12),
                             blurRadius: 6,
                           ),
                         ],
@@ -1346,7 +1393,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
                                   BoxShadow(
                                     color:
                                         (isDark ? Colors.white : Colors.black)
-                                            .withOpacity(0.12),
+                                            .withValues(alpha: 0.12),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -1433,7 +1480,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
                                   BoxShadow(
                                     color:
                                         (isDark ? Colors.white : Colors.black)
-                                            .withOpacity(0.1),
+                                            .withValues(alpha: 0.1),
                                     blurRadius: 8,
                                   ),
                                 ],
@@ -1539,7 +1586,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
                   ),
                 ),
 
-              if (_isOutsideHyderabad)
+              if (_isOutsideHyderabad || _isOutsideServiceZone)
                 Container(
                   margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                   padding: const EdgeInsets.symmetric(
@@ -1548,7 +1595,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
                   ),
                   decoration: BoxDecoration(
                     color: isDark
-                        ? Colors.red.withOpacity(0.15)
+                        ? Colors.red.withValues(alpha: 0.15)
                         : Colors.red.shade50,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.red.shade300),
@@ -1565,7 +1612,9 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'We currently only serve Hyderabad. Please select a location within Hyderabad.',
+                          _isOutsideHyderabad
+                              ? 'We currently only serve Hyderabad. Please select a location within Hyderabad.'
+                              : 'We don\'t serve this specific area yet. Please select a location inside the yellow circles.',
                           style: TextStyle(
                             fontSize: 11,
                             color: isDark
@@ -1615,8 +1664,8 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: (isDark ? Colors.white : Colors.black).withOpacity(
-                    0.1,
+                  color: (isDark ? Colors.white : Colors.black).withValues(
+                    alpha: 0.1,
                   ),
                   blurRadius: 20,
                   offset: const Offset(0, -5),
@@ -1685,8 +1734,8 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: isDark
-                                ? theme.colorScheme.surfaceVariant.withOpacity(
-                                    0.3,
+                                ? theme.colorScheme.surfaceContainerHighest.withValues(
+                                    alpha: 0.3,
                                   )
                                 : Colors.grey.shade50,
                             borderRadius: BorderRadius.circular(10),
@@ -1919,7 +1968,8 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
                           onPressed:
                               (_selectedPosition != null &&
                                   !_isFetchingLocation &&
-                                  !_isOutsideHyderabad)
+                                  !_isOutsideHyderabad &&
+                                  !_isOutsideServiceZone)
                               ? _saveLocation
                               : null,
                           style: ElevatedButton.styleFrom(

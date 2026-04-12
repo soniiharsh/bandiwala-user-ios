@@ -253,7 +253,7 @@ class _ItemCustomizationSheetState
                                 ),
                                 decoration: BoxDecoration(
                                   color: isSelected
-                                      ? _kYellow.withOpacity(0.1)
+                                      ? _kYellow.withValues(alpha: 0.1)
                                       : Colors.transparent,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
@@ -398,7 +398,7 @@ class _ItemCustomizationSheetState
                                 ),
                                 decoration: BoxDecoration(
                                   color: isSelected
-                                      ? _kYellow.withOpacity(0.1)
+                                      ? _kYellow.withValues(alpha: 0.1)
                                       : Colors.transparent,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(

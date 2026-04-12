@@ -167,6 +167,7 @@ class _LoginPageState extends State<LoginPage> {
                           keyboardType: TextInputType.phone,
                           maxLength: 10,
                           enabled: !_isLoading,
+                          style: const TextStyle(color: Colors.black, fontSize: 16),
                           validator: _validatePhone,
                           decoration: InputDecoration(
                             counterText: '',

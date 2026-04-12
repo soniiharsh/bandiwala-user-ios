@@ -217,7 +217,7 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
           Container(
             padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
-              color: kBandiwalaYellow.withOpacity(0.1),
+              color: kBandiwalaYellow.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(
