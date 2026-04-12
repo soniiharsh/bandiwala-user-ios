@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 /// Widgets should read from Theme.of(context).colorScheme instead.
 abstract final class AppColors {
   // ── Brand (theme-independent) ──────────────────────────────────────────────
-  static const Color primary     = Color(0xFFFFC107); // Bandiwala yellow
+  static const Color primary     = Color(0xFFFFC107); // BandiWala yellow
   static const Color primaryDark = Color(0xFFE6AC00); // darker yellow for dark bg
   static const Color onPrimary   = Color(0xFF1A1A1A); // text on yellow buttons
 

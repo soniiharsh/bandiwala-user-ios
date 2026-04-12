@@ -40,7 +40,7 @@ class PaymentService {
     final options = {
       'key': _razorpayKey,
       'amount': (amount * 100).toInt(),
-      'name': 'Bandiwala',
+      'name': 'BandiWala',
       'description': 'Street food delivery',
       'prefill': {
         'contact': FirebaseAuth.instance.currentUser?.phoneNumber ?? '',

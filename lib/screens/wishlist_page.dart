@@ -8,7 +8,7 @@ import '../core/theme/theme.dart';
 import '../core/navigation/app_page_route.dart';
 import '../widgets/skeletons.dart';
 
-const _kBandiwalaYellow = AppColors.primary;
+const _kBandiWalaYellow = AppColors.primary;
 
 class WishlistPage extends StatefulWidget {
   const WishlistPage({super.key});
@@ -140,7 +140,7 @@ class _WishlistPageState extends State<WishlistPage> with RouteAware {
           : _wishlist.isEmpty
           ? _buildEmptyState()
           : RefreshIndicator(
-              color: _kBandiwalaYellow,
+              color: _kBandiWalaYellow,
               onRefresh: _loadWishlist,
               child: ListView.builder(
                 padding: const EdgeInsets.all(16),
@@ -165,13 +165,13 @@ class _WishlistPageState extends State<WishlistPage> with RouteAware {
           Container(
             padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
-              color: _kBandiwalaYellow.withValues(alpha: 0.1),
+              color: _kBandiWalaYellow.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.favorite_border,
               size: 80,
-              color: _kBandiwalaYellow,
+              color: _kBandiWalaYellow,
             ),
           ),
           const SizedBox(height: 24),

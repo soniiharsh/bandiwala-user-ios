@@ -4,7 +4,7 @@ import 'orders_page.dart'; // ← adjust import path as needed
 import '../core/theme/theme.dart';
 import '../core/navigation/app_page_route.dart';
 
-const kBandiwalaYellow = AppColors.primary;
+const kBandiWalaYellow = AppColors.primary;
 
 class HelpSupportPage extends StatefulWidget {
   const HelpSupportPage({super.key});
@@ -62,7 +62,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
         centerTitle: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.chat, color: kBandiwalaYellow, size: 20),
+            icon: const Icon(Icons.chat, color: kBandiWalaYellow, size: 20),
             onPressed: () => _launchWhatsApp(),
             tooltip: 'WhatsApp Support',
           ),
@@ -86,7 +86,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                   const Icon(
                     Icons.support_agent,
                     size: 36,
-                    color: kBandiwalaYellow,
+                    color: kBandiWalaYellow,
                   ),
                   const SizedBox(height: 8),
                   const Text(
@@ -184,7 +184,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.flash_on, color: kBandiwalaYellow, size: 16),
+                      const Icon(Icons.flash_on, color: kBandiWalaYellow, size: 16),
                       const SizedBox(width: 6),
                       const Text(
                         'Quick Actions',
@@ -233,13 +233,13 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: kBandiwalaYellow.withValues(alpha: 0.1),
+                color: kBandiWalaYellow.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kBandiwalaYellow.withValues(alpha: 0.3)),
+                border: Border.all(color: kBandiWalaYellow.withValues(alpha: 0.3)),
               ),
               child: Column(
                 children: [
-                  const Icon(Icons.chat_bubble_outline, size: 32, color: kBandiwalaYellow),
+                  const Icon(Icons.chat_bubble_outline, size: 32, color: kBandiWalaYellow),
                   const SizedBox(height: 10),
                   const Text(
                     'Still Need Help?',
@@ -266,7 +266,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: kBandiwalaYellow,
+                        backgroundColor: kBandiWalaYellow,
                         foregroundColor: Colors.black87,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
@@ -320,7 +320,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
                   ),
                   Icon(
                     isExpanded ? Icons.expand_less : Icons.expand_more,
-                    color: kBandiwalaYellow,
+                    color: kBandiWalaYellow,
                     size: 20,
                   ),
                 ],
@@ -367,7 +367,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
       height: 36,
       child: OutlinedButton.icon(
         onPressed: onTap,
-        icon: Icon(icon, color: kBandiwalaYellow, size: 16),
+        icon: Icon(icon, color: kBandiWalaYellow, size: 16),
         label: Text(
           label,
           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),

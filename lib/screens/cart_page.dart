@@ -16,7 +16,7 @@ import '../core/theme/theme.dart';
 import '../widgets/skeletons.dart';
 import '../core/navigation/app_page_route.dart';
 
-const kBandiwalaYellow = AppColors.primary;
+const kBandiWalaYellow = AppColors.primary;
 
 // ─── CartPage ─────────────────────────────────────────────────────────────────
 
@@ -168,7 +168,7 @@ class _CartPageState extends ConsumerState<CartPage> {
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
             style: ElevatedButton.styleFrom(
-              backgroundColor: kBandiwalaYellow,
+              backgroundColor: kBandiWalaYellow,
               foregroundColor: Colors.black87,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -265,7 +265,7 @@ class _CartPageState extends ConsumerState<CartPage> {
                             );
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: kBandiwalaYellow,
+                            backgroundColor: kBandiWalaYellow,
                             foregroundColor: Colors.black87,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
@@ -355,7 +355,7 @@ class _CartPageState extends ConsumerState<CartPage> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: kBandiwalaYellow.withValues(alpha: 0.2),
+                        color: kBandiWalaYellow.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -630,7 +630,7 @@ class _CartPageState extends ConsumerState<CartPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: disableCheckout
                     ? (isDark ? Colors.grey.shade800 : Colors.grey.shade300)
-                    : kBandiwalaYellow,
+                    : kBandiWalaYellow,
                 foregroundColor: Colors.black,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -795,7 +795,7 @@ class AddressSection extends StatelessWidget {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: kBandiwalaYellow.withValues(alpha: 0.15),
+                            color: kBandiWalaYellow.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -1209,13 +1209,13 @@ class VendorCartSection extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: kBandiwalaYellow.withValues(alpha: 0.15),
+                    color: kBandiWalaYellow.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
                     Icons.store_rounded,
                     size: 18,
-                    color: kBandiwalaYellow,
+                    color: kBandiWalaYellow,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -1371,7 +1371,7 @@ class VendorCartSection extends ConsumerWidget {
                             child: Icon(
                               Icons.remove,
                               size: 16,
-                              color: isDark ? kBandiwalaYellow : Colors.black87,
+                              color: isDark ? kBandiWalaYellow : Colors.black87,
                             ),
                           ),
                         ),
@@ -1402,7 +1402,7 @@ class VendorCartSection extends ConsumerWidget {
                               color: blockIncrement
                                   ? theme.colorScheme.onSurface.withValues(alpha: 0.3)
                                   : (isDark
-                                        ? kBandiwalaYellow
+                                        ? kBandiWalaYellow
                                         : Colors.black87),
                             ),
                           ),

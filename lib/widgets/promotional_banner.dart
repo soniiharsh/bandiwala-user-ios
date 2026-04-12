@@ -7,7 +7,7 @@ import '../providers/promotions_provider.dart';
 import '../core/theme/theme.dart';
 import 'skeletons.dart';
 
-const kBandiwalaYellow = AppColors.primary;
+const kBandiWalaYellow = AppColors.primary;
 
 // ─── PromotionalBanner ────────────────────────────────────────────────────────
 
@@ -88,7 +88,7 @@ class _PromotionalBannerState extends ConsumerState<PromotionalBanner>
                   height: 7,
                   decoration: BoxDecoration(
                     color: _currentPage == i
-                        ? kBandiwalaYellow
+                        ? kBandiWalaYellow
                         : Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(4),
                   ),

@@ -64,7 +64,7 @@ class MyApp extends ConsumerWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppTheme.systemUiStyle(brightness),
       child: MaterialApp(
-        title: 'Bandiwala',
+        title: 'BandiWala',
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: themeMode,

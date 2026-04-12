@@ -8,7 +8,7 @@ import '../core/theme/theme.dart';
 import '../widgets/skeletons.dart';
 import 'track_order_page.dart';
 
-const kBandiwalaYellow = AppColors.primary;
+const kBandiWalaYellow = AppColors.primary;
 
 class OrdersPage extends ConsumerWidget {
   const OrdersPage({super.key});
@@ -43,7 +43,7 @@ class OrdersPage extends ConsumerWidget {
             );
           }
           return RefreshIndicator(
-            color: kBandiwalaYellow,
+            color: kBandiWalaYellow,
             onRefresh: () async => ref.invalidate(userOrdersProvider),
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
@@ -64,10 +64,10 @@ class OrdersPage extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: kBandiwalaYellow.withValues(alpha: 0.1),
+              color: kBandiWalaYellow.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 64, color: kBandiwalaYellow),
+            child: Icon(icon, size: 64, color: kBandiWalaYellow),
           ),
           const SizedBox(height: 16),
           Text(
@@ -119,12 +119,12 @@ class _OrderCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: kBandiwalaYellow.withValues(alpha: 0.2),
+                    color: kBandiWalaYellow.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(
                     Icons.receipt_long,
-                    color: kBandiwalaYellow,
+                    color: kBandiWalaYellow,
                     size: 20,
                   ),
                 ),
@@ -212,7 +212,7 @@ class _OrderCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: kBandiwalaYellow,
+                    color: kBandiWalaYellow,
                   ),
                 ),
               ],
@@ -238,8 +238,8 @@ class _OrderCard extends StatelessWidget {
                   icon: const Icon(Icons.location_on, size: 16),
                   label: const Text('Track Order'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: kBandiwalaYellow,
-                    side: const BorderSide(color: kBandiwalaYellow),
+                    foregroundColor: kBandiWalaYellow,
+                    side: const BorderSide(color: kBandiWalaYellow),
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -336,10 +336,10 @@ class _VendorSection extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: kBandiwalaYellow.withValues(alpha: 0.15),
+                color: kBandiWalaYellow.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.store, color: kBandiwalaYellow, size: 18),
+              child: const Icon(Icons.store, color: kBandiWalaYellow, size: 18),
             ),
             const SizedBox(width: 10),
             Expanded(

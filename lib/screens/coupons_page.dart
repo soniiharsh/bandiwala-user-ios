@@ -5,7 +5,7 @@ import '../models/coupon.dart';
 import '../core/theme/theme.dart';
 import '../widgets/skeletons.dart';
 
-const kBandiwalaYellow = AppColors.primary;
+const kBandiWalaYellow = AppColors.primary;
 
 class CouponsPage extends ConsumerStatefulWidget {
   final double cartAmount;
@@ -400,12 +400,12 @@ class _CouponCard extends StatelessWidget {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: kBandiwalaYellow.withValues(alpha: 0.15),
+                      color: kBandiWalaYellow.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(
                       Icons.local_offer,
-                      color: kBandiwalaYellow,
+                      color: kBandiWalaYellow,
                       size: 24,
                     ),
                   ),
@@ -477,7 +477,7 @@ class _CouponCard extends StatelessWidget {
                       limitReached ? 'Limit reached' : 'Apply',
                       style: TextStyle(
                         color: isApplicable
-                            ? kBandiwalaYellow
+                            ? kBandiWalaYellow
                             : Colors.grey.shade500,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -512,7 +512,7 @@ class _CouponCard extends StatelessWidget {
                       addMoreMsg,
                       style: const TextStyle(
                         fontSize: 12,
-                        color: kBandiwalaYellow,
+                        color: kBandiWalaYellow,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

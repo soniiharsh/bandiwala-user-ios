@@ -7,7 +7,7 @@ import '../services/analytics_service.dart';
 import '../core/theme/theme.dart';
 import '../core/navigation/app_page_route.dart';
 
-const kBandiwalaYellow = AppColors.primary;
+const kBandiWalaYellow = AppColors.primary;
 const kWhite = Colors.white;
 
 class PaymentSuccessPage extends StatefulWidget {
@@ -66,7 +66,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
     AnalyticsService.logPurchase(
       transactionId: widget.paymentId,
       value: widget.amount,
-      currency: 'INR', // Assuming INR for Bandiwala
+      currency: 'INR', // Assuming INR for BandiWala
       items:
           [], // At this point we might not have the full cart details without looking up the order, but we can log the total value
     );
@@ -190,17 +190,17 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: kBandiwalaYellow.withValues(alpha: 0.05),
+                      color: kBandiWalaYellow.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: kBandiwalaYellow.withValues(alpha: 0.2),
+                        color: kBandiWalaYellow.withValues(alpha: 0.2),
                       ),
                     ),
                     child: Column(
                       children: [
                         Icon(
                           Icons.format_quote,
-                          color: kBandiwalaYellow,
+                          color: kBandiWalaYellow,
                           size: 28,
                         ),
                         const SizedBox(height: 16),
@@ -221,7 +221,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                           '- Food Wisdom',
                           style: TextStyle(
                             fontSize: 13,
-                            color: kBandiwalaYellow,
+                            color: kBandiWalaYellow,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -249,7 +249,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                         minHeight: 6,
                         backgroundColor: Colors.grey.shade200,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          kBandiwalaYellow,
+                          kBandiWalaYellow,
                         ),
                       ),
                     ),
@@ -268,8 +268,8 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                           );
                         },
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: kBandiwalaYellow,
-                          side: BorderSide(color: kBandiwalaYellow, width: 2),
+                          foregroundColor: kBandiWalaYellow,
+                          side: BorderSide(color: kBandiWalaYellow, width: 2),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),

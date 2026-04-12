@@ -9,7 +9,7 @@ import '../core/theme/theme.dart';
 import '../widgets/skeletons.dart';
 import '../core/navigation/app_page_route.dart';
 
-const kBandiwalaYellow = AppColors.primary;
+const kBandiWalaYellow = AppColors.primary;
 
 class SavedAddressesPage extends ConsumerStatefulWidget {
   const SavedAddressesPage({super.key});
@@ -198,7 +198,7 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
           );
           // No need to setState — userProvider stream updates automatically
         },
-        backgroundColor: kBandiwalaYellow,
+        backgroundColor: kBandiWalaYellow,
         foregroundColor: Colors.black87,
         icon: const Icon(Icons.add_location_alt),
         label: const Text(
@@ -217,13 +217,13 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
           Container(
             padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
-              color: kBandiwalaYellow.withValues(alpha: 0.1),
+              color: kBandiWalaYellow.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.location_off_outlined,
               size: 80,
-              color: kBandiwalaYellow,
+              color: kBandiWalaYellow,
             ),
           ),
           const SizedBox(height: 24),
@@ -266,7 +266,7 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
               ),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: kBandiwalaYellow,
+              backgroundColor: kBandiWalaYellow,
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -351,7 +351,7 @@ class _SavedAddressesPageState extends ConsumerState<SavedAddressesPage> {
             IconButton(
               onPressed: () => _editLocation(index, location),
               icon: const Icon(Icons.edit_outlined, size: 20),
-              color: kBandiwalaYellow,
+              color: kBandiWalaYellow,
               tooltip: 'Edit',
               padding: const EdgeInsets.all(6),
               constraints: const BoxConstraints(),
@@ -600,7 +600,7 @@ class _LocationPickerEditModeState
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(
-                          color: kBandiwalaYellow,
+                          color: kBandiWalaYellow,
                           width: 2,
                         ),
                       ),
@@ -619,7 +619,7 @@ class _LocationPickerEditModeState
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: const BorderSide(
-                          color: kBandiwalaYellow,
+                          color: kBandiWalaYellow,
                           width: 2,
                         ),
                       ),
@@ -638,7 +638,7 @@ class _LocationPickerEditModeState
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: const BorderSide(
-                            color: kBandiwalaYellow,
+                            color: kBandiWalaYellow,
                             width: 2,
                           ),
                         ),
@@ -652,7 +652,7 @@ class _LocationPickerEditModeState
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _updateLocation,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: kBandiwalaYellow,
+                        backgroundColor: kBandiWalaYellow,
                         foregroundColor: Colors.black87,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -703,7 +703,7 @@ class _LocationPickerEditModeState
         ),
         selected: isSelected,
         onSelected: (_) => setState(() => _selectedLabel = label),
-        selectedColor: kBandiwalaYellow,
+        selectedColor: kBandiWalaYellow,
         labelStyle: TextStyle(
           color: isSelected ? Colors.black87 : Colors.grey.shade700,
           fontWeight: FontWeight.w600,

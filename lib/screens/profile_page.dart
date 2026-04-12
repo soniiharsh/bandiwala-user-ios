@@ -17,7 +17,7 @@ import '../core/theme/theme.dart';
 import '../widgets/skeletons.dart';
 import '../core/navigation/app_page_route.dart';
 
-const Color kBandiwalaYellow = AppColors.primary;
+const Color kBandiWalaYellow = AppColors.primary;
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -57,7 +57,7 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.login, color: kBandiwalaYellow, size: 28),
+            Icon(Icons.login, color: kBandiWalaYellow, size: 28),
             SizedBox(width: 12),
             Text(
               'Login Required',
@@ -93,7 +93,7 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: kBandiwalaYellow,
+              backgroundColor: kBandiWalaYellow,
               foregroundColor: Colors.black87,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -141,7 +141,7 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: kBandiwalaYellow, width: 2),
+              borderSide: const BorderSide(color: kBandiWalaYellow, width: 2),
             ),
           ),
         ),
@@ -174,7 +174,7 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: kBandiwalaYellow,
+              backgroundColor: kBandiWalaYellow,
               foregroundColor: Colors.black87,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -347,7 +347,7 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.lock_outline, color: kBandiwalaYellow, size: 24),
+            Icon(Icons.lock_outline, color: kBandiWalaYellow, size: 24),
             SizedBox(width: 12),
             Text(
               'Login Required',
@@ -374,7 +374,7 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: kBandiwalaYellow,
+              backgroundColor: kBandiWalaYellow,
               foregroundColor: Colors.black87,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -487,7 +487,7 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
           ? const ProfilePageSkeleton()
           : RefreshIndicator(
               onRefresh: _initializeData,
-              color: kBandiwalaYellow,
+              color: kBandiWalaYellow,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 child: Column(
@@ -797,9 +797,9 @@ class _SettingsScreenState extends ConsumerState<ProfilePage> {
             ),
           ),
           style: ElevatedButton.styleFrom(
-            backgroundColor: kBandiwalaYellow,
+            backgroundColor: kBandiWalaYellow,
             elevation: 2,
-            shadowColor: kBandiwalaYellow.withValues(alpha: 0.3),
+            shadowColor: kBandiWalaYellow.withValues(alpha: 0.3),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),

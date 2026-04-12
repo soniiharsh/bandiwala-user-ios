@@ -3,17 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/cart_provider.dart';
 import '../core/theme/theme.dart';
 
-class BandiwalaBottomNavigation extends ConsumerWidget {
+class BandiWalaBottomNavigation extends ConsumerWidget {
   final int currentIndex;
   final ValueChanged<int> onItemSelected;
 
-  const BandiwalaBottomNavigation({
+  const BandiWalaBottomNavigation({
     super.key,
     required this.currentIndex,
     required this.onItemSelected,
   });
 
-  static const Color bandiwalaYellow = AppColors.primary;
+  static const Color bandiWalaYellow = AppColors.primary;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -21,7 +21,7 @@ class BandiwalaBottomNavigation extends ConsumerWidget {
 
     return BottomNavigationBar(
       currentIndex: currentIndex,
-      selectedItemColor: bandiwalaYellow,
+      selectedItemColor: bandiWalaYellow,
       type: BottomNavigationBarType.fixed,
       onTap: onItemSelected,
       items: [

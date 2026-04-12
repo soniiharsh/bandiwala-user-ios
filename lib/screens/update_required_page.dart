@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/theme/theme.dart';
 
-const kBandiwalaYellow = AppColors.primary;
+const kBandiWalaYellow = AppColors.primary;
 
 class UpdateRequiredPage extends StatelessWidget {
   final String currentVersion;
@@ -62,7 +62,7 @@ class UpdateRequiredPage extends StatelessWidget {
                 Icon(
                   Icons.system_update_alt,
                   size: 80,
-                  color: kBandiwalaYellow,
+                  color: kBandiWalaYellow,
                 ),
                 const SizedBox(height: 24),
 
@@ -80,7 +80,7 @@ class UpdateRequiredPage extends StatelessWidget {
 
                 // Description
                 Text(
-                  'A new version of Bandiwala is available. Please update to continue using the app.',
+                  'A new version of BandiWala is available. Please update to continue using the app.',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.grey.shade700,
@@ -94,10 +94,10 @@ class UpdateRequiredPage extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: kBandiwalaYellow.withValues(alpha: 0.1),
+                    color: kBandiWalaYellow.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: kBandiwalaYellow.withValues(alpha: 0.3),
+                      color: kBandiWalaYellow.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Column(
@@ -139,7 +139,7 @@ class UpdateRequiredPage extends StatelessWidget {
                             minimumVersion,
                             style: const TextStyle(
                               fontSize: 15,
-                              color: kBandiwalaYellow,
+                              color: kBandiWalaYellow,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -156,7 +156,7 @@ class UpdateRequiredPage extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: _openPlayStore,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: kBandiwalaYellow,
+                      backgroundColor: kBandiWalaYellow,
                       foregroundColor: Colors.black87,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(

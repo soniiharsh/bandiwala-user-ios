@@ -16,7 +16,7 @@ import '../core/navigation/app_page_route.dart';
 import '../models/vendor.dart';
 import '../providers/vendors_provider.dart';
 
-const kBandiwalaYellow = AppColors.primary;
+const kBandiWalaYellow = AppColors.primary;
 
 // ─── Pricing Config Model ─────────────────────────────────────────────────────
 
@@ -358,7 +358,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, 'pickup'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: kBandiwalaYellow,
+              backgroundColor: kBandiWalaYellow,
               foregroundColor: Colors.black,
             ),
             child: const Text('Pickup'),
@@ -423,7 +423,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       ),
       body: ref.watch(pricingConfigProvider).isLoading
           ? const Center(
-              child: CircularProgressIndicator(color: kBandiwalaYellow),
+              child: CircularProgressIndicator(color: kBandiWalaYellow),
             )
           : Column(
               children: [
@@ -515,7 +515,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
                       color: _selectedOrderType == 'delivery'
-                          ? kBandiwalaYellow.withValues(alpha: 0.1)
+                          ? kBandiWalaYellow.withValues(alpha: 0.1)
                           : null,
                       borderRadius: const BorderRadius.horizontal(
                         left: Radius.circular(12),
@@ -526,7 +526,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         Icon(
                           Icons.delivery_dining,
                           color: _selectedOrderType == 'delivery'
-                              ? kBandiwalaYellow
+                              ? kBandiWalaYellow
                               : cs.onSurfaceVariant,
                         ),
                         const SizedBox(height: 4),
@@ -536,7 +536,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: _selectedOrderType == 'delivery'
-                                ? kBandiwalaYellow
+                                ? kBandiWalaYellow
                                 : cs.onSurfaceVariant,
                           ),
                         ),
@@ -553,7 +553,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
                       color: _selectedOrderType == 'pickup'
-                          ? kBandiwalaYellow.withValues(alpha: 0.1)
+                          ? kBandiWalaYellow.withValues(alpha: 0.1)
                           : null,
                       borderRadius: const BorderRadius.horizontal(
                         right: Radius.circular(12),
@@ -564,7 +564,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         Icon(
                           Icons.shopping_bag_outlined,
                           color: _selectedOrderType == 'pickup'
-                              ? kBandiwalaYellow
+                              ? kBandiWalaYellow
                               : cs.onSurfaceVariant,
                         ),
                         const SizedBox(height: 4),
@@ -574,7 +574,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
                             color: _selectedOrderType == 'pickup'
-                                ? kBandiwalaYellow
+                                ? kBandiWalaYellow
                                 : cs.onSurfaceVariant,
                           ),
                         ),
@@ -612,13 +612,13 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: kBandiwalaYellow.withValues(alpha: 0.15),
+                        color: kBandiWalaYellow.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Icon(
                         Icons.store_rounded,
                         size: 15,
-                        color: kBandiwalaYellow,
+                        color: kBandiWalaYellow,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -1011,7 +1011,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: kBandiwalaYellow,
+                  color: kBandiWalaYellow,
                 ),
               ),
             ],
@@ -1119,7 +1119,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: kBandiwalaYellow.withValues(alpha: 0.15),
+                        color: kBandiWalaYellow.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -1285,7 +1285,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? kBandiwalaYellow.withValues(alpha: 0.08) : kWhite,
+          color: isSelected ? kBandiWalaYellow.withValues(alpha: 0.08) : kWhite,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
@@ -1294,13 +1294,13 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? kBandiwalaYellow.withValues(alpha: 0.2)
+                    ? kBandiWalaYellow.withValues(alpha: 0.2)
                     : iconBg,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 icon,
-                color: isSelected ? kBandiwalaYellow : iconColor,
+                color: isSelected ? kBandiWalaYellow : iconColor,
                 size: 20,
               ),
             ),
@@ -1332,10 +1332,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? kBandiwalaYellow : cs.outline,
+                  color: isSelected ? kBandiWalaYellow : cs.outline,
                   width: 2,
                 ),
-                color: isSelected ? kBandiwalaYellow : Colors.transparent,
+                color: isSelected ? kBandiWalaYellow : Colors.transparent,
               ),
               child: isSelected
                   ? const Icon(Icons.check, size: 13, color: Colors.white)
@@ -1400,10 +1400,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: kBandiwalaYellow.withValues(alpha: 0.12),
+                        color: kBandiWalaYellow.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: kBandiwalaYellow.withValues(alpha: 0.4),
+                          color: kBandiWalaYellow.withValues(alpha: 0.4),
                         ),
                       ),
                       child: const Row(
@@ -1411,14 +1411,14 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                           Icon(
                             Icons.security,
                             size: 12,
-                            color: kBandiwalaYellow,
+                            color: kBandiWalaYellow,
                           ),
                           SizedBox(width: 4),
                           Text(
                             'Secured by Razorpay',
                             style: TextStyle(
                               fontSize: 10,
-                              color: kBandiwalaYellow,
+                              color: kBandiWalaYellow,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1490,10 +1490,10 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kBandiwalaYellow,
+                  backgroundColor: kBandiWalaYellow,
                   foregroundColor: Colors.black87,
                   elevation: 0,
-                  disabledBackgroundColor: kBandiwalaYellow.withValues(alpha: 0.5),
+                  disabledBackgroundColor: kBandiWalaYellow.withValues(alpha: 0.5),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -1627,9 +1627,9 @@ class _CodConfirmDialog extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: kBandiwalaYellow.withValues(alpha: 0.10),
+              color: kBandiWalaYellow.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: kBandiwalaYellow.withValues(alpha: 0.3)),
+              border: Border.all(color: kBandiWalaYellow.withValues(alpha: 0.3)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1650,7 +1650,7 @@ class _CodConfirmDialog extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
-                    color: kBandiwalaYellow,
+                    color: kBandiWalaYellow,
                   ),
                 ),
               ],
@@ -1706,7 +1706,7 @@ class _CodConfirmDialog extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kBandiwalaYellow,
+                  backgroundColor: kBandiWalaYellow,
                   foregroundColor: Colors.black87,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 12),
