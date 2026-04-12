@@ -77,6 +77,13 @@ class NotificationService {
         >()
         ?.createNotificationChannel(androidChannel);
 
+    // iOS: enable foreground notification presentation (alert, badge, sound)
+    await _messaging.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
     // Set background message handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 

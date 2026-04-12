@@ -1,11 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import '../core/app_env.dart';
 import '../models/order.dart';
 import '../models/order_status.dart';
 import '../providers/orders_provider.dart';
 
-const _razorpayKey = 'rzp_live_SIEw0ZGDGbPgTd';
 
 class PaymentService {
   final Razorpay _razorpay = Razorpay();
@@ -38,13 +38,13 @@ class PaymentService {
 
   void openRazorpay(double amount) {
     final options = {
-      'key': _razorpayKey,
+      'key': AppEnv.razorpayKey,
       'amount': (amount * 100).toInt(),
       'name': 'BandiWala',
       'description': 'Street food delivery',
       'prefill': {
         'contact': FirebaseAuth.instance.currentUser?.phoneNumber ?? '',
-        'email': 'customer@bandiwala.in',
+        'email': AppEnv.customerEmail,
       },
       'external': {
         'wallets': ['paytm'],

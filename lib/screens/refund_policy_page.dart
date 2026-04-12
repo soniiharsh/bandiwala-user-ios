@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/app_env.dart';
 
 class RefundPolicyPage extends StatelessWidget {
   const RefundPolicyPage({super.key});
@@ -155,9 +156,7 @@ class RefundPolicyPage extends StatelessWidget {
               'If you need assistance with refund requests or have any questions regarding this policy, please contact our customer support team:',
             ),
 
-            _buildParagraph(
-              'Email: support@bandiwala.com\nPhone: +91 7382107075\nSupport Hours: 9 AM - 10 PM (Monday to Saturday)',
-            ),
+            _buildParagraph(AppEnv.supportContactBlock),
 
             _buildParagraph(
               'Our support team is dedicated to helping you resolve any issues with your orders and will guide you through the refund process if needed.',

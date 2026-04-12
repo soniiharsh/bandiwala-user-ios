@@ -1,5 +1,7 @@
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../core/app_env.dart';
 import '../core/theme/theme.dart';
 
 const kBandiWalaYellow = AppColors.primary;
@@ -14,11 +16,8 @@ class UpdateRequiredPage extends StatelessWidget {
     required this.minimumVersion,
   });
 
-  Future<void> _openPlayStore() async {
-    const playStoreUrl =
-        'https://play.google.com/store/apps/details?id=com.bandiwala.user';
-    final uri = Uri.parse(playStoreUrl);
-
+  Future<void> _openStore() async {
+    final uri = Uri.parse(AppEnv.storeUrl);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -154,7 +153,7 @@ class UpdateRequiredPage extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _openPlayStore,
+                    onPressed: _openStore,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: kBandiWalaYellow,
                       foregroundColor: Colors.black87,
@@ -164,14 +163,19 @@ class UpdateRequiredPage extends StatelessWidget {
                       ),
                       elevation: 2,
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.download, size: 24),
-                        SizedBox(width: 12),
+                        Icon(
+                          Platform.isIOS ? Icons.apple : Icons.download,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
                         Text(
-                          'Update Now',
-                          style: TextStyle(
+                          Platform.isIOS
+                              ? 'Update on App Store'
+                              : 'Update on Play Store',
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/app_env.dart';
 
 class TermsConditionsPage extends StatelessWidget {
   const TermsConditionsPage({super.key});
@@ -183,9 +184,7 @@ class TermsConditionsPage extends StatelessWidget {
               'For questions, concerns, or inquiries regarding these Terms and Conditions or any aspect of the BandiWala Platform, please contact us using the information below:',
             ),
 
-            _buildParagraph(
-              'General Inquiries: hello@bandiwala.com\nCustomer Support: support@bandiwala.com\nPrivacy Concerns: privacy@bandiwala.com\nCompliance Issues: compliance@bandiwala.com',
-            ),
+            _buildParagraph(AppEnv.termsContactBlock),
 
             _buildParagraph(
               'Registered Office Address:\nP-405, PG Block, VJ Hub\nVNRVJIET, Bachupally\nHyderabad, Telangana - 500090\nIndia',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/app_env.dart';
 
 class CancellationPolicyPage extends StatelessWidget {
   const CancellationPolicyPage({super.key});
@@ -137,9 +138,7 @@ class CancellationPolicyPage extends StatelessWidget {
               'If you need assistance with order cancellations, refunds, or have any questions regarding this policy, please feel free to contact our customer support team. We are here to help you.',
             ),
 
-            _buildParagraph(
-              'Email: support@bandiwala.com\nPhone: +91 7382107075',
-            ),
+            _buildParagraph(AppEnv.supportContactShort),
 
             _buildParagraph(
               'Our support team is available to assist you with any concerns or queries you may have regarding order cancellations and refunds.',

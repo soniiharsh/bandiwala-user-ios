@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'orders_page.dart'; // ← adjust import path as needed
+import 'orders_page.dart';
+import '../core/app_env.dart';
 import '../core/theme/theme.dart';
 import '../core/navigation/app_page_route.dart';
 
@@ -22,7 +23,7 @@ class _HelpSupportPageState extends State<HelpSupportPage> {
   // ─── WhatsApp launcher ─────────────────────────────────────────────────────
 
   Future<void> _launchWhatsApp({String prefillMessage = ''}) async {
-    final phone = '+917382107075';
+    final phone = AppEnv.supportPhone;
     final encoded = Uri.encodeComponent(
       prefillMessage.isNotEmpty
           ? prefillMessage

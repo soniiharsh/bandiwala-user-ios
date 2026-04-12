@@ -13,6 +13,7 @@ import '../providers/user_provider.dart';
 import '../models/app_user.dart';
 import '../core/theme/theme.dart';
 import '../core/theme/map_style.dart';
+import '../core/app_env.dart';
 // ─── Shared model ─────────────────────────────────────────────────────────────
 
 // ─── Shared model consolidated into SavedAddress in app_user.dart ────────────────
@@ -85,8 +86,6 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
   Timer? _debounce;
 
   final http.Client _httpClient = http.Client();
-  static const String _googleMapsApiKey =
-      'AIzaSyDKVT8aUdGm6EcR8DdRdh0QxI2oj7HRo5E';
   String? _sessionToken;
 
   void _generateSessionToken() {
@@ -163,7 +162,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
         '/maps/api/place/autocomplete/json',
         {
           'input': query,
-          'key': _googleMapsApiKey,
+          'key': AppEnv.googleMapsApiKey,
           'location': '17.3850,78.4867', // Hyderabad center
           'radius': '50000',
           'strictbounds': 'false',
@@ -283,7 +282,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
           Uri.https('maps.googleapis.com', '/maps/api/place/details/json', {
             'place_id': placeId,
             'fields': 'geometry',
-            'key': _googleMapsApiKey,
+            'key': AppEnv.googleMapsApiKey,
             'sessiontoken': _sessionToken,
           });
       final response = await _httpClient.get(uri);
@@ -338,7 +337,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
     try {
       final uri = Uri.https('maps.googleapis.com', '/maps/api/geocode/json', {
         'latlng': '${position.latitude},${position.longitude}',
-        'key': _googleMapsApiKey,
+        'key': AppEnv.googleMapsApiKey,
         'language': 'en',
       });
       final response = await _httpClient.get(uri);
