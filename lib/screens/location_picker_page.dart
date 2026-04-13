@@ -580,7 +580,6 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
     setState(() {
       _selectedPosition = point;
       _fetchedAddress = address.isNotEmpty ? address : 'Selected Location';
-      _searchController.text = _fetchedAddress;
       _validateLocation(point);
       _isMapIdleUpdating = false;
     });
@@ -874,8 +873,8 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
           border: Border.all(color: theme.dividerColor),
           boxShadow: [
             BoxShadow(
-              color: (isDark ? Colors.white : Colors.black).withValues(alpha: 
-                isDark ? 0.08 : 0.04,
+              color: (isDark ? Colors.white : Colors.black).withValues(
+                alpha: isDark ? 0.08 : 0.04,
               ),
               blurRadius: 8,
               offset: const Offset(0, 2),
@@ -932,7 +931,9 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: isSelected ? bandiWalaYellow.withValues(alpha: 0.12) : theme.cardColor,
+        color: isSelected
+            ? bandiWalaYellow.withValues(alpha: 0.12)
+            : theme.cardColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isSelected ? bandiWalaYellow : theme.dividerColor,
@@ -1293,7 +1294,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
       children: [
         GoogleMap(
           initialCameraPosition: const CameraPosition(
-            target: LatLng(17.3850, 78.4867),
+            target: LatLng(17.5, 78.4),
             zoom: 14.0,
           ),
           onMapCreated: (controller) {
@@ -1733,9 +1734,8 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: isDark
-                                ? theme.colorScheme.surfaceContainerHighest.withValues(
-                                    alpha: 0.3,
-                                  )
+                                ? theme.colorScheme.surfaceContainerHighest
+                                      .withValues(alpha: 0.3)
                                 : Colors.grey.shade50,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: theme.dividerColor),

@@ -71,29 +71,71 @@ class _SplashPageState extends ConsumerState<SplashPage> {
   }
 
   /// Checks Firestore for the minimum required version.
-  /// Never throws — returns a non-outdated result on any failure.
+  /// Checks Firestore for the minimum required version.
+  /// Only bypasses the check on network/unavailability errors.
+  /// Any other failure (bad data, parse error) is treated as outdated.
   Future<_VersionResult> _checkVersion() async {
+    late final String current;
     try {
       final packageInfo = await PackageInfo.fromPlatform();
-      final current = packageInfo.version;
+      current = packageInfo.version;
+    } catch (_) {
+      // Can't read own version — treat as outdated to be safe.
+      return const _VersionResult(
+        currentVersion: '',
+        minimumVersion: '',
+        isOutdated: true,
+      );
+    }
 
+    try {
       final snap = await FirebaseFirestore.instance
           .collection(DbCollections.latestVersion)
           .limit(1)
           .get();
+      print("Document count: ${snap.docs.length}");
 
-      if (snap.docs.isEmpty) return _VersionResult.upToDate(current);
+      if (snap.docs.isEmpty) {
+        // No version document configured — block the app until one is set.
+        return _VersionResult(
+          currentVersion: current,
+          minimumVersion: 'unknown',
+          isOutdated: true,
+        );
+      }
+      final data = snap.docs.first.data();
 
-      final minimum =
-          snap.docs.first.data()['minimum-version'] as String? ?? '0.0.0';
+      final minimum = data['minimum-version'];
+      if (minimum is! String || minimum.isEmpty) {
+        // Malformed version field — treat as outdated.
+        return _VersionResult(
+          currentVersion: current,
+          minimumVersion: 'unknown',
+          isOutdated: true,
+        );
+      }
 
       return _VersionResult(
         currentVersion: current,
         minimumVersion: minimum,
         isOutdated: _isOlderVersion(current, minimum),
       );
-    } catch (_) {
-      return _VersionResult.upToDate('');
+    } on FirebaseException catch (e) {
+      // Network/unavailable — give benefit of the doubt.
+      debugPrint(
+        'Version check Firestore error: ${e.code} ${e.message} ------------------------------------------------------------------------------------',
+      );
+      return _VersionResult.upToDate(current);
+    } catch (e) {
+      // Unexpected error — treat as outdated.
+      debugPrint(
+        'Version check unexpected error: $e ------------------------------------------------------------------------------------',
+      );
+      return _VersionResult(
+        currentVersion: current,
+        minimumVersion: '',
+        isOutdated: true,
+      );
     }
   }
 
