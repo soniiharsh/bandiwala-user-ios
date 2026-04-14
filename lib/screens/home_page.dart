@@ -8,7 +8,7 @@ import '../widgets/recommended_vendors.dart';
 import '../widgets/food_category_carousel.dart';
 import '../providers/active_address_provider.dart';
 import '../providers/items_provider.dart';
-import '../providers/vendors_provider.dart';
+import '../providers/vendors_in_location_provider.dart';
 import '../widgets/vendor_card.dart';
 import '../widgets/vendors_list.dart';
 import '../core/theme/theme.dart';
@@ -249,7 +249,7 @@ class _HomeContent extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          VendorsList(matchedZone: null),
+          const VendorsList(),
         ],
       ],
     );
@@ -267,8 +267,10 @@ class _CategoryResults extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final itemsAsync = ref.watch(allAvailableItemsProvider);
-    final vendors = ref.watch(vendorsStreamProvider).valueOrNull ?? [];
+    final locationVendorsAsync = ref.watch(vendorsInLocationProvider);
+    final vendors = locationVendorsAsync.valueOrNull ?? [];
     final vendorMap = {for (final v in vendors) v.id: v};
+    final locationVendorIds = vendorMap.keys.toSet();
 
     return itemsAsync.when(
       loading: () => const Padding(
@@ -281,6 +283,7 @@ class _CategoryResults extends StatelessWidget {
         final Map<String, List<dynamic>> byVendor = {};
         for (final item in items) {
           if (item.vendorId.isEmpty) continue;
+          if (!locationVendorIds.contains(item.vendorId)) continue;
           if (!item.category.toLowerCase().contains(cat)) continue;
           byVendor.putIfAbsent(item.vendorId, () => []).add(item);
         }

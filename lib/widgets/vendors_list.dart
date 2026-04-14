@@ -1,32 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/vendors_provider.dart';
+import '../providers/vendors_in_location_provider.dart';
 import 'vendor_card.dart';
 import 'skeletons.dart';
 
 class VendorsList extends ConsumerWidget {
-  final String? matchedZone;
-  const VendorsList({super.key, this.matchedZone});
+  const VendorsList({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final vendorsAsync = ref.watch(vendorsStreamProvider);
+    final vendorsAsync = ref.watch(vendorsInLocationProvider);
 
     return vendorsAsync.when(
       loading: () => const VendorsListSkeleton(),
       error: (_, __) => const Center(child: Text('Something went wrong')),
       data: (vendors) {
-        final filtered = matchedZone == null
-            ? vendors
-            : vendors.where((v) {
-                final z = matchedZone!.toLowerCase().trim();
-                final address = v.address.toLowerCase();
-                return address
-                    .split(',')
-                    .any((p) => p.trim().contains(z) || z.contains(p.trim()));
-              }).toList();
-
-        if (filtered.isEmpty) {
+        if (vendors.isEmpty) {
           return Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 40),
@@ -39,9 +28,7 @@ class VendorsList extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    matchedZone != null
-                        ? 'No vendors in $matchedZone right now'
-                        : 'No vendors available right now',
+                    'No vendors available in your area',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
@@ -54,7 +41,7 @@ class VendorsList extends ConsumerWidget {
           );
         }
 
-        final sorted = [...filtered]
+        final sorted = [...vendors]
           ..sort((a, b) {
             if (a.isAvailable == b.isAvailable) return 0;
             return a.isAvailable ? -1 : 1;
