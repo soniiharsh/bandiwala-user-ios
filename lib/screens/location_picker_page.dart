@@ -7,8 +7,10 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
-import '../providers/service_zones_provider.dart';
-import '../models/service_zone.dart';
+import 'dart:math';
+import '../providers/hexagon_provider.dart';
+import '../models/hexagon.dart';
+import '../utils/hexagon_resolver.dart';
 import '../providers/user_provider.dart';
 import '../models/app_user.dart';
 import '../core/theme/theme.dart';
@@ -65,7 +67,6 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
   GoogleMapController? _mapController;
   LatLng? _currentPosition;
   LatLng? _selectedPosition;
-  bool _isOutsideHyderabad = false;
   bool _isOutsideServiceZone = false;
 
   final TextEditingController _searchController = TextEditingController();
@@ -91,11 +92,6 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
   void _generateSessionToken() {
     _sessionToken = DateTime.now().millisecondsSinceEpoch.toString();
   }
-
-  static const double _minLat = 17.25;
-  static const double _maxLat = 17.55;
-  static const double _minLng = 78.25;
-  static const double _maxLng = 78.65;
 
   @override
   void initState() {
@@ -157,66 +153,68 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
     if (_sessionToken == null) _generateSessionToken();
 
     try {
-      final uri = Uri.https(
-        'maps.googleapis.com',
-        '/maps/api/place/autocomplete/json',
-        {
-          'input': query,
-          'key': AppEnv.googleMapsApiKey,
-          'location': '17.3850,78.4867', // Hyderabad center
-          'radius': '50000',
-          'strictbounds': 'false',
-          'components': 'country:in',
-          'language': 'en',
-          'sessiontoken': _sessionToken,
+      final response = await _httpClient.post(
+        Uri.parse('https://places.googleapis.com/v1/places:autocomplete'),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': AppEnv.googleMapsApiKey,
         },
+        body: jsonEncode({
+          'input': query,
+          'locationBias': {
+            'circle': {
+              'center': {'latitude': 17.3850, 'longitude': 78.4867},
+              'radius': 50000.0,
+            }
+          },
+          'includedRegionCodes': ['IN'],
+          'languageCode': 'en',
+          'sessionToken': _sessionToken,
+        }),
       );
-
-      final response = await _httpClient.get(uri);
 
       if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['status'] == 'OK') {
-          final predictions = data['predictions'] as List;
-          final suggestions = predictions.map((p) {
-            final description = p['description'] as String;
-            final structuredFormatting =
-                p['structured_formatting'] as Map<String, dynamic>;
-            final mainText = structuredFormatting['main_text'] as String;
+        final List? predictions = data['suggestions'];
 
-            return _PlaceSuggestion(
-              displayName: description,
-              shortName: mainText,
-              placeId: p['place_id'],
-            );
-          }).toList();
-
-          setState(() {
-            _suggestions = suggestions;
-            _isSearching = false;
-            _showSuggestions = suggestions.isNotEmpty;
-          });
-          return;
-        } else if (data['status'] == 'ZERO_RESULTS') {
+        if (predictions == null || predictions.isEmpty) {
           setState(() {
             _suggestions = [];
             _isSearching = false;
             _showSuggestions = false;
           });
           return;
-        } else {
-          debugPrint('Google Autocomplete Error Status: ${data['status']}');
-          if (data['error_message'] != null) {
-            debugPrint('Error Message: ${data['error_message']}');
-          }
-          // Fallback to nominatim if Google returns an error (denied, over limit, etc)
-          await _fetchSuggestionsFallback(query);
-          return;
         }
+
+        final suggestions = predictions.map((s) {
+          final prediction = s['placePrediction'] as Map<String, dynamic>;
+          final description = prediction['text']['text'] as String;
+          final mainText =
+              prediction['structuredFormat']['mainText']['text'] as String;
+
+          return _PlaceSuggestion(
+            displayName: description,
+            shortName: mainText,
+            placeId: prediction['placeId'],
+          );
+        }).toList();
+
+        setState(() {
+          _suggestions = suggestions;
+          _isSearching = false;
+          _showSuggestions = suggestions.isNotEmpty;
+        });
+        return;
       } else {
-        debugPrint('Google API HTTP Error: ${response.statusCode}');
+        final data = jsonDecode(response.body);
+        debugPrint('Google Autocomplete Error Status Code: ${response.statusCode}');
+        if (data['error'] != null) {
+          debugPrint('Error Message: ${data['error']['message']}');
+        }
+        // Fallback to nominatim if Google returns an error (denied, over limit, etc)
         await _fetchSuggestionsFallback(query);
+        return;
       }
     } catch (e) {
       debugPrint('Google Autocomplete catch error: $e');
@@ -278,19 +276,19 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
 
   Future<LatLng> _getPlaceDetails(String placeId) async {
     try {
-      final uri =
-          Uri.https('maps.googleapis.com', '/maps/api/place/details/json', {
-            'place_id': placeId,
-            'fields': 'geometry',
-            'key': AppEnv.googleMapsApiKey,
-            'sessiontoken': _sessionToken,
-          });
-      final response = await _httpClient.get(uri);
+      final uri = Uri.parse('https://places.googleapis.com/v1/places/$placeId');
+      final response = await _httpClient.get(
+        uri,
+        headers: {
+          'X-Goog-Api-Key': AppEnv.googleMapsApiKey,
+          'X-Goog-FieldMask': 'location',
+        },
+      );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['status'] == 'OK') {
-          final location = data['result']['geometry']['location'];
-          return LatLng(location['lat'], location['lng']);
+        if (data['location'] != null) {
+          final loc = data['location'];
+          return LatLng(loc['latitude'], loc['longitude']);
         }
       }
     } catch (e) {
@@ -409,24 +407,10 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
   // Convert AppUser's SavedAddress to our model (now the same)
   SavedAddress _toSavedAddress(SavedAddress a) => a;
 
-  bool _isInHyderabad(LatLng pos) =>
-      pos.latitude >= _minLat &&
-      pos.latitude <= _maxLat &&
-      pos.longitude >= _minLng &&
-      pos.longitude <= _maxLng;
-
   void _validateLocation(LatLng pos) {
-    final zones = ref.read(serviceZonesProvider).valueOrNull ?? [];
-    _isOutsideHyderabad = !_isInHyderabad(pos);
-
-    // If already outside Hyderabad, no need to check specific zones
-    if (_isOutsideHyderabad) {
-      _isOutsideServiceZone = true;
-      return;
-    }
-
-    final zoneName = matchZone(zones, pos.latitude, pos.longitude);
-    _isOutsideServiceZone = zoneName == null;
+    final hexagons = ref.read(hexagonProvider).valueOrNull ?? [];
+    final hex = resolveHexagon(hexagons, pos.latitude, pos.longitude);
+    _isOutsideServiceZone = hex == null;
   }
 
   Future<void> _enterCurrentLocationMode() async {
@@ -1273,18 +1257,36 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
     }
   }
 
-  Set<Circle> _buildServiceAreaCircles() {
-    final zones = ref.watch(serviceZonesProvider).valueOrNull ?? [];
-    return zones.map((zone) {
-      return Circle(
-        circleId: CircleId(zone.name),
-        center: LatLng(zone.lat, zone.lng),
-        radius: zone.radiusMeters,
+  Set<Polygon> _buildServiceAreaHexagons() {
+    final hexagons = ref.watch(hexagonProvider).valueOrNull ?? [];
+    return hexagons.map((hex) {
+      return Polygon(
+        polygonId: PolygonId(hex.id),
+        points: _getHexagonPoints(hex),
         fillColor: bandiWalaYellow.withValues(alpha: 0.15),
         strokeColor: bandiWalaYellow,
         strokeWidth: 2,
       );
     }).toSet();
+  }
+
+  List<LatLng> _getHexagonPoints(Hexagon h) {
+    final points = <LatLng>[];
+    for (var i = 0; i < 6; i++) {
+      final angleDeg = 60.0 * i;
+      final angleRad = angleDeg * pi / 180;
+
+      // Regular flat-top hexagon vertices
+      final dx = h.sideLength * cos(angleRad);
+      final dy = h.sideLength * sin(angleRad);
+
+      // Convert meters offset back to lat/lng (consistent with resolver)
+      final dLat = dy / 110540;
+      final dLng = dx / (cos(h.lat * pi / 180) * 111320);
+
+      points.add(LatLng(h.lat + dLat, h.long + dLng));
+    }
+    return points;
   }
 
   Widget _buildMapView(BuildContext context) {
@@ -1321,7 +1323,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
             }
           },
           markers: {},
-          circles: _buildServiceAreaCircles(),
+          polygons: _buildServiceAreaHexagons(),
           myLocationEnabled: true,
           myLocationButtonEnabled: false,
           zoomControlsEnabled: false,
@@ -1586,7 +1588,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
                   ),
                 ),
 
-              if (_isOutsideHyderabad || _isOutsideServiceZone)
+              if (_isOutsideServiceZone)
                 Container(
                   margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                   padding: const EdgeInsets.symmetric(
@@ -1612,9 +1614,7 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          _isOutsideHyderabad
-                              ? 'We currently only serve Hyderabad. Please select a location within Hyderabad.'
-                              : 'We don\'t serve this specific area yet. Please select a location inside the yellow circles.',
+                          'We don\'t serve this specific area yet. Please select a location inside the yellow hexagons.',
                           style: TextStyle(
                             fontSize: 11,
                             color: isDark
@@ -1967,7 +1967,6 @@ class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
                           onPressed:
                               (_selectedPosition != null &&
                                   !_isFetchingLocation &&
-                                  !_isOutsideHyderabad &&
                                   !_isOutsideServiceZone)
                               ? _saveLocation
                               : null,
