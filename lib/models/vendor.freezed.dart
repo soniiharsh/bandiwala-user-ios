@@ -30,6 +30,7 @@ mixin _$Vendor {
   String get category => throw _privateConstructorUsedError;
   bool get isAvailable => throw _privateConstructorUsedError;
   bool get isPickupAvailable => throw _privateConstructorUsedError;
+  bool get isDeliveryAvailable => throw _privateConstructorUsedError;
   double get rating => throw _privateConstructorUsedError;
   DateTime? get createdAt => throw _privateConstructorUsedError;
   DateTime? get updatedAt => throw _privateConstructorUsedError;
@@ -58,6 +59,7 @@ abstract class $VendorCopyWith<$Res> {
     String category,
     bool isAvailable,
     bool isPickupAvailable,
+    bool isDeliveryAvailable,
     double rating,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -88,6 +90,7 @@ class _$VendorCopyWithImpl<$Res, $Val extends Vendor>
     Object? category = null,
     Object? isAvailable = null,
     Object? isPickupAvailable = null,
+    Object? isDeliveryAvailable = null,
     Object? rating = null,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
@@ -130,6 +133,10 @@ class _$VendorCopyWithImpl<$Res, $Val extends Vendor>
                 ? _value.isPickupAvailable
                 : isPickupAvailable // ignore: cast_nullable_to_non_nullable
                       as bool,
+            isDeliveryAvailable: null == isDeliveryAvailable
+                ? _value.isDeliveryAvailable
+                : isDeliveryAvailable // ignore: cast_nullable_to_non_nullable
+                      as bool,
             rating: null == rating
                 ? _value.rating
                 : rating // ignore: cast_nullable_to_non_nullable
@@ -166,6 +173,7 @@ abstract class _$$VendorImplCopyWith<$Res> implements $VendorCopyWith<$Res> {
     String category,
     bool isAvailable,
     bool isPickupAvailable,
+    bool isDeliveryAvailable,
     double rating,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -195,6 +203,7 @@ class __$$VendorImplCopyWithImpl<$Res>
     Object? category = null,
     Object? isAvailable = null,
     Object? isPickupAvailable = null,
+    Object? isDeliveryAvailable = null,
     Object? rating = null,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
@@ -237,6 +246,10 @@ class __$$VendorImplCopyWithImpl<$Res>
             ? _value.isPickupAvailable
             : isPickupAvailable // ignore: cast_nullable_to_non_nullable
                   as bool,
+        isDeliveryAvailable: null == isDeliveryAvailable
+            ? _value.isDeliveryAvailable
+            : isDeliveryAvailable // ignore: cast_nullable_to_non_nullable
+                  as bool,
         rating: null == rating
             ? _value.rating
             : rating // ignore: cast_nullable_to_non_nullable
@@ -267,6 +280,7 @@ class _$VendorImpl implements _Vendor {
     this.category = '',
     this.isAvailable = false,
     this.isPickupAvailable = false,
+    this.isDeliveryAvailable = false,
     this.rating = 4.2,
     this.createdAt,
     this.updatedAt,
@@ -300,6 +314,9 @@ class _$VendorImpl implements _Vendor {
   final bool isPickupAvailable;
   @override
   @JsonKey()
+  final bool isDeliveryAvailable;
+  @override
+  @JsonKey()
   final double rating;
   @override
   final DateTime? createdAt;
@@ -308,7 +325,7 @@ class _$VendorImpl implements _Vendor {
 
   @override
   String toString() {
-    return 'Vendor(id: $id, name: $name, phone: $phone, fcmToken: $fcmToken, imageUrl: $imageUrl, address: $address, category: $category, isAvailable: $isAvailable, isPickupAvailable: $isPickupAvailable, rating: $rating, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'Vendor(id: $id, name: $name, phone: $phone, fcmToken: $fcmToken, imageUrl: $imageUrl, address: $address, category: $category, isAvailable: $isAvailable, isPickupAvailable: $isPickupAvailable, isDeliveryAvailable: $isDeliveryAvailable, rating: $rating, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -330,6 +347,8 @@ class _$VendorImpl implements _Vendor {
                 other.isAvailable == isAvailable) &&
             (identical(other.isPickupAvailable, isPickupAvailable) ||
                 other.isPickupAvailable == isPickupAvailable) &&
+            (identical(other.isDeliveryAvailable, isDeliveryAvailable) ||
+                other.isDeliveryAvailable == isDeliveryAvailable) &&
             (identical(other.rating, rating) || other.rating == rating) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
@@ -350,6 +369,7 @@ class _$VendorImpl implements _Vendor {
     category,
     isAvailable,
     isPickupAvailable,
+    isDeliveryAvailable,
     rating,
     createdAt,
     updatedAt,
@@ -380,6 +400,7 @@ abstract class _Vendor implements Vendor {
     final String category,
     final bool isAvailable,
     final bool isPickupAvailable,
+    final bool isDeliveryAvailable,
     final double rating,
     final DateTime? createdAt,
     final DateTime? updatedAt,
@@ -405,6 +426,8 @@ abstract class _Vendor implements Vendor {
   bool get isAvailable;
   @override
   bool get isPickupAvailable;
+  @override
+  bool get isDeliveryAvailable;
   @override
   double get rating;
   @override

@@ -222,6 +222,36 @@ class CartNotifier extends StateNotifier<CartState> {
     _persist();
   }
 
+  void removeVendor(String vendorId) {
+    final current = Map<String, VendorCart>.from(state.cartByVendor);
+    if (current.containsKey(vendorId)) {
+      current.remove(vendorId);
+      state = CartState(cartByVendor: current);
+      _persist();
+    }
+  }
+
+  void removeItems(List<String> itemIds) {
+    final current = Map<String, VendorCart>.from(state.cartByVendor);
+    bool changed = false;
+    current.forEach((vendorId, vendorCart) {
+      final newItems = vendorCart.items.where((i) => !itemIds.contains(i.id)).toList();
+      if (newItems.length != vendorCart.items.length) {
+        if (newItems.isEmpty) {
+          current.remove(vendorId);
+        } else {
+          current[vendorId] = vendorCart.copyWith(items: newItems);
+        }
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      state = CartState(cartByVendor: current);
+      _persist();
+    }
+  }
+
   Future<void> clear() async {
     state = const CartState();
     final prefs = await SharedPreferences.getInstance();

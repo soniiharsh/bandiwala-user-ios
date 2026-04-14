@@ -303,15 +303,17 @@ class _CartPageState extends ConsumerState<CartPage> {
     });
     _selectedAddress ??= ref.read(activeAddressProvider);
 
-    // Collect provider-based availability
-    final Map<String, bool> itemAvailability = {};
-    final Map<String, bool> vendorOnlineStatus = {};
+    final Map<String, bool> vendorPickupSupport = {};
+    final Map<String, bool> vendorDeliverySupport = {};
 
     for (final vendorEntry in cart.cartByVendor.entries) {
       final vendorId = vendorEntry.key;
       final vendorAsync = ref.watch(vendorStreamProvider(vendorId));
-      vendorOnlineStatus[vendorId] =
-          vendorAsync.valueOrNull?.isAvailable ?? true;
+      final vendor = vendorAsync.valueOrNull;
+
+      vendorOnlineStatus[vendorId] = vendor?.isAvailable ?? true;
+      vendorPickupSupport[vendorId] = vendor?.isPickupAvailable ?? false;
+      vendorDeliverySupport[vendorId] = vendor?.isDeliveryAvailable ?? false;
 
       for (final item in vendorEntry.value.items) {
         final itemAsync = ref.watch(itemStreamProvider(item.id));
@@ -326,7 +328,29 @@ class _CartPageState extends ConsumerState<CartPage> {
     final hasVendorOffline = cart.cartByVendor.keys.any(
       (id) => vendorOnlineStatus[id] == false,
     );
+
+    // Fulfillment Compatibility
     final vendorIds = cart.cartByVendor.keys.toList();
+    final allSupportPickup =
+        vendorIds.isNotEmpty && vendorIds.every((id) => vendorPickupSupport[id] ?? false);
+    final allSupportDelivery =
+        vendorIds.isNotEmpty && vendorIds.every((id) => vendorDeliverySupport[id] ?? false);
+    final hasIncompatibleFulfillment =
+        vendorIds.isNotEmpty && !allSupportPickup && !allSupportDelivery;
+
+    // Determine which vendors to remove to resolve incompatibility
+    final deliveryOnlyIds =
+        vendorIds.where((id) => (vendorDeliverySupport[id] ?? false)).toList();
+    final pickupOnlyIds =
+        vendorIds.where((id) => (vendorPickupSupport[id] ?? false)).toList();
+    final bothSupportIds = vendorIds
+        .where((id) => (vendorDeliverySupport[id] ?? false) && (vendorPickupSupport[id] ?? false))
+        .toList();
+    final neitherSupportIds = vendorIds
+        .where((id) => !(vendorDeliverySupport[id] ?? false) && !(vendorPickupSupport[id] ?? false))
+        .toList();
+
+    final canCleanup = hasUnavailableItems || hasVendorOffline || hasIncompatibleFulfillment;
 
     final theme = Theme.of(context);
     return Scaffold(
@@ -378,28 +402,35 @@ class _CartPageState extends ConsumerState<CartPage> {
                       controller: _scrollController,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       children: [
-                        ...cart.cartByVendor.entries.map((entry) {
-                          final isVendorOnline =
-                              vendorOnlineStatus[entry.key] ?? true;
-                          return VendorCartSection(
-                            vendorId: entry.key,
-                            vendorCart: entry.value,
-                            itemAvailability: itemAvailability,
-                            isVendorOnline: isVendorOnline,
-                            onQuantityChanged:
-                                (itemId, delta, {String? cartKey}) {
-                                  ref
-                                      .read(cartProvider.notifier)
-                                      .updateQuantity(
-                                        vendorId: entry.key,
-                                        itemId: itemId,
-                                        delta: delta,
-                                        cartKey: cartKey,
-                                      );
-                                },
-                            vendorTotal: cart.vendorTotal(entry.key),
-                          );
-                        }),
+                          ...cart.cartByVendor.entries.map((entry) {
+                            final isVendorOnline =
+                                vendorOnlineStatus[entry.key] ?? true;
+                            final supportsPickup =
+                                vendorPickupSupport[entry.key] ?? false;
+                            final supportsDelivery =
+                                vendorDeliverySupport[entry.key] ?? false;
+
+                            return VendorCartSection(
+                              vendorId: entry.key,
+                              vendorCart: entry.value,
+                              itemAvailability: itemAvailability,
+                              isVendorOnline: isVendorOnline,
+                              supportsPickup: supportsPickup,
+                              supportsDelivery: supportsDelivery,
+                              onQuantityChanged:
+                                  (itemId, delta, {String? cartKey}) {
+                                ref
+                                    .read(cartProvider.notifier)
+                                    .updateQuantity(
+                                      vendorId: entry.key,
+                                      itemId: itemId,
+                                      delta: delta,
+                                      cartKey: cartKey,
+                                    );
+                              },
+                              vendorTotal: cart.vendorTotal(entry.key),
+                            );
+                          }),
 
                         if (vendorIds.isNotEmpty) ...[
                           const SizedBox(height: 20),
@@ -423,7 +454,11 @@ class _CartPageState extends ConsumerState<CartPage> {
               _buildBottomBar(
                 hasUnavailableItems: hasUnavailableItems,
                 hasVendorOffline: hasVendorOffline,
+                hasIncompatibleFulfillment: hasIncompatibleFulfillment,
                 itemAvailability: itemAvailability,
+                vendorOnlineStatus: vendorOnlineStatus,
+                vendorDeliverySupport: vendorDeliverySupport,
+                vendorPickupSupport: vendorPickupSupport,
               ),
           ],
         ),
@@ -434,11 +469,18 @@ class _CartPageState extends ConsumerState<CartPage> {
   Widget _buildBottomBar({
     required bool hasUnavailableItems,
     required bool hasVendorOffline,
+    required bool hasIncompatibleFulfillment,
     required Map<String, bool> itemAvailability,
+    required Map<String, bool> vendorOnlineStatus,
+    required Map<String, bool> vendorDeliverySupport,
+    required Map<String, bool> vendorPickupSupport,
   }) {
     final cart = ref.read(cartProvider);
     final bool disableCheckout =
-        _selectedAddress == null || hasVendorOffline || hasUnavailableItems;
+        _selectedAddress == null ||
+        hasVendorOffline ||
+        hasUnavailableItems ||
+        hasIncompatibleFulfillment;
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -530,7 +572,7 @@ class _CartPageState extends ConsumerState<CartPage> {
             ),
 
           // Unavailable items strip
-          if (hasUnavailableItems && !hasVendorOffline)
+          if (hasUnavailableItems && !hasVendorOffline && !hasIncompatibleFulfillment)
             Padding(
               padding: const EdgeInsets.only(top: 8, bottom: 4),
               child: Container(
@@ -584,6 +626,84 @@ class _CartPageState extends ConsumerState<CartPage> {
                       ),
                     ),
                   ],
+                ),
+              ),
+            ),
+
+          // Incompatible fulfillment strip
+          if (hasIncompatibleFulfillment && !hasVendorOffline)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.blue.withValues(alpha: 0.15)
+                      : Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isDark ? Colors.blue.shade800 : Colors.blue.shade200,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: isDark ? Colors.blue.shade400 : Colors.blue.shade700,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Mixed fulfillment options in cart',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Cleanup Option
+          if (hasVendorOffline || hasUnavailableItems || hasIncompatibleFulfillment)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 4),
+              child: InkWell(
+                onTap: () => _showCleanupDialog(
+                  vendorOnlineStatus: vendorOnlineStatus,
+                  itemAvailability: itemAvailability,
+                  vendorDeliverySupport: vendorDeliverySupport,
+                  vendorPickupSupport: vendorPickupSupport,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.cleaning_services_rounded,
+                        size: 14,
+                        color: kBandiWalaYellow,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'CLEANUP CART TO CHECKOUT',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: kBandiWalaYellow,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -644,6 +764,8 @@ class _CartPageState extends ConsumerState<CartPage> {
                     ? 'Vendor Offline — Cannot Checkout'
                     : hasUnavailableItems
                     ? 'Remove Unavailable Items'
+                    : hasIncompatibleFulfillment
+                    ? 'Resolve Fulfillment Conflict'
                     : 'Proceed to Checkout',
                 style: const TextStyle(
                   fontSize: 16,
@@ -689,7 +811,104 @@ class _CartPageState extends ConsumerState<CartPage> {
       ),
     );
   }
+
+  void _showCleanupDialog({
+    required Map<String, bool> vendorOnlineStatus,
+    required Map<String, bool> itemAvailability,
+    required Map<String, bool> vendorDeliverySupport,
+    required Map<String, bool> vendorPickupSupport,
+  }) {
+    final cart = ref.read(cartProvider);
+    final vendorIds = cart.cartByVendor.keys.toList();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.cleaning_services_rounded, color: kBandiWalaYellow, size: 24),
+            const SizedBox(width: 12),
+            const Text('Cleanup Cart', style: TextStyle(fontWeight: FontWeight.w800)),
+          ],
+        ),
+        content: const Text(
+          'We will remove offline vendors, unavailable items, and resolve fulfillment conflicts so you can proceed to checkout.',
+          style: TextStyle(fontSize: 14, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: TextStyle(color: Colors.grey.shade600)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final itemsToRemove = <String>[];
+              final vendorsToRemove = <String>[];
+
+              // Determine dominant fulfillment method
+              int deliverySupportCount =
+                  vendorIds.where((id) => vendorDeliverySupport[id] ?? false).length;
+              int pickupSupportCount =
+                  vendorIds.where((id) => vendorPickupSupport[id] ?? false).length;
+
+              bool preferDelivery = deliverySupportCount >= pickupSupportCount;
+
+              for (final id in vendorIds) {
+                if (!(vendorOnlineStatus[id] ?? true)) {
+                  vendorsToRemove.add(id);
+                  continue;
+                }
+
+                if (preferDelivery && !(vendorDeliverySupport[id] ?? false)) {
+                  vendorsToRemove.add(id);
+                  continue;
+                }
+
+                if (!preferDelivery && !(vendorPickupSupport[id] ?? false)) {
+                  vendorsToRemove.add(id);
+                  continue;
+                }
+
+                // Check items in this vendor
+                final vc = cart.cartByVendor[id];
+                if (vc != null) {
+                  for (final item in vc.items) {
+                    if (!(itemAvailability[item.id] ?? true)) {
+                      itemsToRemove.add(item.id);
+                    }
+                  }
+                }
+              }
+
+              for (final vid in vendorsToRemove) {
+                ref.read(cartProvider.notifier).removeVendor(vid);
+              }
+              if (itemsToRemove.isNotEmpty) {
+                ref.read(cartProvider.notifier).removeItems(itemsToRemove);
+              }
+
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Cart cleaned up!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kBandiWalaYellow,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Confirm', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
 
 // ─── AddressSection ───────────────────────────────────────────────────────────
 
@@ -1169,12 +1388,17 @@ class VendorCartSection extends ConsumerWidget {
   onQuantityChanged;
   final double vendorTotal;
 
+  final bool supportsPickup;
+  final bool supportsDelivery;
+
   const VendorCartSection({
     super.key,
     required this.vendorId,
     required this.vendorCart,
     required this.itemAvailability,
     required this.isVendorOnline,
+    required this.supportsPickup,
+    required this.supportsDelivery,
     required this.onQuantityChanged,
     required this.vendorTotal,
   });
@@ -1252,7 +1476,19 @@ class VendorCartSection extends ConsumerWidget {
                             : Colors.deepOrange.shade700,
                       ),
                     ),
-                  ),
+                  )
+                else ...[
+                  if (supportsDelivery)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 6),
+                      child: Icon(Icons.delivery_dining_rounded, size: 16, color: Colors.green),
+                    ),
+                  if (supportsPickup)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 6),
+                      child: Icon(Icons.shopping_bag_outlined, size: 16, color: Colors.blue),
+                    ),
+                ],
               ],
             ),
           ),

@@ -325,17 +325,38 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
     }
   }
 
-  void _checkPickupSupport(List<Vendor> vendors) {
+  void _checkOrderTypeSupport(List<Vendor> vendors) {
     if (_pickupDialogShown) return;
 
     final cart = ref.read(cartProvider);
     final cartVendorIds = cart.cartByVendor.keys.toSet();
-    final cartVendors = vendors
-        .where((v) => cartVendorIds.contains(v.id))
-        .toList();
+    final cartVendors =
+        vendors.where((v) => cartVendorIds.contains(v.id)).toList();
 
-    if (cartVendors.length == cartVendorIds.length &&
-        cartVendors.every((v) => v.isPickupAvailable)) {
+    final allSupportPickup = cartVendors.length == cartVendorIds.length &&
+        cartVendors.every((v) => v.isPickupAvailable);
+    final allSupportDelivery = cartVendors.length == cartVendorIds.length &&
+        cartVendors.every((v) => v.isDeliveryAvailable);
+
+    // If only pickup is available, default to pickup
+    if (allSupportPickup && !allSupportDelivery) {
+      if (_selectedOrderType != 'pickup') {
+        Future.microtask(() => setState(() {
+              _selectedOrderType = 'pickup';
+              if (_selectedMethod == _PaymentMethod.cod) {
+                _selectedMethod = _PaymentMethod.online;
+              }
+            }));
+      }
+    }
+    // If only delivery is available, default to delivery (already default)
+    else if (!allSupportPickup && allSupportDelivery) {
+      if (_selectedOrderType != 'delivery') {
+        Future.microtask(() => setState(() => _selectedOrderType = 'delivery'));
+      }
+    }
+    // If both available, maybe show dialog if not shown yet
+    else if (allSupportPickup && allSupportDelivery && !_pickupDialogShown) {
       _pickupDialogShown = true;
       Future.microtask(() => _showOrderTypeDialog());
     }
@@ -375,22 +396,29 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
   @override
   Widget build(BuildContext context) {
-    final vendorsAsync = ref.watch(vendorsStreamProvider);
     vendorsAsync.whenData((vendors) {
-      _checkPickupSupport(vendors);
+      _checkOrderTypeSupport(vendors);
 
-      // Ensure we revert to delivery if any vendor no longer supports pickup
       final cart = ref.read(cartProvider);
       final cartVendorIds = cart.cartByVendor.keys.toSet();
-      final cartVendors = vendors
-          .where((v) => cartVendorIds.contains(v.id))
-          .toList();
-      final allSupportPickup =
-          cartVendors.length == cartVendorIds.length &&
-          cartVendors.every((v) => v.isPickupAvailable);
+      final cartVendors =
+          vendors.where((v) => cartVendorIds.contains(v.id)).toList();
 
+      final allSupportPickup = cartVendors.length == cartVendorIds.length &&
+          cartVendors.every((v) => v.isPickupAvailable);
+      final allSupportDelivery = cartVendors.length == cartVendorIds.length &&
+          cartVendors.every((v) => v.isDeliveryAvailable);
+
+      // Revert if current selection is no longer supported
       if (!allSupportPickup && _selectedOrderType == 'pickup') {
         Future.microtask(() => setState(() => _selectedOrderType = 'delivery'));
+      } else if (!allSupportDelivery && _selectedOrderType == 'delivery') {
+        Future.microtask(() => setState(() {
+              _selectedOrderType = 'pickup';
+              if (_selectedMethod == _PaymentMethod.cod) {
+                _selectedMethod = _PaymentMethod.online;
+              }
+            }));
       }
     });
 
@@ -492,8 +520,12 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         .where((v) => cartVendorIds.contains(v.id))
         .toList();
 
-    if (cartVendors.length != cartVendorIds.length ||
-        !cartVendors.every((v) => v.isPickupAvailable)) {
+    final allSupportPickup = cartVendors.length == cartVendorIds.length &&
+        cartVendors.every((v) => v.isPickupAvailable);
+    final allSupportDelivery = cartVendors.length == cartVendorIds.length &&
+        cartVendors.every((v) => v.isDeliveryAvailable);
+
+    if (!allSupportPickup && !allSupportDelivery) {
       return const SizedBox.shrink();
     }
 
@@ -508,81 +540,98 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           kBorderGrey,
           child: Row(
             children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => setState(() => _selectedOrderType = 'delivery'),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: _selectedOrderType == 'delivery'
-                          ? kBandiWalaYellow.withValues(alpha: 0.1)
-                          : null,
-                      borderRadius: const BorderRadius.horizontal(
-                        left: Radius.circular(12),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.delivery_dining,
-                          color: _selectedOrderType == 'delivery'
-                              ? kBandiWalaYellow
-                              : cs.onSurfaceVariant,
+              if (allSupportDelivery)
+                Expanded(
+                  child: InkWell(
+                    onTap: () =>
+                        setState(() => _selectedOrderType = 'delivery'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _selectedOrderType == 'delivery'
+                            ? kBandiWalaYellow.withValues(alpha: 0.1)
+                            : null,
+                        borderRadius: BorderRadius.horizontal(
+                          left: const Radius.circular(12),
+                          right: allSupportPickup
+                              ? Radius.zero
+                              : const Radius.circular(12),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Delivery',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.delivery_dining,
                             color: _selectedOrderType == 'delivery'
                                 ? kBandiWalaYellow
                                 : cs.onSurfaceVariant,
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 4),
+                          Text(
+                            'Delivery',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: _selectedOrderType == 'delivery'
+                                  ? kBandiWalaYellow
+                                  : cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Container(width: 1, height: 40, color: kBorderGrey),
-              Expanded(
-                child: InkWell(
-                  onTap: () => setState(() => _selectedOrderType = 'pickup'),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: _selectedOrderType == 'pickup'
-                          ? kBandiWalaYellow.withValues(alpha: 0.1)
-                          : null,
-                      borderRadius: const BorderRadius.horizontal(
-                        right: Radius.circular(12),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.shopping_bag_outlined,
-                          color: _selectedOrderType == 'pickup'
-                              ? kBandiWalaYellow
-                              : cs.onSurfaceVariant,
+              if (allSupportDelivery && allSupportPickup)
+                Container(width: 1, height: 40, color: kBorderGrey),
+              if (allSupportPickup)
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _selectedOrderType = 'pickup';
+                        if (_selectedMethod == _PaymentMethod.cod) {
+                          _selectedMethod = _PaymentMethod.online;
+                        }
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _selectedOrderType == 'pickup'
+                            ? kBandiWalaYellow.withValues(alpha: 0.1)
+                            : null,
+                        borderRadius: BorderRadius.horizontal(
+                          right: const Radius.circular(12),
+                          left: allSupportDelivery
+                              ? Radius.zero
+                              : const Radius.circular(12),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Pickup',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.shopping_bag_outlined,
                             color: _selectedOrderType == 'pickup'
                                 ? kBandiWalaYellow
                                 : cs.onSurfaceVariant,
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 4),
+                          Text(
+                            'Pickup',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: _selectedOrderType == 'pickup'
+                                  ? kBandiWalaYellow
+                                  : cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -1250,17 +1299,19 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
             kTextGrey: kTextGrey,
             kWhite: kWhite,
           ),
-          Divider(height: 1, color: kBorderGrey),
-          _methodTile(
-            method: _PaymentMethod.cod,
-            icon: Icons.money_rounded,
-            iconBg: Colors.green.shade900.withValues(alpha: 0.3),
-            iconColor: Colors.green.shade400,
-            title: 'Cash on Delivery',
-            subtitle: 'Pay in cash when your order arrives',
-            kTextGrey: kTextGrey,
-            kWhite: kWhite,
-          ),
+          if (_selectedOrderType != 'pickup') ...[
+            Divider(height: 1, color: kBorderGrey),
+            _methodTile(
+              method: _PaymentMethod.cod,
+              icon: Icons.money_rounded,
+              iconBg: Colors.green.shade900.withValues(alpha: 0.3),
+              iconColor: Colors.green.shade400,
+              title: 'Cash on Delivery',
+              subtitle: 'Pay in cash when your order arrives',
+              kTextGrey: kTextGrey,
+              kWhite: kWhite,
+            ),
+          ],
         ],
       ),
     );

@@ -16,6 +16,7 @@ _$VendorImpl _$$VendorImplFromJson(Map<String, dynamic> json) => _$VendorImpl(
   category: json['category'] as String? ?? '',
   isAvailable: json['isAvailable'] as bool? ?? false,
   isPickupAvailable: json['isPickupAvailable'] as bool? ?? false,
+  isDeliveryAvailable: json['isDeliveryAvailable'] as bool? ?? false,
   rating: (json['rating'] as num?)?.toDouble() ?? 4.2,
   createdAt: json['createdAt'] == null
       ? null
@@ -36,6 +37,7 @@ Map<String, dynamic> _$$VendorImplToJson(_$VendorImpl instance) =>
       'category': instance.category,
       'isAvailable': instance.isAvailable,
       'isPickupAvailable': instance.isPickupAvailable,
+      'isDeliveryAvailable': instance.isDeliveryAvailable,
       'rating': instance.rating,
       'createdAt': instance.createdAt?.toIso8601String(),
       'updatedAt': instance.updatedAt?.toIso8601String(),
