@@ -396,7 +396,11 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
   @override
   Widget build(BuildContext context) {
-    vendorsAsync.whenData((vendors) {
+    final vendorsAsync = ref.watch(vendorsStreamProvider);
+    final pricingAsync = ref.watch(pricingConfigProvider);
+
+    if (vendorsAsync.hasValue) {
+      final vendors = vendorsAsync.value!;
       _checkOrderTypeSupport(vendors);
 
       final cart = ref.read(cartProvider);
@@ -420,7 +424,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
               }
             }));
       }
-    });
+    }
 
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -449,7 +453,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
           child: Container(height: 1, color: kBorderGrey),
         ),
       ),
-      body: ref.watch(pricingConfigProvider).isLoading
+      body: (pricingAsync.isLoading || vendorsAsync.isLoading)
           ? const Center(
               child: CircularProgressIndicator(color: kBandiWalaYellow),
             )
