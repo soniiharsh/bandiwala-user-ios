@@ -96,7 +96,9 @@ class _CouponsPageState extends ConsumerState<CouponsPage> {
       );
     }
 
-    final globalCoupons = globalAsync.valueOrNull ?? [];
+    final globalCoupons = (globalAsync.valueOrNull ?? [])
+        .where((c) => c.couponType != 'free_delivery')
+        .toList();
     final redemptions = redemptionsAsync.valueOrNull ?? {};
 
     final Map<String, Coupon> vendorCouponMap = {};
@@ -105,7 +107,9 @@ class _CouponsPageState extends ConsumerState<CouponsPage> {
         vendorCouponMap[c.id] = c;
       }
     }
-    final vendorCoupons = vendorCouponMap.values.toList();
+    final vendorCoupons = vendorCouponMap.values
+        .where((c) => c.couponType != 'free_delivery')
+        .toList();
     final allEmpty = globalCoupons.isEmpty && vendorCoupons.isEmpty;
 
     return Scaffold(

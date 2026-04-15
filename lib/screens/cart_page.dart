@@ -98,7 +98,25 @@ class _CartPageState extends ConsumerState<CartPage> {
   }
 
   void _handlePlaceOrder() {
-    if (_selectedAddress == null) {
+    final cart = ref.read(cartProvider);
+    final vendorIds = cart.cartByVendor.keys.toList();
+
+    // Check if ALL vendors in the cart support delivery.
+    // We use the stream provider to get the latest data.
+    bool allSupportDelivery = true;
+    if (vendorIds.isEmpty) {
+      allSupportDelivery = false;
+    } else {
+      for (final vid in vendorIds) {
+        final v = ref.read(vendorStreamProvider(vid)).valueOrNull;
+        if (v == null || !v.isDeliveryAvailable) {
+          allSupportDelivery = false;
+          break;
+        }
+      }
+    }
+
+    if (allSupportDelivery && _selectedAddress == null) {
       _scrollToAddress();
       return;
     }
@@ -505,11 +523,12 @@ class _CartPageState extends ConsumerState<CartPage> {
 
                         const SizedBox(height: 20),
 
-                        AddressSection(
-                          key: _addressKey,
-                          selectedAddress: _selectedAddress,
-                          onTapLocation: _pickDeliveryLocation,
-                        ),
+                        if (allSupportDelivery)
+                          AddressSection(
+                            key: _addressKey,
+                            selectedAddress: _selectedAddress,
+                            onTapLocation: _pickDeliveryLocation,
+                          ),
 
                         const SizedBox(height: 120),
                       ],
@@ -548,8 +567,13 @@ class _CartPageState extends ConsumerState<CartPage> {
     required int deliveryOnlyCount,
   }) {
     final cart = ref.read(cartProvider);
+    final vendorIds = cart.cartByVendor.keys.toList();
+    final allSupportDelivery =
+        vendorIds.isNotEmpty &&
+        vendorIds.every((id) => vendorDeliverySupport[id] ?? false);
+
     final bool disableCheckout =
-        _selectedAddress == null ||
+        (allSupportDelivery && _selectedAddress == null) ||
         hasVendorOffline ||
         hasUnavailableItems ||
         hasIncompatibleFulfillment ||
@@ -855,7 +879,7 @@ class _CartPageState extends ConsumerState<CartPage> {
           const SizedBox(height: 12),
 
           // Delivering to indicator
-          if (_selectedAddress != null)
+          if (_selectedAddress != null && allSupportDelivery)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Row(
@@ -902,7 +926,7 @@ class _CartPageState extends ConsumerState<CartPage> {
                 ),
               ),
               child: Text(
-                _selectedAddress == null
+                _selectedAddress == null && allSupportDelivery
                     ? 'Select Delivery Address'
                     : hasVendorOffline
                     ? 'Vendor Offline — Cannot Checkout'
