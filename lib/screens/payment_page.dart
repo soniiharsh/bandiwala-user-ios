@@ -96,9 +96,12 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
 
   // ── Computed values ───────────────────────────────────────────────────────
 
-  bool get _isFreeDelivery =>
-      _appliedCoupon?['couponType'] == 'free_delivery' ||
-      _selectedOrderType == 'pickup';
+  bool get _isPickup => _selectedOrderType == 'pickup';
+
+  bool get _isCouponFreeDelivery =>
+      _appliedCoupon?['couponType'] == 'free_delivery';
+
+  bool get _isFreeDelivery => _isCouponFreeDelivery || _isPickup;
 
   double get _deliveryCharge => _isFreeDelivery ? 0.0 : _pricing.deliveryCharge;
 
@@ -852,8 +855,9 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         _couponDiscount > 0 &&
         _appliedCoupon != null &&
         _appliedCoupon!['couponType'] != 'free_delivery';
-    final totalSavings = _isFreeDelivery
-        ? _pricing.deliveryCharge
+
+    final totalSavings = _isCouponFreeDelivery
+        ? _pricing.deliveryCharge + _couponDiscount
         : _couponDiscount;
 
     return _card(
@@ -878,7 +882,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                     'Delivery Charge',
                     style: TextStyle(fontSize: 13, color: kTextGrey),
                   ),
-                  if (_isFreeDelivery) ...[
+                  if (_isCouponFreeDelivery && !_isPickup) ...[
                     const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -901,36 +905,46 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   ],
                 ],
               ),
-              _isFreeDelivery
-                  ? Row(
-                      children: [
-                        Text(
-                          '₹${_pricing.deliveryCharge.toStringAsFixed(0)}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: cs.onSurfaceVariant,
-                            decoration: TextDecoration.lineThrough,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'FREE',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.green.shade400,
-                          ),
-                        ),
-                      ],
-                    )
-                  : Text(
+              if (_isPickup)
+                Text(
+                  '₹0',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                  ),
+                )
+              else if (_isCouponFreeDelivery)
+                Row(
+                  children: [
+                    Text(
                       '₹${_pricing.deliveryCharge.toStringAsFixed(0)}',
                       style: TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: cs.onSurface,
+                        color: cs.onSurfaceVariant,
+                        decoration: TextDecoration.lineThrough,
                       ),
                     ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'FREE',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.green.shade400,
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Text(
+                  '₹${_pricing.deliveryCharge.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 10),
@@ -1088,7 +1102,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      _isFreeDelivery && _couponDiscount == 0
+                      _isCouponFreeDelivery && _couponDiscount == 0
                           ? "You're saving ₹${_pricing.deliveryCharge.toStringAsFixed(0)} on delivery!"
                           : 'Total savings: ₹${totalSavings.toStringAsFixed(0)} on this order',
                       style: TextStyle(
