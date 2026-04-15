@@ -34,17 +34,20 @@ enum OrderStatus {
 enum VendorOrderStatus {
   pending,
   accepted,
-  rejected;
+  rejected,
+  readyForPickup;
 
   String get value => switch (this) {
     VendorOrderStatus.pending => 'pending',
     VendorOrderStatus.accepted => 'accepted',
     VendorOrderStatus.rejected => 'rejected',
+    VendorOrderStatus.readyForPickup => 'ready_for_pickup',
   };
 
   static VendorOrderStatus fromValue(String value) => switch (value) {
     'accepted' => VendorOrderStatus.accepted,
     'rejected' => VendorOrderStatus.rejected,
+    'ready_for_pickup' => VendorOrderStatus.readyForPickup,
     _ => VendorOrderStatus.pending,
   };
 }
