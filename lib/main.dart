@@ -11,31 +11,26 @@ import 'firebase_options.dart';
 import 'screens/splash_page.dart';
 import 'services/notification_service.dart';
 import 'services/analytics_service.dart';
+import 'services/deep_link_service.dart';
 import 'core/theme/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load environment variables before anything else
   await dotenv.load(fileName: '.env');
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Disable reCAPTCHA / app verification in debug builds — must be set
-  // before App Check activates so it isn't overridden.
   if (kDebugMode) {
     await FirebaseAuth.instance.setSettings(
       appVerificationDisabledForTesting: true,
     );
   }
 
-  // Disable offline persistence so failures are visible when there's no internet
   FirebaseFirestore.instance.settings = const Settings(
     persistenceEnabled: false,
   );
 
-  // Skip App Check entirely in debug — it blocks phone auth even with
-  // appVerificationDisabledForTesting set.
   if (!kDebugMode) {
     try {
       print('DEBUG: Activating Firebase App Check');
@@ -46,7 +41,6 @@ Future<void> main() async {
     } catch (_) {}
   }
 
-  // Fire and forget — no await
   NotificationService().initialize();
   AnalyticsService.logAppOpen();
 
@@ -55,6 +49,8 @@ Future<void> main() async {
 
 class MyApp extends ConsumerWidget {
   const MyApp({super.key});
+
+  static final navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -65,6 +61,10 @@ class MyApp extends ConsumerWidget {
       _ => MediaQuery.platformBrightnessOf(context),
     };
 
+    // Init deep links once — foreground links work immediately,
+    // cold-start links wait until splash signals it's done.
+    DeepLinkService.init(navigatorKey);
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppTheme.systemUiStyle(brightness),
       child: MaterialApp(
@@ -73,6 +73,7 @@ class MyApp extends ConsumerWidget {
         darkTheme: AppTheme.dark,
         themeMode: themeMode,
         debugShowCheckedModeBanner: false,
+        navigatorKey: navigatorKey,
         navigatorObservers: [AnalyticsService.observer],
         home: const SplashPage(),
       ),

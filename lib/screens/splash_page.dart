@@ -1,4 +1,5 @@
 import 'package:bandiwala_user/core/db_collections.dart';
+import 'package:bandiwala_user/services/deep_link_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
@@ -152,6 +153,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
   }
 
   void _navigate(AppUser? user) {
+    DeepLinkService.onSplashComplete();
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => user != null ? const NavPage() : const LoginPage(),
