@@ -1,36 +1,37 @@
-// payment_page.dart
-
+import 'package:bandiwala_user/providers/pricing_config_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:razorpay_flutter/razorpay_flutter.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'cart_store.dart';
+import '../providers/cart_provider.dart';
+import '../providers/coupons_provider.dart';
+import '../models/order.dart';
+import '../models/order_status.dart';
+import '../models/app_user.dart';
+import '../services/payment_service.dart';
 import 'payment_success_page.dart';
-import 'location_picker_page.dart';
+import 'coupons_page.dart';
+import '../core/theme/theme.dart';
+import '../core/navigation/app_page_route.dart';
 
-const kBandiwalaYellow = Color(0xFFFFC107);
-const kWhite = Color(0xFFFFFFFF);
-const kBorderGrey = Color(0xFFE5E7EB);
-const kTextGrey = Color(0xFF6B7280);
-const kBgGrey = Color(0xFFF9FAFB);
+import '../models/vendor.dart';
+import '../providers/vendors_provider.dart';
 
-// ─── Tax Constants ────────────────────────────────────────────────────────────
+const kBandiWalaYellow = AppColors.primary;
+
+// ─── Pricing Config Model ─────────────────────────────────────────────────────
 
 const double kFoodTaxPercent = 5.0;
 const double kDeliveryTaxPercent = 18.0;
 const double kPlatformFeeTaxPercent = 18.0;
 
-// ─── Pricing Config Model ─────────────────────────────────────────────────────
-
-class _PricingConfig {
+class PricingConfig {
   final double deliveryCharge;
   final double platformFee;
-  // taxPercent kept for Firestore compat but individual rates are constants above
   final double foodTaxPercent;
   final double deliveryTaxPercent;
   final double platformFeeTaxPercent;
 
-  const _PricingConfig({
+  const PricingConfig({
     required this.deliveryCharge,
     required this.platformFee,
     this.foodTaxPercent = kFoodTaxPercent,
@@ -38,10 +39,10 @@ class _PricingConfig {
     this.platformFeeTaxPercent = kPlatformFeeTaxPercent,
   });
 
-  factory _PricingConfig.defaults() =>
-      const _PricingConfig(deliveryCharge: 29, platformFee: 10);
+  factory PricingConfig.defaults() =>
+      const PricingConfig(deliveryCharge: 29, platformFee: 10);
 
-  factory _PricingConfig.fromMap(Map<String, dynamic> map) => _PricingConfig(
+  factory PricingConfig.fromMap(Map<String, dynamic> map) => PricingConfig(
     deliveryCharge: (map['deliveryCharge'] ?? 29).toDouble(),
     platformFee: (map['platformFee'] ?? 10).toDouble(),
     foodTaxPercent: (map['foodTaxPercent'] ?? kFoodTaxPercent).toDouble(),
@@ -54,524 +55,400 @@ class _PricingConfig {
 
 // ─── PaymentPage ──────────────────────────────────────────────────────────────
 
-class PaymentPage extends StatefulWidget {
+class PaymentPage extends ConsumerStatefulWidget {
   final double itemsTotal;
-  final SavedLocation? deliveryLocation;
-  final Map<String, dynamic>? appliedCoupon;
-  final double couponDiscount;
+  final SavedAddress? deliveryLocation;
 
   const PaymentPage({
     super.key,
     required this.itemsTotal,
     this.deliveryLocation,
-    this.appliedCoupon,
-    this.couponDiscount = 0,
   });
 
   @override
-  State<PaymentPage> createState() => _PaymentPageState();
+  ConsumerState<PaymentPage> createState() => _PaymentPageState();
 }
 
 enum _PaymentMethod { online, cod }
 
-class _PaymentPageState extends State<PaymentPage> {
-  late Razorpay _razorpay;
+class _PaymentPageState extends ConsumerState<PaymentPage> {
+  late PaymentService _paymentService;
   bool _isProcessing = false;
-  bool _isLoadingPricing = true;
   bool _taxBreakdownExpanded = false;
   _PaymentMethod _selectedMethod = _PaymentMethod.online;
 
-  _PricingConfig _pricing = _PricingConfig.defaults();
+  Map<String, dynamic>? _appliedCoupon;
+  double _couponDiscount = 0;
+  // vendorId of the applied coupon — "" means global
+  String _couponVendorId = '';
 
-  // ── Computed values ────────────────────────────────────────────────────────
+  String _selectedOrderType = 'delivery';
+  bool _pickupDialogShown = false;
 
-  bool get _isFreeDelivery =>
-      widget.appliedCoupon != null &&
-      (widget.appliedCoupon!['couponType'] == 'freeDelivery' ||
-          widget.appliedCoupon!['couponType'] == 'free_delivery');
+  // ── Pricing ───────────────────────────────────────────────────────────────
+
+  PricingConfig get _pricing {
+    final data = ref.watch(pricingConfigProvider).valueOrNull ?? {};
+    return data.isEmpty
+        ? PricingConfig.defaults()
+        : PricingConfig.fromMap(data);
+  }
+
+  // ── Computed values ───────────────────────────────────────────────────────
+
+  bool get _isPickup => _selectedOrderType == 'pickup';
+
+  bool get _isCouponFreeDelivery =>
+      _appliedCoupon?['couponType'] == 'free_delivery';
+
+  bool get _isFreeDelivery => _isCouponFreeDelivery || _isPickup;
 
   double get _deliveryCharge => _isFreeDelivery ? 0.0 : _pricing.deliveryCharge;
 
   double get _platformFee => _pricing.platformFee;
 
-  // ── Split tax getters ──────────────────────────────────────────────────────
   double get _foodTax => widget.itemsTotal * (_pricing.foodTaxPercent / 100);
 
-  double get _deliveryTax =>
-      _deliveryCharge * (_pricing.deliveryTaxPercent / 100);
+  double get _deliveryTax => _selectedOrderType == 'pickup'
+      ? 0.0
+      : _deliveryCharge * (_pricing.deliveryTaxPercent / 100);
 
   double get _platformFeeTax =>
       _platformFee * (_pricing.platformFeeTaxPercent / 100);
 
   double get _totalTaxAmount => _foodTax + _deliveryTax + _platformFeeTax;
 
-  // ── Grand total ────────────────────────────────────────────────────────────
   double get _grandTotal {
-    final discountToApply = _isFreeDelivery ? 0.0 : widget.couponDiscount;
+    final discount = _isFreeDelivery ? 0.0 : _couponDiscount;
     return widget.itemsTotal +
         _deliveryCharge +
         _platformFee +
         _totalTaxAmount -
-        discountToApply;
+        discount;
   }
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
-    _razorpay = Razorpay();
-    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
-    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
-    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
-    _fetchPricingConfig();
+    _paymentService = PaymentService(
+      buildOrder: _buildOrder,
+      onSuccess: _onOrderSuccess,
+      onError: _onOrderError,
+    );
   }
 
   @override
   void dispose() {
-    _razorpay.clear();
+    _paymentService.dispose();
     super.dispose();
   }
 
-  // ── Fetch pricing ──────────────────────────────────────────────────────────
+  // ── Order builder (snapshot of current state) ─────────────────────────────
 
-  Future<void> _fetchPricingConfig() async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('pricing_config')
-          .doc('defaults')
-          .get();
-      if (doc.exists && doc.data() != null) {
-        if (mounted) {
-          setState(() {
-            _pricing = _PricingConfig.fromMap(doc.data()!);
-            _isLoadingPricing = false;
-          });
+  AppOrder _buildOrder() {
+    final user = FirebaseAuth.instance.currentUser;
+    final cart = ref.read(cartProvider);
+    final loc = widget.deliveryLocation!;
+
+    final List<String> vendorIds = [];
+    final Map<String, VendorOrder> itemsByVendor = {};
+
+    for (final entry in cart.cartByVendor.entries) {
+      vendorIds.add(entry.key);
+      itemsByVendor[entry.key] = VendorOrder(
+        vendorName: entry.value.vendorName,
+        items: {
+          for (final item in entry.value.items)
+            item.id: OrderItem(
+              name: item.name,
+              price: item.totalUnitPrice,
+              quantity: item.quantity,
+              selectedOption: item.selectedOption,
+              selectedAddons: item.selectedAddons,
+            ),
+        },
+      );
+    }
+
+    return AppOrder(
+      id: '',
+      userId: user?.uid ?? '',
+      customerPhone: loc.phone,
+      deliveryAddress: OrderDeliveryAddress.fromSavedAddress(loc),
+      itemsByVendor: itemsByVendor,
+      vendorIds: vendorIds,
+      paymentMethod: '',
+      paymentId: '',
+      deliveryFee: _deliveryCharge,
+      platformFee: _platformFee,
+      foodTax: _foodTax,
+      deliveryTax: _deliveryTax,
+      platformTax: _platformFeeTax > 0,
+      couponApplied: _appliedCoupon != null,
+      couponCode: _appliedCoupon?['couponCode'] ?? '',
+      couponType: _appliedCoupon?['couponType'] ?? '',
+      couponDiscount: _isFreeDelivery ? 0.0 : _couponDiscount,
+      couponMaxDiscountableAmount:
+          (_appliedCoupon?['maxDiscountableAmount'] ?? 0).toDouble(),
+      couponVendorId: _couponVendorId,
+      grandTotal: _grandTotal,
+      status: OrderStatus.orderCreated,
+      orderType: _selectedOrderType,
+    );
+  }
+
+  // ── Payment callbacks ─────────────────────────────────────────────────────
+
+  void _onOrderSuccess(String orderId) {
+    // Record coupon usage on successful order
+    if (_appliedCoupon != null) {
+      final couponId = _appliedCoupon!['id'] as String?;
+      if (couponId != null && couponId.isNotEmpty) {
+        incrementCouponUsage(couponId);
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid != null) {
+          recordCouponRedemption(userId: uid, couponId: couponId);
         }
-      } else {
-        if (mounted) setState(() => _isLoadingPricing = false);
       }
-    } catch (e) {
-      debugPrint('Pricing config fetch error: $e — using defaults');
-      if (mounted) setState(() => _isLoadingPricing = false);
+    }
+    ref.read(cartProvider.notifier).clear();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+      Navigator.pushReplacement(
+        context,
+        AppPageRoute(
+          type: PageTransitionType.scale,
+          builder: (_) => PaymentSuccessPage(
+            paymentId: orderId,
+            amount: _grandTotal,
+            orderId: orderId,
+          ),
+        ),
+      );
+    });
+  }
+
+  void _onOrderError(String message) {
+    if (!mounted) return;
+    setState(() => _isProcessing = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
+  // ── Coupon logic ──────────────────────────────────────────────────────────
+
+  double _calculateCouponDiscount() {
+    if (_appliedCoupon == null) return 0;
+    final type = _appliedCoupon!['couponType'] ?? '';
+    if (type == 'free_delivery') return 0.0;
+
+    final vendorId = _appliedCoupon!['vendorId'] ?? '';
+    final isVendorCoupon = vendorId.isNotEmpty;
+
+    // For vendor coupons, apply discount only to that vendor's subtotal
+    double base;
+    if (isVendorCoupon) {
+      final cart = ref.read(cartProvider);
+      base = cart.vendorTotal(vendorId);
+    } else {
+      base =
+          widget.itemsTotal + _deliveryCharge + _platformFee + _totalTaxAmount;
+    }
+
+    final discount = (_appliedCoupon!['discount'] ?? 0).toDouble();
+    final maxDiscountable = (_appliedCoupon!['maxDiscountableAmount'] ?? 0)
+        .toDouble();
+
+    if (type == 'flat_off') return discount.clamp(0, base);
+    if (type == 'discount') {
+      final pct = base * (discount / 100);
+      return maxDiscountable > 0
+          ? pct.clamp(0, maxDiscountable).toDouble()
+          : pct;
+    }
+    return 0;
+  }
+
+  Future<void> _showAllCoupons() async {
+    final cart = ref.read(cartProvider);
+    final selected = await Navigator.push<Map<String, dynamic>>(
+      context,
+      AppPageRoute(
+        type: PageTransitionType.slideUp,
+        builder: (_) => CouponsPage(
+          cartAmount: cart.grandTotal,
+          vendorSubtotals: {
+            for (final e in cart.cartByVendor.entries)
+              e.key: cart.vendorTotal(e.key),
+          },
+        ),
+      ),
+    );
+    if (selected != null && mounted) {
+      setState(() {
+        _appliedCoupon = selected;
+        _couponVendorId = selected['vendorId'] ?? '';
+        _couponDiscount = _calculateCouponDiscount();
+      });
     }
   }
 
-  // ── Razorpay ───────────────────────────────────────────────────────────────
+  void _removeCoupon() => setState(() {
+    _appliedCoupon = null;
+    _couponDiscount = 0;
+    _couponVendorId = '';
+  });
 
-  void _openRazorpay() {
+  // ── Actions ───────────────────────────────────────────────────────────────
+
+  void _handlePrimaryAction() {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
-
-    final options = {
-      'key': 'rzp_live_SIEw0ZGDGbPgTd',
-      'amount': (_grandTotal * 100).toInt(),
-      'name': 'Bandiwala',
-      'description': 'Street food delivery',
-      'prefill': {
-        'contact':
-            FirebaseAuth.instance.currentUser?.phoneNumber ?? '9999999999',
-        'email': 'customer@bandiwala.in',
-      },
-      'external': {
-        'wallets': ['paytm'],
-      },
-    };
-
-    try {
-      _razorpay.open(options);
-    } catch (e) {
-      debugPrint('Razorpay Error: $e');
-      setState(() => _isProcessing = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Payment failed to initialize')),
-        );
-      }
+    if (_selectedMethod == _PaymentMethod.cod) {
+      _showCodConfirmationDialog();
+    } else {
+      _paymentService.openRazorpay(_grandTotal);
     }
   }
-
-  // ── COD Confirmation Dialog ────────────────────────────────────────────────
 
   Future<void> _showCodConfirmationDialog() async {
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
+      builder: (ctx) => _CodConfirmDialog(grandTotal: _grandTotal),
+    );
+    if (confirmed == true) {
+      await _paymentService.placeCodOrder();
+    } else {
+      setState(() => _isProcessing = false);
+    }
+  }
+
+  void _checkOrderTypeSupport(List<Vendor> vendors) {
+    if (_pickupDialogShown) return;
+
+    final cart = ref.read(cartProvider);
+    final cartVendorIds = cart.cartByVendor.keys.toSet();
+    final cartVendors =
+        vendors.where((v) => cartVendorIds.contains(v.id)).toList();
+
+    final allSupportPickup = cartVendors.length == cartVendorIds.length &&
+        cartVendors.every((v) => v.isPickupAvailable);
+    final allSupportDelivery = cartVendors.length == cartVendorIds.length &&
+        cartVendors.every((v) => v.isDeliveryAvailable);
+
+    // If only pickup is available, default to pickup
+    if (allSupportPickup && !allSupportDelivery) {
+      if (_selectedOrderType != 'pickup') {
+        Future.microtask(() => setState(() {
+              _selectedOrderType = 'pickup';
+              if (_selectedMethod == _PaymentMethod.cod) {
+                _selectedMethod = _PaymentMethod.online;
+              }
+            }));
+      }
+    }
+    // If only delivery is available, default to delivery (already default)
+    else if (!allSupportPickup && allSupportDelivery) {
+      if (_selectedOrderType != 'delivery') {
+        Future.microtask(() => setState(() => _selectedOrderType = 'delivery'));
+      }
+    }
+    // If both available, maybe show dialog if not shown yet
+    else if (allSupportPickup && allSupportDelivery && !_pickupDialogShown) {
+      _pickupDialogShown = true;
+      Future.microtask(() => _showOrderTypeDialog());
+    }
+  }
+
+  Future<void> _showOrderTypeDialog() async {
+    final type = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.money_rounded,
-                color: Colors.green.shade600,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Confirm Cash on Delivery',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 12),
-            Text(
-              'You are placing an order with Cash on Delivery.',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: kBandiwalaYellow.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kBandiwalaYellow.withOpacity(0.3)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Amount to pay on delivery',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  Text(
-                    '₹${_grandTotal.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: kBandiwalaYellow,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.info_outline, size: 14, color: Colors.grey.shade500),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Please keep exact change ready. Our delivery partner will collect payment at your doorstep.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-          ],
-        ),
-        actionsPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 12,
+        title: const Text('Choose Delivery Option'),
+        content: const Text(
+          'All items in your cart are available for pickup. Would you like to pick up your order or have it delivered?',
         ),
         actions: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(color: Colors.grey.shade300),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(
-                      color: Colors.black54,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kBandiwalaYellow,
-                    foregroundColor: Colors.black87,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text(
-                    'Place Order',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                  ),
-                ),
-              ),
-            ],
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'delivery'),
+            child: const Text('Delivery'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, 'pickup'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kBandiWalaYellow,
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Pickup'),
           ),
         ],
       ),
     );
-
-    if (confirmed == true) await _placeCodOrder();
-  }
-
-  // ── COD ────────────────────────────────────────────────────────────────────
-
-  Future<void> _placeCodOrder() async {
-    if (_isProcessing) return;
-    setState(() => _isProcessing = true);
-
-    try {
-      final orderId = await _createOrderInFirestore(
-        paymentId: 'COD_${DateTime.now().millisecondsSinceEpoch}',
-        paymentMethod: 'cod',
-        status: 'order_created',
-      );
-      _clearCartSafely();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => PaymentSuccessPage(
-                paymentId: orderId,
-                amount: _grandTotal,
-                orderId: orderId,
-              ),
-            ),
-          );
-        }
-      });
-    } catch (e) {
-      debugPrint('COD Order Error: $e');
-      setState(() => _isProcessing = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to place order: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    if (type != null && mounted) {
+      setState(() => _selectedOrderType = type);
     }
   }
 
-  // ── Firestore order creation ───────────────────────────────────────────────
-
-  Future<String> _createOrderInFirestore({
-    required String paymentId,
-    required String paymentMethod,
-    required String status,
-  }) async {
-    final user = FirebaseAuth.instance.currentUser;
-    final customerPhone =
-        user?.phoneNumber ?? 'guest_${DateTime.now().millisecondsSinceEpoch}';
-    final orderId = 'ORD_${DateTime.now().millisecondsSinceEpoch}';
-
-    final Map<String, dynamic> itemsByVendor = {};
-    for (final entry in cartStore.cartByVendor.entries) {
-      final vendorId = entry.key;
-      double vendorSubtotal = 0;
-      final itemsCopy = entry.value.items.map((item) {
-        vendorSubtotal += item.price * item.quantity;
-        return {
-          'itemId': item.id,
-          'name': item.name,
-          'price': item.price,
-          'quantity': item.quantity,
-          'lineTotal': item.price * item.quantity,
-        };
-      }).toList();
-
-      itemsByVendor[vendorId] = {
-        'vendorName': entry.value.vendorName,
-        'items': itemsCopy,
-        'vendorSubtotal': vendorSubtotal,
-        'status': 'pending',
-        'orderReceivedAt': FieldValue.serverTimestamp(),
-        'statusUpdatedAt': FieldValue.serverTimestamp(),
-      };
-    }
-
-    final loc = widget.deliveryLocation;
-    final Map<String, dynamic> deliveryLocationMap = loc != null
-        ? {
-            'address': loc.address,
-            'latitude': loc.latitude,
-            'longitude': loc.longitude,
-            'houseNo': loc.houseNo ?? '',
-            'phone': loc.phone ?? '',
-            'label': loc.label ?? 'Other',
-            'geopoint': GeoPoint(loc.latitude, loc.longitude),
-          }
-        : {};
-
-    final orderData = {
-      'orderId': orderId,
-      'paymentId': paymentId,
-      'paymentMethod': paymentMethod,
-      'customerPhone': customerPhone,
-      'deliveryLocation': deliveryLocationMap,
-      'deliveryAddress': loc?.fullDisplay ?? 'Not provided',
-      'latitude': loc?.latitude,
-      'longitude': loc?.longitude,
-      'status': status,
-      'timestamp': FieldValue.serverTimestamp(),
-      'itemsTotal': widget.itemsTotal,
-      'deliveryCharge': _deliveryCharge,
-      'platformFee': _platformFee,
-      // Split tax stored in Firestore
-      'foodTaxPercent': _pricing.foodTaxPercent,
-      'deliveryTaxPercent': _pricing.deliveryTaxPercent,
-      'platformFeeTaxPercent': _pricing.platformFeeTaxPercent,
-      'foodTaxAmount': _foodTax,
-      'deliveryTaxAmount': _deliveryTax,
-      'platformFeeTaxAmount': _platformFeeTax,
-      'totalTaxAmount': _totalTaxAmount,
-      'couponDiscount': _isFreeDelivery ? 0.0 : widget.couponDiscount,
-      'grandTotal': _grandTotal,
-      'couponApplied': widget.appliedCoupon != null,
-      'couponCode': widget.appliedCoupon?['couponCode'] ?? '',
-      'couponType': widget.appliedCoupon?['couponType'] ?? '',
-      'freeDelivery': _isFreeDelivery,
-      'itemsByVendor': itemsByVendor,
-    };
-
-    await FirebaseFirestore.instance.collection('orders').add(orderData);
-    debugPrint(
-      '✅ Order: $orderId | $paymentMethod | Total: $_grandTotal | Lat: ${loc?.latitude}',
-    );
-    return orderId;
-  }
-
-  void _clearCartSafely() {
-    final vendorIds = List<String>.from(cartStore.cartByVendor.keys);
-    for (final vendorId in vendorIds) {
-      final vendorCart = cartStore.cartByVendor[vendorId];
-      if (vendorCart != null) {
-        final itemIds = List<String>.from(
-          vendorCart.items.map((item) => item.id),
-        );
-        for (final itemId in itemIds) {
-          cartStore.updateQuantity(
-            vendorId: vendorId,
-            itemId: itemId,
-            delta: -999,
-          );
-        }
-      }
-    }
-  }
-
-  // ── Razorpay callbacks ─────────────────────────────────────────────────────
-
-  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
-    final paymentId = response.paymentId ?? '';
-    if (paymentId.isEmpty) {
-      setState(() => _isProcessing = false);
-      return;
-    }
-    try {
-      final orderId = await _createOrderInFirestore(
-        paymentId: paymentId,
-        paymentMethod: 'online',
-        status: 'order_created',
-      );
-      _clearCartSafely();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (_) => PaymentSuccessPage(
-                paymentId: paymentId,
-                amount: _grandTotal,
-                orderId: orderId,
-              ),
-            ),
-          );
-        }
-      });
-    } catch (e) {
-      setState(() => _isProcessing = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Order error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _handlePaymentError(PaymentFailureResponse response) {
-    setState(() => _isProcessing = false);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Payment Failed: ${response.message ?? 'Unknown error'}',
-          ),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    }
-  }
-
-  void _handleExternalWallet(ExternalWalletResponse response) {
-    debugPrint('Wallet: ${response.walletName}');
-  }
-
-  void _handlePrimaryAction() {
-    if (_selectedMethod == _PaymentMethod.cod) {
-      _showCodConfirmationDialog();
-    } else {
-      _openRazorpay();
-    }
-  }
-
-  // ─── Build ─────────────────────────────────────────────────────────────────
+  // ─── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
+    final vendorsAsync = ref.watch(vendorsStreamProvider);
+    final pricingAsync = ref.watch(pricingConfigProvider);
+
+    if (vendorsAsync.hasValue) {
+      final vendors = vendorsAsync.value!;
+      _checkOrderTypeSupport(vendors);
+
+      final cart = ref.read(cartProvider);
+      final cartVendorIds = cart.cartByVendor.keys.toSet();
+      final cartVendors =
+          vendors.where((v) => cartVendorIds.contains(v.id)).toList();
+
+      final allSupportPickup = cartVendors.length == cartVendorIds.length &&
+          cartVendors.every((v) => v.isPickupAvailable);
+      final allSupportDelivery = cartVendors.length == cartVendorIds.length &&
+          cartVendors.every((v) => v.isDeliveryAvailable);
+
+      // Revert if current selection is no longer supported
+      if (!allSupportPickup && _selectedOrderType == 'pickup') {
+        Future.microtask(() => setState(() => _selectedOrderType = 'delivery'));
+      } else if (!allSupportDelivery && _selectedOrderType == 'delivery') {
+        Future.microtask(() => setState(() {
+              _selectedOrderType = 'pickup';
+              if (_selectedMethod == _PaymentMethod.cod) {
+                _selectedMethod = _PaymentMethod.online;
+              }
+            }));
+      }
+    }
+
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final kBgGrey = isDark ? cs.surface : const Color(0xFFF9FAFB);
+    final kWhite = isDark ? cs.surfaceContainerHighest : Colors.white;
+    final kBorderGrey = isDark ? cs.outlineVariant : const Color(0xFFE5E7EB);
+    final kTextGrey = isDark ? cs.onSurfaceVariant : const Color(0xFF6B7280);
+
     return Scaffold(
       backgroundColor: kBgGrey,
       appBar: AppBar(
         backgroundColor: kWhite,
         elevation: 0,
-        foregroundColor: Colors.black87,
+        foregroundColor: cs.onSurface,
         centerTitle: false,
-        title: const Text(
+        title: Text(
           'Checkout',
           style: TextStyle(
             fontSize: 19,
             fontWeight: FontWeight.w700,
-            color: Colors.black87,
+            color: cs.onSurface,
           ),
         ),
         bottom: PreferredSize(
@@ -579,9 +456,9 @@ class _PaymentPageState extends State<PaymentPage> {
           child: Container(height: 1, color: kBorderGrey),
         ),
       ),
-      body: _isLoadingPricing
+      body: (pricingAsync.isLoading || vendorsAsync.isLoading)
           ? const Center(
-              child: CircularProgressIndicator(color: kBandiwalaYellow),
+              child: CircularProgressIndicator(color: kBandiWalaYellow),
             )
           : Column(
               children: [
@@ -589,189 +466,332 @@ class _PaymentPageState extends State<PaymentPage> {
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                     children: [
-                      _sectionLabel('Order Summary'),
+                      _sectionLabel(kTextGrey, 'Order Summary'),
                       const SizedBox(height: 8),
-                      _orderSummaryCard(),
+                      _orderSummaryCard(kWhite, kBorderGrey),
                       const SizedBox(height: 16),
-                      if (widget.deliveryLocation != null) ...[
-                        _sectionLabel('Delivery To'),
-                        const SizedBox(height: 8),
-                        _addressCard(),
+                      if (vendorsAsync.hasValue) ...[
+                        _pickupOptionToggle(
+                          kWhite,
+                          kBorderGrey,
+                          vendorsAsync.value!,
+                        ),
                         const SizedBox(height: 16),
                       ],
-                      _sectionLabel('Bill Details'),
+                      if (_selectedOrderType == 'delivery' &&
+                          widget.deliveryLocation != null) ...[
+                        _sectionLabel(kTextGrey, 'Delivery To'),
+                        const SizedBox(height: 8),
+                        _addressCard(kWhite, kBorderGrey, kTextGrey),
+                        const SizedBox(height: 16),
+                      ],
+                      _sectionLabel(kTextGrey, 'Bill Details'),
                       const SizedBox(height: 8),
-                      _billDetailsCard(),
+                      _billDetailsCard(kWhite, kBorderGrey, kTextGrey, isDark),
                       const SizedBox(height: 16),
-                      _sectionLabel('Payment Method'),
+                      _sectionLabel(kTextGrey, 'Offers & Coupons'),
                       const SizedBox(height: 8),
-                      _paymentMethodCard(),
+                      _couponSection(kWhite, kBorderGrey),
+                      const SizedBox(height: 16),
+                      _sectionLabel(kTextGrey, 'Payment Method'),
+                      const SizedBox(height: 8),
+                      _paymentMethodCard(kWhite, kBorderGrey, kTextGrey),
                       const SizedBox(height: 100),
                     ],
                   ),
                 ),
-                _bottomBar(),
+                _bottomBar(kWhite, kBorderGrey, cs),
               ],
             ),
     );
   }
 
-  // ─── Section label ────────────────────────────────────────────────────────
+  Widget _sectionLabel(Color textGrey, String text) => Text(
+    text,
+    style: TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      color: textGrey,
+      letterSpacing: 0.5,
+    ),
+  );
 
-  Widget _sectionLabel(String text) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w700,
-        color: kTextGrey,
-        letterSpacing: 0.5,
-      ),
+  Widget _pickupOptionToggle(
+    Color kWhite,
+    Color kBorderGrey,
+    List<Vendor> vendors,
+  ) {
+    final cart = ref.read(cartProvider);
+    final cartVendorIds = cart.cartByVendor.keys.toSet();
+    final cartVendors = vendors
+        .where((v) => cartVendorIds.contains(v.id))
+        .toList();
+
+    final allSupportPickup = cartVendors.length == cartVendorIds.length &&
+        cartVendors.every((v) => v.isPickupAvailable);
+    final allSupportDelivery = cartVendors.length == cartVendorIds.length &&
+        cartVendors.every((v) => v.isDeliveryAvailable);
+
+    if (!allSupportPickup && !allSupportDelivery) {
+      return const SizedBox.shrink();
+    }
+
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionLabel(cs.onSurfaceVariant, 'Order Type'),
+        const SizedBox(height: 8),
+        _card(
+          kWhite,
+          kBorderGrey,
+          child: Row(
+            children: [
+              if (allSupportDelivery)
+                Expanded(
+                  child: InkWell(
+                    onTap: () =>
+                        setState(() => _selectedOrderType = 'delivery'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _selectedOrderType == 'delivery'
+                            ? kBandiWalaYellow.withValues(alpha: 0.1)
+                            : null,
+                        borderRadius: BorderRadius.horizontal(
+                          left: const Radius.circular(12),
+                          right: allSupportPickup
+                              ? Radius.zero
+                              : const Radius.circular(12),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.delivery_dining,
+                            color: _selectedOrderType == 'delivery'
+                                ? kBandiWalaYellow
+                                : cs.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Delivery',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: _selectedOrderType == 'delivery'
+                                  ? kBandiWalaYellow
+                                  : cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              if (allSupportDelivery && allSupportPickup)
+                Container(width: 1, height: 40, color: kBorderGrey),
+              if (allSupportPickup)
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _selectedOrderType = 'pickup';
+                        if (_selectedMethod == _PaymentMethod.cod) {
+                          _selectedMethod = _PaymentMethod.online;
+                        }
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _selectedOrderType == 'pickup'
+                            ? kBandiWalaYellow.withValues(alpha: 0.1)
+                            : null,
+                        borderRadius: BorderRadius.horizontal(
+                          right: const Radius.circular(12),
+                          left: allSupportDelivery
+                              ? Radius.zero
+                              : const Radius.circular(12),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.shopping_bag_outlined,
+                            color: _selectedOrderType == 'pickup'
+                                ? kBandiWalaYellow
+                                : cs.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Pickup',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: _selectedOrderType == 'pickup'
+                                  ? kBandiWalaYellow
+                                  : cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
-  // ─── Order Summary ────────────────────────────────────────────────────────
-
-  Widget _orderSummaryCard() {
-    final vendors = cartStore.cartByVendor.entries.toList();
-    return Container(
-      decoration: BoxDecoration(
-        color: kWhite,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kBorderGrey),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+  Widget _orderSummaryCard(Color kWhite, Color kBorderGrey) {
+    final cs = Theme.of(context).colorScheme;
+    final cart = ref.watch(cartProvider);
+    final vendors = cart.cartByVendor.entries.toList();
+    return _card(
+      kWhite,
+      kBorderGrey,
       child: Column(
-        children: [
-          ...vendors.asMap().entries.map((entry) {
-            final idx = entry.key;
-            final e = entry.value;
-            final isLast = idx == vendors.length - 1;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: kBandiwalaYellow.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.store_rounded,
-                          size: 15,
-                          color: kBandiwalaYellow,
+        children: vendors.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final e = entry.value;
+          final isLast = idx == vendors.length - 1;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: kBandiWalaYellow.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.store_rounded,
+                        size: 15,
+                        color: kBandiWalaYellow,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        e.value.vendorName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                    ),
+                  ],
+                ),
+              ),
+              ...e.value.items.map((item) {
+                // Build customization label
+                final List<String> parts = [];
+                if (item.selectedOption != null) {
+                  parts.add(item.selectedOption!['name'] ?? '');
+                }
+                for (final addon in item.selectedAddons) {
+                  parts.add(addon['name'] ?? '');
+                }
+                final customLabel = parts.where((s) => s.isNotEmpty).join(', ');
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.only(right: 8, top: 5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                        ),
+                      ),
                       Expanded(
-                        child: Text(
-                          e.value.vendorName,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${item.name}  ×${item.quantity}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                            if (customLabel.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 1),
+                                child: Text(
+                                  customLabel,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: cs.onSurfaceVariant,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        '₹${(item.totalUnitPrice * item.quantity).toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
-                ),
-                ...e.value.items.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          margin: const EdgeInsets.only(right: 8, top: 2),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.grey.shade400,
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            '${item.name}  ×${item.quantity}',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          '₹${(item.price * item.quantity).toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                );
+              }),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'Subtotal: ₹${cart.vendorTotal(e.key).toStringAsFixed(0)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      'Subtotal: ₹${cartStore.vendorTotal(e.key).toStringAsFixed(0)}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                if (!isLast) Divider(height: 1, color: Colors.grey.shade100),
-              ],
-            );
-          }),
-        ],
+              ),
+              if (!isLast) Divider(height: 1, color: cs.outlineVariant),
+            ],
+          );
+        }).toList(),
       ),
     );
   }
 
-  // ─── Address Card ─────────────────────────────────────────────────────────
-
-  Widget _addressCard() {
+  Widget _addressCard(Color kWhite, Color kBorderGrey, Color kTextGrey) {
+    final cs = Theme.of(context).colorScheme;
     final loc = widget.deliveryLocation!;
-    return Container(
+    return _card(
+      kWhite,
+      kBorderGrey,
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: kWhite,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kBorderGrey),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.green.shade50,
+              color: Colors.green.shade900.withValues(alpha: 0.3),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.location_on,
-              color: Colors.green.shade600,
+              color: Colors.green.shade400,
               size: 18,
             ),
           ),
@@ -780,7 +800,7 @@ class _PaymentPageState extends State<PaymentPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Delivering to',
                   style: TextStyle(
                     fontSize: 12,
@@ -791,10 +811,11 @@ class _PaymentPageState extends State<PaymentPage> {
                 const SizedBox(height: 3),
                 Text(
                   loc.fullDisplay,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     height: 1.4,
+                    color: cs.onSurface,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -803,14 +824,14 @@ class _PaymentPageState extends State<PaymentPage> {
                     Icon(
                       Icons.my_location,
                       size: 11,
-                      color: Colors.grey.shade500,
+                      color: cs.onSurfaceVariant,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       '${loc.latitude.toStringAsFixed(6)}, ${loc.longitude.toStringAsFixed(6)}',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.grey.shade500,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -823,41 +844,35 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── Bill Details Card ────────────────────────────────────────────────────
-
-  Widget _billDetailsCard() {
+  Widget _billDetailsCard(
+    Color kWhite,
+    Color kBorderGrey,
+    Color kTextGrey,
+    bool isDark,
+  ) {
+    final cs = Theme.of(context).colorScheme;
     final hasCouponDiscount =
-        widget.couponDiscount > 0 &&
-        widget.appliedCoupon != null &&
-        widget.appliedCoupon!['couponType'] != 'freeDelivery' &&
-        widget.appliedCoupon!['couponType'] != 'free_delivery';
+        _couponDiscount > 0 &&
+        _appliedCoupon != null &&
+        _appliedCoupon!['couponType'] != 'free_delivery';
 
-    final totalSavings = _isFreeDelivery
-        ? _pricing.deliveryCharge
-        : widget.couponDiscount;
+    final totalSavings = _isCouponFreeDelivery
+        ? _pricing.deliveryCharge + _couponDiscount
+        : _couponDiscount;
 
-    return Container(
+    return _card(
+      kWhite,
+      kBorderGrey,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: kWhite,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kBorderGrey),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Items Total
-          _billRow('Items Total', '₹${widget.itemsTotal.toStringAsFixed(0)}'),
+          _billRow(
+            'Items Total',
+            '₹${widget.itemsTotal.toStringAsFixed(0)}',
+            cs: cs,
+          ),
           const SizedBox(height: 10),
-
-          // Delivery Charge
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -865,9 +880,9 @@ class _PaymentPageState extends State<PaymentPage> {
                 children: [
                   Text(
                     'Delivery Charge',
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                    style: TextStyle(fontSize: 13, color: kTextGrey),
                   ),
-                  if (_isFreeDelivery) ...[
+                  if (_isCouponFreeDelivery && !_isPickup) ...[
                     const SizedBox(width: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -875,14 +890,14 @@ class _PaymentPageState extends State<PaymentPage> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50,
+                        color: Colors.green.shade900.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        'FREE via ${widget.appliedCoupon?['couponCode'] ?? 'coupon'}',
+                        'FREE via ${_appliedCoupon?['couponCode'] ?? 'coupon'}',
                         style: TextStyle(
                           fontSize: 10,
-                          color: Colors.green.shade700,
+                          color: Colors.green.shade400,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -890,48 +905,56 @@ class _PaymentPageState extends State<PaymentPage> {
                   ],
                 ],
               ),
-              _isFreeDelivery
-                  ? Row(
-                      children: [
-                        Text(
-                          '₹${_pricing.deliveryCharge.toStringAsFixed(0)}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade400,
-                            decoration: TextDecoration.lineThrough,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'FREE',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.green.shade700,
-                          ),
-                        ),
-                      ],
-                    )
-                  : Text(
+              if (_isPickup)
+                Text(
+                  '₹0',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                  ),
+                )
+              else if (_isCouponFreeDelivery)
+                Row(
+                  children: [
+                    Text(
                       '₹${_pricing.deliveryCharge.toStringAsFixed(0)}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                        color: cs.onSurfaceVariant,
+                        decoration: TextDecoration.lineThrough,
                       ),
                     ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'FREE',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.green.shade400,
+                      ),
+                    ),
+                  ],
+                )
+              else
+                Text(
+                  '₹${_pricing.deliveryCharge.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 10),
-
-          // Platform Fee
           _billRow(
             'Platform Fee',
             '₹${_platformFee.toStringAsFixed(0)}',
-            labelColor: Colors.grey.shade700,
+            labelColor: kTextGrey,
+            cs: cs,
           ),
           const SizedBox(height: 10),
-
-          // ── Taxes Section (expandable breakdown) ──────────────────────────
           GestureDetector(
             onTap: () =>
                 setState(() => _taxBreakdownExpanded = !_taxBreakdownExpanded),
@@ -942,10 +965,7 @@ class _PaymentPageState extends State<PaymentPage> {
                   children: [
                     Text(
                       'Taxes & Charges',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey.shade700,
-                      ),
+                      style: TextStyle(fontSize: 13, color: kTextGrey),
                     ),
                     const SizedBox(width: 4),
                     Icon(
@@ -953,22 +973,21 @@ class _PaymentPageState extends State<PaymentPage> {
                           ? Icons.keyboard_arrow_up
                           : Icons.keyboard_arrow_down,
                       size: 16,
-                      color: Colors.grey.shade500,
+                      color: cs.onSurfaceVariant,
                     ),
                   ],
                 ),
                 Text(
                   '₹${_totalTaxAmount.toStringAsFixed(0)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
                   ),
                 ),
               ],
             ),
           ),
-
-          // ── Expandable tax breakdown ───────────────────────────────────
           AnimatedCrossFade(
             duration: const Duration(milliseconds: 200),
             crossFadeState: _taxBreakdownExpanded
@@ -978,41 +997,34 @@ class _PaymentPageState extends State<PaymentPage> {
               margin: const EdgeInsets.only(top: 8),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: isDark ? cs.surface : Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: cs.outlineVariant),
               ),
               child: Column(
                 children: [
-                  _taxBreakdownRow(
-                    label: 'GST on Food',
-                    percent: _pricing.foodTaxPercent,
-                    amount: _foodTax,
-                    base: widget.itemsTotal,
-                  ),
+                  _taxRow('GST on Food', _pricing.foodTaxPercent, _foodTax, cs),
                   if (!_isFreeDelivery) ...[
                     const SizedBox(height: 6),
-                    _taxBreakdownRow(
-                      label: 'GST on Delivery',
-                      percent: _pricing.deliveryTaxPercent,
-                      amount: _deliveryTax,
-                      base: _deliveryCharge,
+                    _taxRow(
+                      'GST on Delivery',
+                      _pricing.deliveryTaxPercent,
+                      _deliveryTax,
+                      cs,
                     ),
                   ],
                   const SizedBox(height: 6),
-                  _taxBreakdownRow(
-                    label: 'GST on Platform Fee',
-                    percent: _pricing.platformFeeTaxPercent,
-                    amount: _platformFeeTax,
-                    base: _platformFee,
+                  _taxRow(
+                    'GST on Platform Fee',
+                    _pricing.platformFeeTaxPercent,
+                    _platformFeeTax,
+                    cs,
                   ),
                 ],
               ),
             ),
             secondChild: const SizedBox.shrink(),
           ),
-
-          // Coupon Discount
           if (hasCouponDiscount) ...[
             const SizedBox(height: 10),
             Row(
@@ -1023,62 +1035,61 @@ class _PaymentPageState extends State<PaymentPage> {
                     Icon(
                       Icons.local_offer_outlined,
                       size: 13,
-                      color: Colors.green.shade600,
+                      color: Colors.green.shade400,
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      widget.appliedCoupon!['couponCode'] ?? 'Coupon',
+                      _appliedCoupon!['couponCode'] ?? 'Coupon',
                       style: TextStyle(
                         fontSize: 13,
-                        color: Colors.green.shade700,
+                        color: Colors.green.shade400,
                       ),
                     ),
                   ],
                 ),
                 Text(
-                  '-₹${widget.couponDiscount.toStringAsFixed(0)}',
+                  '-₹${_couponDiscount.toStringAsFixed(0)}',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: Colors.green.shade700,
+                    color: Colors.green.shade400,
                   ),
                 ),
               ],
             ),
           ],
-
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Divider(height: 1, color: Colors.grey.shade200),
+            child: Divider(height: 1, color: cs.outlineVariant),
           ),
-
-          // Grand Total
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 'To Pay',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: cs.onSurface,
+                ),
               ),
               Text(
                 '₹${_grandTotal.toStringAsFixed(0)}',
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: kBandiwalaYellow,
+                  color: kBandiWalaYellow,
                 ),
               ),
             ],
           ),
-
-          // Savings Strip
           if (totalSavings > 0) ...[
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: Colors.green.shade900.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -1086,17 +1097,17 @@ class _PaymentPageState extends State<PaymentPage> {
                   Icon(
                     Icons.celebration,
                     size: 14,
-                    color: Colors.green.shade700,
+                    color: Colors.green.shade400,
                   ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      _isFreeDelivery && widget.couponDiscount == 0
+                      _isCouponFreeDelivery && _couponDiscount == 0
                           ? "You're saving ₹${_pricing.deliveryCharge.toStringAsFixed(0)} on delivery!"
                           : 'Total savings: ₹${totalSavings.toStringAsFixed(0)} on this order',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.green.shade800,
+                        color: Colors.green.shade400,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1110,70 +1121,215 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── Tax Breakdown Row ────────────────────────────────────────────────────
-
-  Widget _taxBreakdownRow({
-    required String label,
-    required double percent,
-    required double amount,
-    required double base,
-  }) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Text(
-            '$label (${percent.toStringAsFixed(0)}%)',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-          ),
-        ),
-        Text(
-          '₹${amount.toStringAsFixed(2)}',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey.shade700,
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ─── Payment Method Card ──────────────────────────────────────────────────
-
-  Widget _paymentMethodCard() {
-    return Container(
+  Widget _couponSection(Color kWhite, Color kBorderGrey) {
+    final cs = Theme.of(context).colorScheme;
+    final hasApplied = _appliedCoupon != null;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
       decoration: BoxDecoration(
         color: kWhite,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kBorderGrey),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+        border: Border.all(
+          color: hasApplied ? Colors.green.shade600 : kBorderGrey,
+          width: hasApplied ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: _showAllCoupons,
+            borderRadius: BorderRadius.vertical(
+              top: const Radius.circular(14),
+              bottom: hasApplied ? Radius.zero : const Radius.circular(14),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: hasApplied
+                            ? [Colors.green.shade500, Colors.green.shade700]
+                            : [Colors.orange.shade400, Colors.orange.shade600],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      hasApplied
+                          ? Icons.check_circle_outline_rounded
+                          : Icons.local_offer_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      hasApplied ? 'Offer Applied!' : 'Apply Offer / Coupon',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: hasApplied
+                            ? Colors.green.shade400
+                            : cs.onSurface,
+                      ),
+                    ),
+                  ),
+                  if (!hasApplied)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: kBandiWalaYellow.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            'View all',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.orange.shade400,
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          Icon(
+                            Icons.arrow_forward_ios,
+                            size: 11,
+                            color: Colors.orange.shade400,
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    GestureDetector(
+                      onTap: _removeCoupon,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerHighest,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.close,
+                          size: 16,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
+          if (hasApplied)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+              decoration: BoxDecoration(
+                color: Colors.green.shade900.withValues(alpha: 0.3),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(14),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade700,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      _appliedCoupon!['couponCode'] ?? '',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _isFreeDelivery
+                          ? 'Free delivery applied'
+                          : 'You save ₹${_couponDiscount.toInt()} on this order',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.green.shade400,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade700,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      _isFreeDelivery
+                          ? 'FREE\ndelivery'
+                          : '-₹${_couponDiscount.toInt()}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
+    );
+  }
+
+  Widget _paymentMethodCard(Color kWhite, Color kBorderGrey, Color kTextGrey) {
+    return _card(
+      kWhite,
+      kBorderGrey,
       child: Column(
         children: [
           _methodTile(
             method: _PaymentMethod.online,
             icon: Icons.payment_rounded,
-            iconBg: Colors.blue.shade50,
-            iconColor: Colors.blue.shade600,
+            iconBg: Colors.blue.shade900.withValues(alpha: 0.3),
+            iconColor: Colors.blue.shade300,
             title: 'Pay Online',
             subtitle: 'UPI, Cards, Net Banking, Wallets',
+            kTextGrey: kTextGrey,
+            kWhite: kWhite,
           ),
-          Divider(height: 1, color: Colors.grey.shade100),
-          _methodTile(
-            method: _PaymentMethod.cod,
-            icon: Icons.money_rounded,
-            iconBg: Colors.green.shade50,
-            iconColor: Colors.green.shade600,
-            title: 'Cash on Delivery',
-            subtitle: 'Pay in cash when your order arrives',
-          ),
+          if (_selectedOrderType != 'pickup') ...[
+            Divider(height: 1, color: kBorderGrey),
+            _methodTile(
+              method: _PaymentMethod.cod,
+              icon: Icons.money_rounded,
+              iconBg: Colors.green.shade900.withValues(alpha: 0.3),
+              iconColor: Colors.green.shade400,
+              title: 'Cash on Delivery',
+              subtitle: 'Pay in cash when your order arrives',
+              kTextGrey: kTextGrey,
+              kWhite: kWhite,
+            ),
+          ],
         ],
       ),
     );
@@ -1186,7 +1342,10 @@ class _PaymentPageState extends State<PaymentPage> {
     required Color iconColor,
     required String title,
     required String subtitle,
+    required Color kTextGrey,
+    required Color kWhite,
   }) {
+    final cs = Theme.of(context).colorScheme;
     final isSelected = _selectedMethod == method;
     return InkWell(
       onTap: () => setState(() => _selectedMethod = method),
@@ -1195,7 +1354,7 @@ class _PaymentPageState extends State<PaymentPage> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? kBandiwalaYellow.withOpacity(0.06) : kWhite,
+          color: isSelected ? kBandiWalaYellow.withValues(alpha: 0.08) : kWhite,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
@@ -1203,12 +1362,14 @@ class _PaymentPageState extends State<PaymentPage> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: isSelected ? kBandiwalaYellow.withOpacity(0.2) : iconBg,
+                color: isSelected
+                    ? kBandiWalaYellow.withValues(alpha: 0.2)
+                    : iconBg,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 icon,
-                color: isSelected ? kBandiwalaYellow : iconColor,
+                color: isSelected ? kBandiWalaYellow : iconColor,
                 size: 20,
               ),
             ),
@@ -1219,16 +1380,16 @@ class _PaymentPageState extends State<PaymentPage> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: Colors.black87,
+                      color: cs.onSurface,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(fontSize: 12, color: kTextGrey),
+                    style: TextStyle(fontSize: 12, color: kTextGrey),
                   ),
                 ],
               ),
@@ -1240,10 +1401,10 @@ class _PaymentPageState extends State<PaymentPage> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? kBandiwalaYellow : Colors.grey.shade300,
+                  color: isSelected ? kBandiWalaYellow : cs.outline,
                   width: 2,
                 ),
-                color: isSelected ? kBandiwalaYellow : Colors.transparent,
+                color: isSelected ? kBandiWalaYellow : Colors.transparent,
               ),
               child: isSelected
                   ? const Icon(Icons.check, size: 13, color: Colors.white)
@@ -1255,9 +1416,7 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── Bottom Bar ───────────────────────────────────────────────────────────
-
-  Widget _bottomBar() {
+  Widget _bottomBar(Color kWhite, Color kBorderGrey, ColorScheme cs) {
     final isCod = _selectedMethod == _PaymentMethod.cod;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -1266,7 +1425,7 @@ class _PaymentPageState extends State<PaymentPage> {
         border: Border(top: BorderSide(color: kBorderGrey)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 10,
             offset: const Offset(0, -3),
           ),
@@ -1288,16 +1447,17 @@ class _PaymentPageState extends State<PaymentPage> {
                         isCod ? 'Amount to Pay' : 'Total Payable',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade600,
+                          color: cs.onSurfaceVariant,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '₹${_grandTotal.toStringAsFixed(0)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
+                          color: cs.onSurface,
                         ),
                       ),
                     ],
@@ -1309,10 +1469,10 @@ class _PaymentPageState extends State<PaymentPage> {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: kBandiwalaYellow.withOpacity(0.12),
+                        color: kBandiWalaYellow.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: kBandiwalaYellow.withOpacity(0.4),
+                          color: kBandiWalaYellow.withValues(alpha: 0.4),
                         ),
                       ),
                       child: const Row(
@@ -1320,14 +1480,14 @@ class _PaymentPageState extends State<PaymentPage> {
                           Icon(
                             Icons.security,
                             size: 12,
-                            color: kBandiwalaYellow,
+                            color: kBandiWalaYellow,
                           ),
                           SizedBox(width: 4),
                           Text(
                             'Secured by Razorpay',
                             style: TextStyle(
                               fontSize: 10,
-                              color: kBandiwalaYellow,
+                              color: kBandiWalaYellow,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1341,23 +1501,23 @@ class _PaymentPageState extends State<PaymentPage> {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50,
+                        color: Colors.green.shade900.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.green.shade200),
+                        border: Border.all(color: Colors.green.shade700),
                       ),
                       child: Row(
                         children: [
                           Icon(
                             Icons.money,
                             size: 12,
-                            color: Colors.green.shade700,
+                            color: Colors.green.shade400,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             'Pay on Delivery',
                             style: TextStyle(
                               fontSize: 10,
-                              color: Colors.green.shade700,
+                              color: Colors.green.shade400,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -1399,10 +1559,10 @@ class _PaymentPageState extends State<PaymentPage> {
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: kBandiwalaYellow,
+                  backgroundColor: kBandiWalaYellow,
                   foregroundColor: Colors.black87,
                   elevation: 0,
-                  disabledBackgroundColor: kBandiwalaYellow.withOpacity(0.5),
+                  disabledBackgroundColor: kBandiWalaYellow.withValues(alpha: 0.5),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -1416,22 +1576,220 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  // ─── Bill Row Helper ──────────────────────────────────────────────────────
+  // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  Widget _billRow(String label, String value, {Color? labelColor}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: labelColor ?? Colors.grey.shade700,
-          ),
+  Widget _card(
+    Color kWhite,
+    Color kBorderGrey, {
+    required Widget child,
+    EdgeInsets? padding,
+  }) => Container(
+    padding: padding,
+    decoration: BoxDecoration(
+      color: kWhite,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: kBorderGrey),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.04),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
         ),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      ],
+    ),
+    child: child,
+  );
+
+  Widget _billRow(
+    String label,
+    String value, {
+    Color? labelColor,
+    ColorScheme? cs,
+  }) => Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          color: labelColor ?? cs?.onSurfaceVariant,
+        ),
+      ),
+      Text(
+        value,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: cs?.onSurface,
+        ),
+      ),
+    ],
+  );
+
+  Widget _taxRow(String label, double percent, double amount, ColorScheme cs) =>
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              '$label (${percent.toStringAsFixed(0)}%)',
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+            ),
+          ),
+          Text(
+            '₹${amount.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+        ],
+      );
+}
+
+// ─── COD Confirmation Dialog ──────────────────────────────────────────────────
+
+class _CodConfirmDialog extends StatelessWidget {
+  final double grandTotal;
+  const _CodConfirmDialog({required this.grandTotal});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+      titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.money_rounded,
+              color: Colors.green.shade600,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Confirm Cash on Delivery',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Text(
+            'You are placing an order with Cash on Delivery.',
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: kBandiWalaYellow.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kBandiWalaYellow.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Flexible(
+                  child: Text(
+                    'Amount to pay on delivery',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color.fromARGB(221, 255, 255, 255),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '₹${grandTotal.toStringAsFixed(0)}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: kBandiWalaYellow,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline, size: 14, color: Colors.grey.shade500),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Please keep exact change ready. Our delivery partner will collect payment at your doorstep.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+        ],
+      ),
+      actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      actions: [
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(context, false),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(color: Colors.grey.shade300),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 255, 255, 255),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kBandiWalaYellow,
+                  foregroundColor: Colors.black87,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'Place Order',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );

@@ -2,11 +2,13 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
-import 'orders.dart';
+import 'orders_page.dart';
 import '../services/analytics_service.dart';
+import '../core/theme/theme.dart';
+import '../core/navigation/app_page_route.dart';
 
-const kBandiwalaYellow = Color(0xFFFFC107);
-const kWhite = Color(0xFFFFFFFF);
+const kBandiWalaYellow = AppColors.primary;
+const kWhite = Colors.white;
 
 class PaymentSuccessPage extends StatefulWidget {
   final String paymentId;
@@ -64,8 +66,9 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
     AnalyticsService.logPurchase(
       transactionId: widget.paymentId,
       value: widget.amount,
-      currency: 'INR', // Assuming INR for Bandiwala
-      items: [], // At this point we might not have the full cart details without looking up the order, but we can log the total value
+      currency: 'INR', // Assuming INR for BandiWala
+      items:
+          [], // At this point we might not have the full cart details without looking up the order, but we can log the total value
     );
 
     _navigationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -79,7 +82,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
           Navigator.of(context).popUntil((route) => route.isFirst);
           Navigator.of(
             context,
-          ).push(MaterialPageRoute(builder: (_) => const OrdersPage()));
+          ).push(AppPageRoute(builder: (_) => const OrdersPage()));
         }
       }
     });
@@ -97,7 +100,6 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor: kWhite, // ✅ WHITE BACKGROUND
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(20.0),
@@ -121,11 +123,11 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                         width: 100, // ✅ SMALLER
                         height: 100,
                         decoration: BoxDecoration(
-                          color: kWhite,
+                          color: Theme.of(context).colorScheme.surface,
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.1),
                               blurRadius: 20,
                               spreadRadius: 2,
                             ),
@@ -151,12 +153,12 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                       ),
                       child: Column(
                         children: [
-                          const Text(
+                          Text(
                             'Payment Successful!',
                             style: TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -165,7 +167,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                             'Your order is on the way 🎉',
                             style: TextStyle(
                               fontSize: 16,
-                              color: Colors.black54,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.w600,
                             ),
                             textAlign: TextAlign.center,
@@ -188,17 +190,17 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: kBandiwalaYellow.withOpacity(0.05),
+                      color: kBandiWalaYellow.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: kBandiwalaYellow.withOpacity(0.2),
+                        color: kBandiWalaYellow.withValues(alpha: 0.2),
                       ),
                     ),
                     child: Column(
                       children: [
                         Icon(
                           Icons.format_quote,
-                          color: kBandiwalaYellow,
+                          color: kBandiWalaYellow,
                           size: 28,
                         ),
                         const SizedBox(height: 16),
@@ -206,7 +208,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                           '"$_randomQuote"',
                           style: TextStyle(
                             fontSize: 15,
-                            color: Colors.black87,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontWeight: FontWeight.w500,
                             height: 1.4,
                           ),
@@ -219,7 +221,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                           '- Food Wisdom',
                           style: TextStyle(
                             fontSize: 13,
-                            color: kBandiwalaYellow,
+                            color: kBandiWalaYellow,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -235,7 +237,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                       'Redirecting to order in $_countdownSeconds',
                       style: TextStyle(
                         fontSize: 15,
-                        color: Colors.black54,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -247,7 +249,7 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                         minHeight: 6,
                         backgroundColor: Colors.grey.shade200,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          kBandiwalaYellow,
+                          kBandiWalaYellow,
                         ),
                       ),
                     ),
@@ -260,14 +262,14 @@ class _PaymentSuccessPageState extends State<PaymentSuccessPage>
                             context,
                           ).popUntil((route) => route.isFirst);
                           Navigator.of(context).push(
-                            MaterialPageRoute(
+                            AppPageRoute(
                               builder: (_) => const OrdersPage(),
                             ),
                           );
                         },
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: kBandiwalaYellow,
-                          side: BorderSide(color: kBandiwalaYellow, width: 2),
+                          foregroundColor: kBandiWalaYellow,
+                          side: BorderSide(color: kBandiWalaYellow, width: 2),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),

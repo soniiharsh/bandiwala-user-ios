@@ -43,3 +43,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Environment variables (secrets)
+.env
+
+# Native secret configs (iOS xcconfig, Android local.properties)
+ios/Flutter/Secrets.xcconfig
+android/local.properties

@@ -1,0 +1,155 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:marquee/marquee.dart';
+import '../providers/announcements_provider.dart';
+import '../core/theme/theme.dart';
+
+class ScrollingAnnouncement extends ConsumerWidget {
+  const ScrollingAnnouncement({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final announcementsAsync = ref.watch(announcementsProvider);
+
+    return announcementsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (announcements) {
+        if (announcements.isEmpty) return const SizedBox.shrink();
+
+        final fullText = announcements.join('   ✦   ');
+
+        return Container(
+          height: 38,
+          width: double.infinity,
+          margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primary.withValues(alpha: 0.12),
+                AppColors.primary.withValues(alpha: 0.05),
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.3),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.campaign_rounded,
+                  size: 16,
+                  color: Color(0xFFD9A608),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const _BlinkingIndicator(),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.horizontal(
+                    right: Radius.circular(20),
+                  ),
+                  child: RepaintBoundary(
+                    child: Marquee(
+                      text: '$fullText    ',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        letterSpacing: 0.2,
+                      ),
+                      scrollAxis: Axis.horizontal,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      blankSpace: 80.0,
+                      velocity: 30.0,
+                      pauseAfterRound: Duration(seconds: 1),
+                      startPadding: 5.0,
+                      accelerationDuration: Duration(seconds: 1),
+                      accelerationCurve: Curves.linear,
+                      decelerationDuration: Duration(milliseconds: 500),
+                      decelerationCurve: Curves.easeOut,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _BlinkingIndicator extends StatefulWidget {
+  const _BlinkingIndicator();
+
+  @override
+  State<_BlinkingIndicator> createState() => _BlinkingIndicatorState();
+}
+
+class _BlinkingIndicatorState extends State<_BlinkingIndicator>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: FadeTransition(
+        opacity: _controller.drive(
+          CurveTween(
+            curve: Curves.easeInOut,
+          ).chain(Tween<double>(begin: 0.3, end: 1.0)),
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.red.shade600,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: const Text(
+            'LIVE',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 8,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -1,70 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
-import '../models/service_zone.dart';
-
+import 'dart:math';
+import '../providers/hexagon_provider.dart';
+import '../models/hexagon.dart';
+import '../utils/hexagon_resolver.dart';
+import '../providers/user_provider.dart';
+import '../models/app_user.dart';
+import '../core/theme/theme.dart';
+import '../core/theme/map_style.dart';
+import '../core/app_env.dart';
 // ─── Shared model ─────────────────────────────────────────────────────────────
 
-class SavedLocation {
-  final String address; // Human-readable area name (e.g. "KPHB, Hyderabad")
-  final double latitude; // Full precision e.g. 17.476388123
-  final double longitude; // Full precision e.g. 78.390350456
-  final String? houseNo;
-  final String? phone;
-  final String? label;
-
-  SavedLocation({
-    required this.address,
-    required this.latitude,
-    required this.longitude,
-    this.houseNo,
-    this.phone,
-    this.label,
-  });
-
-  // ✅ lat/lng stored as full-precision doubles — never truncated
-  Map<String, dynamic> toJson() => {
-    'address': address,
-    'latitude': latitude,
-    'longitude': longitude,
-    'houseNo': houseNo,
-    'phone': phone,
-    'label': label,
-  };
-
-  factory SavedLocation.fromJson(Map<String, dynamic> json) => SavedLocation(
-    address: json['address'] ?? '',
-    latitude: (json['latitude'] as num).toDouble(),
-    longitude: (json['longitude'] as num).toDouble(),
-    houseNo: json['houseNo'],
-    phone: json['phone'],
-    label: json['label'],
-  );
-
-  bool isSameLocation(SavedLocation other) {
-    const double threshold = 0.0005;
-    return (latitude - other.latitude).abs() < threshold &&
-        (longitude - other.longitude).abs() < threshold;
-  }
-
-  String get fullDisplay {
-    final parts = <String>[];
-    if (houseNo != null && houseNo!.isNotEmpty) parts.add(houseNo!);
-    if (address.isNotEmpty) parts.add(address);
-    return parts.join(', ');
-  }
-
-  // ✅ Shows area name + precise coordinates
-  String get coordinatesDisplay =>
-      '${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}';
-
-  String get shortLabel => label ?? 'Other';
-}
+// ─── Shared model consolidated into SavedAddress in app_user.dart ────────────────
 
 // ─── Autocomplete model ───────────────────────────────────────────────────────
 
@@ -85,17 +39,25 @@ class _PlaceSuggestion {
 }
 
 // ─── LocationPickerPage ───────────────────────────────────────────────────────
+// Single page for: selecting an address, adding new, editing, deleting.
 
-class LocationPickerPage extends StatefulWidget {
-  final Function(SavedLocation)? onLocationSelected;
-  const LocationPickerPage({super.key, this.onLocationSelected});
+class LocationPickerPage extends ConsumerStatefulWidget {
+  final Function(SavedAddress)? onLocationSelected;
+
+  /// The currently active address — used to highlight the selected tile.
+  final SavedAddress? activeAddress;
+  const LocationPickerPage({
+    super.key,
+    this.onLocationSelected,
+    this.activeAddress,
+  });
 
   @override
-  State<LocationPickerPage> createState() => _LocationPickerPageState();
+  ConsumerState<LocationPickerPage> createState() => _LocationPickerPageState();
 }
 
-class _LocationPickerPageState extends State<LocationPickerPage> {
-  static const Color bandiwalaYellow = Color(0xFFFFC107);
+class _LocationPickerPageState extends ConsumerState<LocationPickerPage> {
+  static const Color bandiWalaYellow = AppColors.primary;
 
   bool _showModeSelection = true;
   bool _isCurrentLocationMode = false;
@@ -105,15 +67,15 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   GoogleMapController? _mapController;
   LatLng? _currentPosition;
   LatLng? _selectedPosition;
-  bool _isOutsideHyderabad = false;
+  bool _isOutsideServiceZone = false;
 
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
-  final TextEditingController _houseNoController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _customLabelController = TextEditingController();
 
-  List<SavedLocation> _savedLocations = [];
-  List<ServiceZone> _serviceZones = [];
+  List<SavedAddress> _savedAddresses = [];
   bool _isFetchingLocation = false;
   String _selectedLabel = 'Home';
   String _fetchedAddress = '';
@@ -125,24 +87,16 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   Timer? _debounce;
 
   final http.Client _httpClient = http.Client();
-  static const String _googleMapsApiKey =
-      'AIzaSyDKVT8aUdGm6EcR8DdRdh0QxI2oj7HRo5E';
   String? _sessionToken;
 
   void _generateSessionToken() {
     _sessionToken = DateTime.now().millisecondsSinceEpoch.toString();
   }
 
-  static const double _minLat = 17.25;
-  static const double _maxLat = 17.55;
-  static const double _minLng = 78.25;
-  static const double _maxLng = 78.65;
-
   @override
   void initState() {
     super.initState();
-    _loadSavedLocations();
-    _loadServiceZones();
+    _syncAddressesFromProvider();
     _searchController.addListener(_onSearchChanged);
     _searchFocusNode.addListener(() {
       if (!_searchFocusNode.hasFocus && mounted) {
@@ -153,6 +107,12 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         });
       }
     });
+
+    // Default phone from user profile
+    final user = ref.read(userProvider).valueOrNull;
+    if (user != null && user.phone.isNotEmpty) {
+      _phoneController.text = user.phone;
+    }
   }
 
   @override
@@ -161,19 +121,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     _httpClient.close();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
-    _houseNoController.dispose();
+    _addressController.dispose();
     _phoneController.dispose();
+    _customLabelController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadServiceZones() async {
-    final zones = await fetchServiceZones();
-    if (mounted) {
-      setState(() {
-        _serviceZones = zones;
-      });
-    }
   }
 
   void _onSearchChanged() {
@@ -201,66 +153,68 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     if (_sessionToken == null) _generateSessionToken();
 
     try {
-      final uri = Uri.https(
-        'maps.googleapis.com',
-        '/maps/api/place/autocomplete/json',
-        {
-          'input': query,
-          'key': _googleMapsApiKey,
-          'location': '17.3850,78.4867', // Hyderabad center
-          'radius': '50000',
-          'strictbounds': 'false',
-          'components': 'country:in',
-          'language': 'en',
-          'sessiontoken': _sessionToken,
+      final response = await _httpClient.post(
+        Uri.parse('https://places.googleapis.com/v1/places:autocomplete'),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': AppEnv.googleMapsApiKey,
         },
+        body: jsonEncode({
+          'input': query,
+          'locationBias': {
+            'circle': {
+              'center': {'latitude': 17.3850, 'longitude': 78.4867},
+              'radius': 50000.0,
+            }
+          },
+          'includedRegionCodes': ['IN'],
+          'languageCode': 'en',
+          'sessionToken': _sessionToken,
+        }),
       );
-
-      final response = await _httpClient.get(uri);
 
       if (!mounted) return;
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['status'] == 'OK') {
-          final predictions = data['predictions'] as List;
-          final suggestions = predictions.map((p) {
-            final description = p['description'] as String;
-            final structuredFormatting =
-                p['structured_formatting'] as Map<String, dynamic>;
-            final mainText = structuredFormatting['main_text'] as String;
+        final List? predictions = data['suggestions'];
 
-            return _PlaceSuggestion(
-              displayName: description,
-              shortName: mainText,
-              placeId: p['place_id'],
-            );
-          }).toList();
-
-          setState(() {
-            _suggestions = suggestions;
-            _isSearching = false;
-            _showSuggestions = suggestions.isNotEmpty;
-          });
-          return;
-        } else if (data['status'] == 'ZERO_RESULTS') {
+        if (predictions == null || predictions.isEmpty) {
           setState(() {
             _suggestions = [];
             _isSearching = false;
             _showSuggestions = false;
           });
           return;
-        } else {
-          debugPrint('Google Autocomplete Error Status: ${data['status']}');
-          if (data['error_message'] != null) {
-            debugPrint('Error Message: ${data['error_message']}');
-          }
-          // Fallback to nominatim if Google returns an error (denied, over limit, etc)
-          await _fetchSuggestionsFallback(query);
-          return;
         }
+
+        final suggestions = predictions.map((s) {
+          final prediction = s['placePrediction'] as Map<String, dynamic>;
+          final description = prediction['text']['text'] as String;
+          final mainText =
+              prediction['structuredFormat']['mainText']['text'] as String;
+
+          return _PlaceSuggestion(
+            displayName: description,
+            shortName: mainText,
+            placeId: prediction['placeId'],
+          );
+        }).toList();
+
+        setState(() {
+          _suggestions = suggestions;
+          _isSearching = false;
+          _showSuggestions = suggestions.isNotEmpty;
+        });
+        return;
       } else {
-        debugPrint('Google API HTTP Error: ${response.statusCode}');
+        final data = jsonDecode(response.body);
+        debugPrint('Google Autocomplete Error Status Code: ${response.statusCode}');
+        if (data['error'] != null) {
+          debugPrint('Error Message: ${data['error']['message']}');
+        }
+        // Fallback to nominatim if Google returns an error (denied, over limit, etc)
         await _fetchSuggestionsFallback(query);
+        return;
       }
     } catch (e) {
       debugPrint('Google Autocomplete catch error: $e');
@@ -322,19 +276,19 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
   Future<LatLng> _getPlaceDetails(String placeId) async {
     try {
-      final uri =
-          Uri.https('maps.googleapis.com', '/maps/api/place/details/json', {
-            'place_id': placeId,
-            'fields': 'geometry',
-            'key': _googleMapsApiKey,
-            'sessiontoken': _sessionToken,
-          });
-      final response = await _httpClient.get(uri);
+      final uri = Uri.parse('https://places.googleapis.com/v1/places/$placeId');
+      final response = await _httpClient.get(
+        uri,
+        headers: {
+          'X-Goog-Api-Key': AppEnv.googleMapsApiKey,
+          'X-Goog-FieldMask': 'location',
+        },
+      );
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        if (data['status'] == 'OK') {
-          final location = data['result']['geometry']['location'];
-          return LatLng(location['lat'], location['lng']);
+        if (data['location'] != null) {
+          final loc = data['location'];
+          return LatLng(loc['latitude'], loc['longitude']);
         }
       }
     } catch (e) {
@@ -365,10 +319,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     _sessionToken = null; // Reset session token after selection
 
     if (!mounted) return;
+    _validateLocation(pos);
     setState(() {
       _selectedPosition = pos;
       _fetchedAddress = address.isNotEmpty ? address : suggestion.displayName;
-      _isOutsideHyderabad = !_isInHyderabad(pos);
     });
     if (_mapController != null) {
       _mapController!.animateCamera(CameraUpdate.newLatLng(pos));
@@ -381,7 +335,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     try {
       final uri = Uri.https('maps.googleapis.com', '/maps/api/geocode/json', {
         'latlng': '${position.latitude},${position.longitude}',
-        'key': _googleMapsApiKey,
+        'key': AppEnv.googleMapsApiKey,
         'language': 'en',
       });
       final response = await _httpClient.get(uri);
@@ -445,27 +399,19 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     return '';
   }
 
-  Future<void> _loadSavedLocations() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final list = prefs.getStringList('saved_locations') ?? [];
-      if (mounted) {
-        setState(() {
-          _savedLocations = list
-              .map((j) => SavedLocation.fromJson(jsonDecode(j)))
-              .toList();
-        });
-      }
-    } catch (e) {
-      debugPrint('Load saved locations error: $e');
-    }
+  void _syncAddressesFromProvider() {
+    final addresses = ref.read(userProvider).valueOrNull?.savedAddresses ?? [];
+    _savedAddresses = addresses.map(_toSavedAddress).toList();
   }
 
-  bool _isInHyderabad(LatLng pos) =>
-      pos.latitude >= _minLat &&
-      pos.latitude <= _maxLat &&
-      pos.longitude >= _minLng &&
-      pos.longitude <= _maxLng;
+  // Convert AppUser's SavedAddress to our model (now the same)
+  SavedAddress _toSavedAddress(SavedAddress a) => a;
+
+  void _validateLocation(LatLng pos) {
+    final hexagons = ref.read(hexagonProvider).valueOrNull ?? [];
+    final hex = resolveHexagon(hexagons, pos.latitude, pos.longitude);
+    _isOutsideServiceZone = hex == null;
+  }
 
   Future<void> _enterCurrentLocationMode() async {
     setState(() {
@@ -524,10 +470,25 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         }
       }
 
-      // ✅ bestForNavigation = maximum GPS precision
+      // Settings for maximum GPS precision across platforms
+      late final LocationSettings locationSettings;
+
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        locationSettings = AndroidSettings(
+          accuracy: LocationAccuracy.best,
+          distanceFilter: 0,
+          forceLocationManager: true,
+          intervalDuration: const Duration(seconds: 10),
+        );
+      } else {
+        locationSettings = AppleSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+          timeLimit: const Duration(seconds: 15),
+        );
+      }
+
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.bestForNavigation,
-        timeLimit: const Duration(seconds: 15),
+        locationSettings: locationSettings,
       );
 
       // ✅ Raw full-precision coordinates — no rounding
@@ -540,12 +501,13 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         _selectedPosition = pos;
         _fetchedAddress = address.isNotEmpty ? address : 'Current Location';
         _searchController.text = _fetchedAddress;
-        _isOutsideHyderabad = !_isInHyderabad(pos);
+        _validateLocation(pos);
         _isFetchingLocation = false;
       });
 
-      if (_mapController != null)
+      if (_mapController != null) {
         _mapController!.animateCamera(CameraUpdate.newLatLngZoom(pos, 17.0));
+      }
     } catch (e) {
       debugPrint('Fetch current location error: $e');
       if (!mounted) return;
@@ -567,8 +529,17 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       _suggestions = [];
       _showSuggestions = false;
       _searchController.clear();
-      _houseNoController.clear();
-      _phoneController.clear();
+      _addressController.clear();
+
+      // Auto-fill phone from user profile
+      final user = ref.read(userProvider).valueOrNull;
+      if (user != null && user.phone.isNotEmpty) {
+        _phoneController.text = user.phone;
+      } else {
+        _phoneController.clear();
+      }
+
+      _customLabelController.clear();
       _selectedLabel = 'Home';
     });
     Future.delayed(const Duration(milliseconds: 450), () {
@@ -593,14 +564,13 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     setState(() {
       _selectedPosition = point;
       _fetchedAddress = address.isNotEmpty ? address : 'Selected Location';
-      _searchController.text = _fetchedAddress;
-      _isOutsideHyderabad = !_isInHyderabad(point);
+      _validateLocation(point);
       _isMapIdleUpdating = false;
     });
   }
 
-  bool _isDuplicate(SavedLocation loc) =>
-      _savedLocations.any((e) => e.isSameLocation(loc));
+  bool _isDuplicate(SavedAddress loc) =>
+      _savedAddresses.any((e) => e.isSameLocation(loc));
 
   Future<void> _saveLocation() async {
     if (_selectedPosition == null) {
@@ -609,28 +579,36 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       );
       return;
     }
-    if (_houseNoController.text.trim().isEmpty) {
+    if (_addressController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter door number or landmark')),
+        const SnackBar(content: Text('Please enter house number or landmark')),
       );
       return;
     }
 
-    // ✅ address = human-readable area name
+    if (_phoneController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a phone number')),
+      );
+      return;
+    }
+
+    // ✅ geolocation = human-readable area name
+    // ✅ address = specific door no / street
     // ✅ latitude/longitude = full precision raw doubles
-    final location = SavedLocation(
-      address: _fetchedAddress.isNotEmpty
+    final location = SavedAddress(
+      geolocation: _fetchedAddress.isNotEmpty
           ? _fetchedAddress
           : _searchController.text.trim().isNotEmpty
           ? _searchController.text.trim()
           : 'Selected Location',
       latitude: _selectedPosition!.latitude, // e.g. 17.476388123456
       longitude: _selectedPosition!.longitude, // e.g. 78.390350456789
-      houseNo: _houseNoController.text.trim(),
-      phone: _phoneController.text.trim().isNotEmpty
-          ? _phoneController.text.trim()
-          : null,
-      label: _selectedLabel,
+      address: _addressController.text.trim(),
+      phone: _phoneController.text.trim(),
+      label: _selectedLabel == 'Other'
+          ? _customLabelController.text.trim()
+          : _selectedLabel,
     );
 
     if (_isDuplicate(location)) {
@@ -662,7 +640,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                 _proceedToSave(location);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: bandiwalaYellow,
+                backgroundColor: bandiWalaYellow,
                 foregroundColor: Colors.black87,
               ),
               child: const Text('Save Anyway'),
@@ -675,18 +653,14 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     await _proceedToSave(location);
   }
 
-  Future<void> _proceedToSave(SavedLocation location) async {
-    final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList('saved_locations') ?? [];
-    list.insert(0, jsonEncode(location.toJson()));
-    if (list.length > 20) list.removeLast();
-    await prefs.setStringList('saved_locations', list);
-    if (mounted) setState(() => _savedLocations.insert(0, location));
+  Future<void> _proceedToSave(SavedAddress location) async {
+    await ref.read(userProvider.notifier).addAddress(_toSavedAddress(location));
+    if (mounted) setState(() => _savedAddresses.insert(0, location));
     widget.onLocationSelected?.call(location);
     if (mounted) Navigator.pop(context, location);
   }
 
-  Future<void> _selectSavedLocation(SavedLocation location) async {
+  Future<void> _selectSavedAddress(SavedAddress location) async {
     widget.onLocationSelected?.call(location);
     if (mounted) Navigator.pop(context, location);
   }
@@ -737,7 +711,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: bandiwalaYellow,
+              backgroundColor: bandiWalaYellow,
               foregroundColor: Colors.black87,
             ),
             child: Text(isSettings ? 'Open Settings' : 'Retry'),
@@ -751,13 +725,33 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: _showModeSelection ? _buildModeSelection() : _buildMapView(),
+    final theme = Theme.of(context);
+
+    return PopScope(
+      canPop: _showModeSelection,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (!_showModeSelection) {
+          setState(() {
+            _showModeSelection = true;
+            _isNewAddressMode = false;
+            _isCurrentLocationMode = false;
+            _isMapReady = false;
+          });
+        }
+      },
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: _showModeSelection
+            ? _buildModeSelection(context)
+            : _buildMapView(context),
+      ),
     );
   }
 
-  Widget _buildModeSelection() {
+  Widget _buildModeSelection(BuildContext context) {
+    final theme = Theme.of(context);
+
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -767,17 +761,24 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back),
+                  icon: Icon(
+                    Icons.arrow_back,
+                    color: theme.colorScheme.onSurface,
+                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
-                const Text(
+                Text(
                   'Select Address',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.onSurface,
+                  ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: theme.dividerColor),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -788,6 +789,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                     children: [
                       Expanded(
                         child: _buildModeButton(
+                          context: context,
                           icon: Icons.my_location,
                           title: 'Use Current\nLocation',
                           subtitle: 'Auto-detect GPS',
@@ -797,6 +799,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _buildModeButton(
+                          context: context,
                           icon: Icons.add_location_alt_outlined,
                           title: 'Add New\nAddress',
                           subtitle: 'Search & pin on map',
@@ -805,18 +808,25 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                       ),
                     ],
                   ),
-                  if (_savedLocations.isNotEmpty) ...[
+                  if (_savedAddresses.isNotEmpty) ...[
                     const SizedBox(height: 24),
-                    const Text(
+                    Text(
                       'Saved Addresses',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: Colors.black87,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 12),
-                    ..._savedLocations.map(_buildSavedLocationTile),
+                    ...List.generate(
+                      _savedAddresses.length,
+                      (i) => _buildSavedAddressTile(
+                        context,
+                        _savedAddresses[i],
+                        i,
+                      ),
+                    ),
                   ],
                 ],
               ),
@@ -828,22 +838,28 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   }
 
   Widget _buildModeButton({
+    required BuildContext context,
     required IconData icon,
     required String title,
     required String subtitle,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.grey.shade300),
+          border: Border.all(color: theme.dividerColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: (isDark ? Colors.white : Colors.black).withValues(
+                alpha: isDark ? 0.08 : 0.04,
+              ),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -855,25 +871,28 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: bandiwalaYellow.withOpacity(0.15),
+                color: bandiWalaYellow.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, color: bandiwalaYellow, size: 24),
+              child: Icon(icon, color: bandiWalaYellow, size: 24),
             ),
             const SizedBox(height: 12),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: Colors.black87,
+                color: theme.colorScheme.onSurface,
                 height: 1.3,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              style: TextStyle(
+                fontSize: 11,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -881,26 +900,41 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
-  // ✅ Shows area name + lat/lng coordinates in saved tile
-  Widget _buildSavedLocationTile(SavedLocation loc) {
+  Widget _buildSavedAddressTile(
+    BuildContext context,
+    SavedAddress loc,
+    int index,
+  ) {
+    final theme = Theme.of(context);
+    final active = widget.activeAddress;
+    final isSelected =
+        active != null &&
+        (active.latitude - loc.latitude).abs() < 0.0005 &&
+        (active.longitude - loc.longitude).abs() < 0.0005;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isSelected
+            ? bandiWalaYellow.withValues(alpha: 0.12)
+            : theme.cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: isSelected ? bandiWalaYellow : theme.dividerColor,
+          width: isSelected ? 1.5 : 1,
+        ),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => _selectSavedLocation(loc),
+        onTap: () => _selectSavedAddress(loc),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: bandiwalaYellow.withOpacity(0.15),
+                  color: bandiWalaYellow.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -909,7 +943,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                       : loc.label == 'Work'
                       ? Icons.work
                       : Icons.location_on,
-                  color: bandiwalaYellow,
+                  color: bandiWalaYellow,
                   size: 18,
                 ),
               ),
@@ -922,49 +956,72 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                       children: [
                         Text(
                           loc.label ?? 'Other',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: Colors.black87,
+                            color: theme.colorScheme.onSurface,
                           ),
                         ),
-                        if (loc.houseNo != null && loc.houseNo!.isNotEmpty) ...[
+                        if (isSelected) ...[
                           const SizedBox(width: 6),
-                          Text(
-                            '• ${loc.houseNo}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: bandiWalaYellow,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'Selected',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black87,
+                              ),
                             ),
                           ),
                         ],
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    // ✅ Area name shown here
-                    Text(
-                      loc.address,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade700,
+                    if (loc.address != null && loc.address!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        loc.address!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    // ✅ Precise coordinates shown below area name
-                    Text(
-                      loc.coordinatesDisplay,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey.shade500,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
+                    ],
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 20),
+              IconButton(
+                icon: Icon(
+                  Icons.edit_outlined,
+                  size: 18,
+                  color: Colors.grey.shade500,
+                ),
+                onPressed: () => _editSavedAddress(index),
+                tooltip: 'Edit',
+                padding: const EdgeInsets.all(6),
+                constraints: const BoxConstraints(),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.delete_outline,
+                  size: 18,
+                  color: Colors.red.shade300,
+                ),
+                onPressed: () => _deleteSavedAddress(index),
+                tooltip: 'Delete',
+                padding: const EdgeInsets.all(6),
+                constraints: const BoxConstraints(),
+              ),
             ],
           ),
         ),
@@ -972,29 +1029,281 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
-  Set<Circle> _buildServiceAreaCircles() {
-    return _serviceZones.map((zone) {
-      return Circle(
-        circleId: CircleId(zone.name),
-        center: LatLng(zone.lat, zone.lng),
-        radius: zone.radiusMeters,
-        fillColor: bandiwalaYellow.withOpacity(0.15),
-        strokeColor: bandiwalaYellow,
+  Future<void> _deleteSavedAddress(int index) async {
+    final theme = Theme.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Delete Address?'),
+        content: const Text('Are you sure you want to delete this address?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.error,
+              foregroundColor: theme.colorScheme.onError,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await ref.read(userProvider.notifier).deleteAddress(index);
+    if (mounted) setState(() => _savedAddresses.removeAt(index));
+  }
+
+  Future<void> _editSavedAddress(int index) async {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final loc = _savedAddresses[index];
+    final addressCtrl = TextEditingController(text: loc.address ?? '');
+    final phoneCtrl = TextEditingController(text: loc.phone);
+    final customLabelCtrl = TextEditingController();
+    String label = loc.label ?? 'Other';
+
+    if (label != 'Home' && label != 'Work') {
+      customLabelCtrl.text = label;
+      label = 'Other';
+    }
+
+    final result = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.cardColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModal) => Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: theme.dividerColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Text(
+                'Edit Address',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                loc.geolocation,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: ['Home', 'Work', 'Other'].map((l) {
+                  final sel = label == l;
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(l),
+                        selected: sel,
+                        onSelected: (_) => setModal(() => label = l),
+                        selectedColor: bandiWalaYellow,
+                        labelStyle: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: sel
+                              ? (isDark ? Colors.black : Colors.black87)
+                              : theme.colorScheme.onSurfaceVariant,
+                        ),
+                        backgroundColor: isDark
+                            ? Colors.grey.shade800
+                            : Colors.grey.shade100,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: addressCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Address (House No, Building, Area) *',
+                  prefixIcon: const Icon(Icons.home_outlined),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(
+                      color: bandiWalaYellow,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phoneCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: 'Phone *',
+                  prefixIcon: const Icon(Icons.phone_outlined),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(
+                      color: bandiWalaYellow,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+              if (label == 'Other') ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: customLabelCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Custom Label *',
+                    prefixIcon: const Icon(Icons.label_outline),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(
+                        color: bandiWalaYellow,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (addressCtrl.text.trim().isEmpty) return;
+                    if (phoneCtrl.text.trim().isEmpty) return;
+                    String finalLabel = label;
+                    if (label == 'Other') {
+                      if (customLabelCtrl.text.trim().isEmpty) return;
+                      finalLabel = customLabelCtrl.text.trim();
+                    }
+                    Navigator.pop(ctx, {
+                      'address': addressCtrl.text.trim(),
+                      'phone': phoneCtrl.text.trim(),
+                      'label': finalLabel,
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: bandiWalaYellow,
+                    foregroundColor: Colors.black87,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Save Changes',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (result == null) return;
+
+    final updatedLoc = SavedAddress(
+      geolocation: loc.geolocation,
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      address: result['address'],
+      phone: result['phone']!,
+      label: result['label']!,
+    );
+    await ref.read(userProvider.notifier).updateAddress(index, updatedLoc);
+    if (mounted) {
+      setState(() => _savedAddresses[index] = updatedLoc);
+    }
+  }
+
+  Set<Polygon> _buildServiceAreaHexagons() {
+    final hexagons = ref.watch(hexagonProvider).valueOrNull ?? [];
+    return hexagons.map((hex) {
+      return Polygon(
+        polygonId: PolygonId(hex.id),
+        points: _getHexagonPoints(hex),
+        fillColor: bandiWalaYellow.withValues(alpha: 0.15),
+        strokeColor: bandiWalaYellow,
         strokeWidth: 2,
       );
     }).toSet();
   }
 
-  Widget _buildMapView() {
+  List<LatLng> _getHexagonPoints(Hexagon h) {
+    final points = <LatLng>[];
+    for (var i = 0; i < 6; i++) {
+      final angleDeg = 60.0 * i;
+      final angleRad = angleDeg * pi / 180;
+
+      // Regular flat-top hexagon vertices
+      final dx = h.sideLength * cos(angleRad);
+      final dy = h.sideLength * sin(angleRad);
+
+      // Convert meters offset back to lat/lng (consistent with resolver)
+      final dLat = dy / 110540;
+      final dLng = dx / (cos(h.lat * pi / 180) * 111320);
+
+      points.add(LatLng(h.lat + dLat, h.long + dLng));
+    }
+    return points;
+  }
+
+  Widget _buildMapView(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Stack(
       children: [
         GoogleMap(
           initialCameraPosition: const CameraPosition(
-            target: LatLng(17.3850, 78.4867),
+            target: LatLng(17.5, 78.4),
             zoom: 14.0,
           ),
           onMapCreated: (controller) {
             _mapController = controller;
+            if (isDark) {
+              _mapController!.setMapStyle(MapStyles.darkStyle);
+            }
             if (mounted) setState(() => _isMapReady = true);
             final target = _selectedPosition ?? _currentPosition;
             if (target != null) {
@@ -1013,15 +1322,14 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               _updateAddressFromMapIdle(_selectedPosition!);
             }
           },
-          markers: {}, // No markers as we use the center pin
-          circles: _buildServiceAreaCircles(),
+          markers: {},
+          polygons: _buildServiceAreaHexagons(),
           myLocationEnabled: true,
           myLocationButtonEnabled: false,
           zoomControlsEnabled: false,
           mapToolbarEnabled: false,
         ),
 
-        // Uber-style center pin
         if (_isNewAddressMode)
           const Center(
             child: Padding(
@@ -1041,17 +1349,22 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                   children: [
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: theme.cardColor,
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.12),
+                            color: (isDark ? Colors.white : Colors.black)
+                                .withValues(alpha: 0.12),
                             blurRadius: 6,
                           ),
                         ],
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.arrow_back, size: 20),
+                        icon: Icon(
+                          Icons.arrow_back,
+                          size: 20,
+                          color: theme.colorScheme.onSurface,
+                        ),
                         onPressed: () {
                           _debounce?.cancel();
                           setState(() {
@@ -1064,7 +1377,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                             _showSuggestions = false;
                             _fetchedAddress = '';
                             _searchController.clear();
-                            _houseNoController.clear();
+                            _addressController.clear();
                             _phoneController.clear();
                           });
                         },
@@ -1075,11 +1388,14 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                       child: _isNewAddressMode
                           ? Container(
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: theme.cardColor,
                                 borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: theme.dividerColor),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.12),
+                                    color:
+                                        (isDark ? Colors.white : Colors.black)
+                                            .withValues(alpha: 0.12),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -1088,12 +1404,15 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                               child: TextField(
                                 controller: _searchController,
                                 focusNode: _searchFocusNode,
-                                style: const TextStyle(fontSize: 14),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: theme.colorScheme.onSurface,
+                                ),
                                 textInputAction: TextInputAction.search,
                                 decoration: InputDecoration(
                                   hintText: 'Search city, area or street...',
                                   hintStyle: TextStyle(
-                                    color: Colors.grey.shade500,
+                                    color: theme.colorScheme.onSurfaceVariant,
                                     fontSize: 13,
                                   ),
                                   border: InputBorder.none,
@@ -1109,20 +1428,24 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                                             height: 16,
                                             child: CircularProgressIndicator(
                                               strokeWidth: 2,
-                                              color: bandiwalaYellow,
+                                              color: bandiWalaYellow,
                                             ),
                                           ),
                                         )
                                       : Icon(
                                           Icons.search,
-                                          color: Colors.grey.shade500,
+                                          color: theme
+                                              .colorScheme
+                                              .onSurfaceVariant,
                                           size: 20,
                                         ),
                                   suffixIcon: _searchController.text.isNotEmpty
                                       ? IconButton(
                                           icon: Icon(
                                             Icons.clear,
-                                            color: Colors.grey.shade500,
+                                            color: theme
+                                                .colorScheme
+                                                .onSurfaceVariant,
                                             size: 18,
                                           ),
                                           onPressed: () {
@@ -1152,11 +1475,14 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                                 vertical: 10,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: theme.cardColor,
                                 borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: theme.dividerColor),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.1),
+                                    color:
+                                        (isDark ? Colors.white : Colors.black)
+                                            .withValues(alpha: 0.1),
                                     blurRadius: 8,
                                   ),
                                 ],
@@ -1165,15 +1491,16 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                                 children: [
                                   Icon(
                                     Icons.my_location,
-                                    color: bandiwalaYellow,
+                                    color: bandiWalaYellow,
                                     size: 18,
                                   ),
                                   const SizedBox(width: 8),
-                                  const Text(
+                                  Text(
                                     'Using Current Location',
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
+                                      color: theme.colorScheme.onSurface,
                                     ),
                                   ),
                                 ],
@@ -1190,18 +1517,18 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                   child: Material(
                     elevation: 8,
                     borderRadius: BorderRadius.circular(12),
-                    shadowColor: Colors.black26,
+                    shadowColor: (isDark ? Colors.white : Colors.black26),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
-                        color: Colors.white,
+                        color: theme.cardColor,
                         constraints: const BoxConstraints(maxHeight: 300),
                         child: ListView.separated(
                           padding: EdgeInsets.zero,
                           shrinkWrap: true,
                           itemCount: _suggestions.length,
                           separatorBuilder: (_, __) =>
-                              Divider(height: 1, color: Colors.grey.shade100),
+                              Divider(height: 1, color: theme.dividerColor),
                           itemBuilder: (ctx, i) {
                             final s = _suggestions[i];
                             return InkWell(
@@ -1215,7 +1542,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                                   children: [
                                     Icon(
                                       Icons.location_on_outlined,
-                                      color: Colors.grey.shade400,
+                                      color: theme.colorScheme.onSurfaceVariant,
                                       size: 18,
                                     ),
                                     const SizedBox(width: 10),
@@ -1226,10 +1553,11 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                                         children: [
                                           Text(
                                             s.shortName,
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 13,
                                               fontWeight: FontWeight.w600,
-                                              color: Colors.black87,
+                                              color:
+                                                  theme.colorScheme.onSurface,
                                             ),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
@@ -1239,7 +1567,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                                               s.displayName,
                                               style: TextStyle(
                                                 fontSize: 11,
-                                                color: Colors.grey.shade600,
+                                                color: theme
+                                                    .colorScheme
+                                                    .onSurfaceVariant,
                                               ),
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
@@ -1258,32 +1588,38 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                   ),
                 ),
 
-              if (_isOutsideHyderabad)
+              if (_isOutsideServiceZone)
                 Container(
                   margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
-                    vertical: 8,
+                    vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
+                    color: isDark
+                        ? Colors.red.withValues(alpha: 0.15)
+                        : Colors.red.shade50,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.shade300),
+                    border: Border.all(color: Colors.red.shade300),
                   ),
                   child: Row(
                     children: [
                       Icon(
-                        Icons.warning_amber_rounded,
-                        color: Colors.orange.shade700,
+                        Icons.error_outline_rounded,
+                        color: isDark
+                            ? Colors.red.shade300
+                            : Colors.red.shade700,
                         size: 16,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Outside Hyderabad service area — you can still save this address',
+                          'We don\'t serve this specific area yet. Please select a location inside the yellow hexagons.',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.orange.shade800,
+                            color: isDark
+                                ? Colors.red.shade200
+                                : Colors.red.shade800,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -1301,7 +1637,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           child: FloatingActionButton.small(
             heroTag: 'gps_fab',
             onPressed: _isFetchingLocation ? null : _fetchCurrentLocation,
-            backgroundColor: Colors.white,
+            backgroundColor: theme.cardColor,
             elevation: 4,
             child: _isFetchingLocation
                 ? SizedBox(
@@ -1309,10 +1645,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: bandiwalaYellow,
+                      color: bandiWalaYellow,
                     ),
                   )
-                : Icon(Icons.gps_fixed, color: bandiwalaYellow, size: 22),
+                : Icon(Icons.gps_fixed, color: bandiWalaYellow, size: 22),
           ),
         ),
 
@@ -1322,13 +1658,15 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           maxChildSize: 0.85,
           builder: (ctx, scrollCtrl) => Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.cardColor,
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(20),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: (isDark ? Colors.white : Colors.black).withValues(
+                    alpha: 0.1,
+                  ),
                   blurRadius: 20,
                   offset: const Offset(0, -5),
                 ),
@@ -1344,7 +1682,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                     width: 36,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: theme.dividerColor,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1358,10 +1696,10 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                         _isCurrentLocationMode
                             ? 'Confirm Current Location'
                             : 'Add Address Details',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color: Colors.black87,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -1376,7 +1714,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                                 height: 18,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: bandiwalaYellow,
+                                  color: bandiWalaYellow,
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -1384,21 +1722,23 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                                 'Fetching your location...',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey.shade600,
+                                  color: theme.colorScheme.onSurfaceVariant,
                                 ),
                               ),
                             ],
                           ),
                         )
                       else if (_fetchedAddress.isNotEmpty)
-                        // ✅ Address preview: area name + precise coordinates
                         Container(
                           margin: const EdgeInsets.only(top: 8, bottom: 4),
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
+                            color: isDark
+                                ? theme.colorScheme.surfaceContainerHighest
+                                      .withValues(alpha: 0.3)
+                                : Colors.grey.shade50,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.grey.shade200),
+                            border: Border.all(color: theme.dividerColor),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1413,27 +1753,42 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
-                                    child: Text(
-                                      _fetchedAddress,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.grey.shade800,
-                                        fontWeight: FontWeight.w600,
-                                        height: 1.4,
-                                      ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Geolocation',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: bandiWalaYellow,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          _fetchedAddress,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: theme.colorScheme.onSurface,
+                                            fontWeight: FontWeight.w600,
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
                               if (_selectedPosition != null) ...[
                                 const SizedBox(height: 6),
-                                // ✅ Show lat/lng with 6 decimal precision
                                 Row(
                                   children: [
                                     Icon(
                                       Icons.my_location,
                                       size: 13,
-                                      color: Colors.grey.shade500,
+                                      color: theme.colorScheme.onSurfaceVariant,
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
@@ -1441,7 +1796,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                                       '${_selectedPosition!.longitude.toStringAsFixed(6)}',
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: Colors.grey.shade500,
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
                                         fontFeatures: const [
                                           FontFeature.tabularFigures(),
                                         ],
@@ -1460,55 +1816,95 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                             'Search above or tap anywhere on the map to pin your address',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey.shade500,
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ),
 
                       const SizedBox(height: 16),
 
-                      const Text(
+                      Text(
                         'Label',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          _buildLabelChip('Home', Icons.home),
+                          _buildLabelChip(context, 'Home', Icons.home),
                           const SizedBox(width: 8),
-                          _buildLabelChip('Work', Icons.work),
+                          _buildLabelChip(context, 'Work', Icons.work),
                           const SizedBox(width: 8),
-                          _buildLabelChip('Other', Icons.location_on),
+                          _buildLabelChip(context, 'Other', Icons.location_on),
                         ],
                       ),
+
+                      if (_selectedLabel == 'Other') ...[
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _customLabelController,
+                          textInputAction: TextInputAction.next,
+                          style: TextStyle(color: theme.colorScheme.onSurface),
+                          decoration: InputDecoration(
+                            labelText: 'Custom Label (e.g. Friend\'s House) *',
+                            labelStyle: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: 13,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.label_outline,
+                              color: theme.colorScheme.onSurfaceVariant,
+                              size: 20,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: theme.dividerColor),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(
+                                color: bandiWalaYellow,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
 
                       const SizedBox(height: 16),
 
                       TextField(
-                        controller: _houseNoController,
+                        controller: _addressController,
                         textInputAction: TextInputAction.next,
+                        style: TextStyle(color: theme.colorScheme.onSurface),
                         decoration: InputDecoration(
-                          labelText: 'Door No / Flat / Landmark *',
+                          labelText: 'Address (House No, Building, Area) *',
                           labelStyle: TextStyle(
-                            color: Colors.grey.shade600,
+                            color: theme.colorScheme.onSurfaceVariant,
                             fontSize: 13,
                           ),
                           prefixIcon: Icon(
                             Icons.home_outlined,
-                            color: Colors.grey.shade600,
+                            color: theme.colorScheme.onSurfaceVariant,
                             size: 20,
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: theme.dividerColor),
+                          ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
                             borderSide: const BorderSide(
-                              color: bandiwalaYellow,
+                              color: bandiWalaYellow,
                               width: 2,
                             ),
                           ),
@@ -1525,28 +1921,33 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
                         textInputAction: TextInputAction.done,
+                        style: TextStyle(color: theme.colorScheme.onSurface),
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
                           LengthLimitingTextInputFormatter(10),
                         ],
                         decoration: InputDecoration(
-                          labelText: 'Phone (optional)',
+                          labelText: 'Phone *',
                           labelStyle: TextStyle(
-                            color: Colors.grey.shade600,
+                            color: theme.colorScheme.onSurfaceVariant,
                             fontSize: 13,
                           ),
                           prefixIcon: Icon(
                             Icons.phone_outlined,
-                            color: Colors.grey.shade600,
+                            color: theme.colorScheme.onSurfaceVariant,
                             size: 20,
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: theme.dividerColor),
+                          ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
                             borderSide: const BorderSide(
-                              color: bandiwalaYellow,
+                              color: bandiWalaYellow,
                               width: 2,
                             ),
                           ),
@@ -1565,13 +1966,16 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                         child: ElevatedButton(
                           onPressed:
                               (_selectedPosition != null &&
-                                  !_isFetchingLocation)
+                                  !_isFetchingLocation &&
+                                  !_isOutsideServiceZone)
                               ? _saveLocation
                               : null,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: bandiwalaYellow,
+                            backgroundColor: bandiWalaYellow,
                             foregroundColor: Colors.black87,
-                            disabledBackgroundColor: Colors.grey.shade200,
+                            disabledBackgroundColor: isDark
+                                ? Colors.grey.shade800
+                                : Colors.grey.shade200,
                             disabledForegroundColor: Colors.grey,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
@@ -1598,7 +2002,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     );
   }
 
-  Widget _buildLabelChip(String label, IconData icon) {
+  Widget _buildLabelChip(BuildContext context, String label, IconData icon) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final bool selected = _selectedLabel == label;
     return Expanded(
       child: GestureDetector(
@@ -1606,10 +2012,12 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 9),
           decoration: BoxDecoration(
-            color: selected ? bandiwalaYellow : Colors.grey.shade100,
+            color: selected
+                ? bandiWalaYellow
+                : (isDark ? Colors.grey.shade800 : Colors.grey.shade100),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: selected ? bandiwalaYellow : Colors.grey.shade300,
+              color: selected ? bandiWalaYellow : theme.dividerColor,
             ),
           ),
           child: Row(
@@ -1618,7 +2026,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
               Icon(
                 icon,
                 size: 15,
-                color: selected ? Colors.black87 : Colors.grey.shade600,
+                color: selected
+                    ? (isDark ? Colors.black : Colors.black87)
+                    : theme.colorScheme.onSurfaceVariant,
               ),
               const SizedBox(width: 4),
               Text(
@@ -1626,7 +2036,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: selected ? Colors.black87 : Colors.grey.shade600,
+                  color: selected
+                      ? (isDark ? Colors.black : Colors.black87)
+                      : theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
