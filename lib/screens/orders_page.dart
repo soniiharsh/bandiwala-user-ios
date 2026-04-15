@@ -352,7 +352,7 @@ class _VendorSection extends StatelessWidget {
                 ),
               ),
             ),
-            _buildVendorStatusBadge(vendorOrder.status),
+
           ],
         ),
         const SizedBox(height: 12),
@@ -448,63 +448,6 @@ class _VendorSection extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildVendorStatusBadge(VendorOrderStatus status) {
-    Color bgColor;
-    Color textColor;
-    IconData icon;
-    String label;
-
-    switch (status) {
-      case VendorOrderStatus.pending:
-        bgColor = Colors.grey.withValues(alpha: 0.15);
-        textColor = Colors.grey.shade700;
-        icon = Icons.hourglass_empty;
-        label = 'Pending';
-        break;
-      case VendorOrderStatus.accepted:
-        bgColor = Colors.blue.withValues(alpha: 0.1);
-        textColor = Colors.blue;
-        icon = Icons.thumb_up_alt_outlined;
-        label = 'Accepted';
-        break;
-      case VendorOrderStatus.rejected:
-        bgColor = Colors.red.withValues(alpha: 0.1);
-        textColor = Colors.red;
-        icon = Icons.cancel_outlined;
-        label = 'Rejected';
-        break;
-      case VendorOrderStatus.readyForPickup:
-        bgColor = Colors.green.withValues(alpha: 0.1);
-        textColor = Colors.green;
-        icon = Icons.shopping_bag_outlined;
-        label = 'Ready';
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: textColor),
-          const SizedBox(width: 4),
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: textColor,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

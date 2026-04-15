@@ -43,13 +43,11 @@ class PricingConfig {
       const PricingConfig(deliveryCharge: 29, platformFee: 10);
 
   factory PricingConfig.fromMap(Map<String, dynamic> map) => PricingConfig(
-    deliveryCharge: (map['deliveryCharge'] ?? 29).toDouble(),
-    platformFee: (map['platformFee'] ?? 10).toDouble(),
-    foodTaxPercent: (map['foodTaxPercent'] ?? kFoodTaxPercent).toDouble(),
-    deliveryTaxPercent: (map['deliveryTaxPercent'] ?? kDeliveryTaxPercent)
-        .toDouble(),
-    platformFeeTaxPercent:
-        (map['platformFeeTaxPercent'] ?? kPlatformFeeTaxPercent).toDouble(),
+    deliveryCharge: (map['deliveryCharge'] ?? map['deliveryFee'] ?? map['delivery_charge'] ?? 29).toDouble(),
+    platformFee: (map['platformFee'] ?? map['platform_fee'] ?? 10).toDouble(),
+    foodTaxPercent: (map['foodTaxPercent'] ?? map['food_tax_percent'] ?? kFoodTaxPercent).toDouble(),
+    deliveryTaxPercent: (map['deliveryTaxPercent'] ?? map['delivery_tax_percent'] ?? kDeliveryTaxPercent).toDouble(),
+    platformFeeTaxPercent: (map['platformFeeTaxPercent'] ?? map['platform_fee_tax_percent'] ?? kPlatformFeeTaxPercent).toDouble(),
   );
 }
 
@@ -99,6 +97,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   bool get _isPickup => _selectedOrderType == 'pickup';
 
   bool get _isCouponFreeDelivery =>
+      _selectedOrderType == 'delivery' &&
       _appliedCoupon?['couponType'] == 'free_delivery';
 
   bool get _isFreeDelivery => _isCouponFreeDelivery || _isPickup;
@@ -119,7 +118,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
   double get _totalTaxAmount => _foodTax + _deliveryTax + _platformFeeTax;
 
   double get _grandTotal {
-    final discount = _isFreeDelivery ? 0.0 : _couponDiscount;
+    final discount = _couponDiscount;
     return widget.itemsTotal +
         _deliveryCharge +
         _platformFee +
@@ -189,7 +188,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
       couponApplied: _appliedCoupon != null,
       couponCode: _appliedCoupon?['couponCode'] ?? '',
       couponType: _appliedCoupon?['couponType'] ?? '',
-      couponDiscount: _isFreeDelivery ? 0.0 : _couponDiscount,
+      couponDiscount: _couponDiscount,
       couponMaxDiscountableAmount:
           (_appliedCoupon?['maxDiscountableAmount'] ?? 0).toDouble(),
       couponVendorId: _couponVendorId,
@@ -281,6 +280,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
         type: PageTransitionType.slideUp,
         builder: (_) => CouponsPage(
           cartAmount: cart.grandTotal,
+          isDelivery: _selectedOrderType == 'delivery',
           vendorSubtotals: {
             for (final e in cart.cartByVendor.entries)
               e.key: cart.vendorTotal(e.key),
@@ -1262,7 +1262,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      _isFreeDelivery
+                      _isCouponFreeDelivery
                           ? 'Free delivery applied'
                           : 'You save ₹${_couponDiscount.toInt()} on this order',
                       style: TextStyle(
@@ -1282,7 +1282,7 @@ class _PaymentPageState extends ConsumerState<PaymentPage> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      _isFreeDelivery
+                      _isCouponFreeDelivery
                           ? 'FREE\ndelivery'
                           : '-₹${_couponDiscount.toInt()}',
                       textAlign: TextAlign.center,
