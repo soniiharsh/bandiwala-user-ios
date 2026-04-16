@@ -6,12 +6,13 @@ import '../widgets/active_order_bar.dart';
 import '../widgets/cart_bar.dart';
 import '../providers/user_provider.dart';
 import '../providers/active_address_provider.dart';
+import '../providers/orders_provider.dart';
 import '../core/navigation/app_page_route.dart';
 import '../widgets/skeletons.dart';
 import '../models/app_user.dart';
 import 'location_picker_page.dart';
 import '../core/theme/theme.dart';
-import 'orders_page.dart';
+import 'order_details_page.dart';
 
 class NavPage extends ConsumerStatefulWidget {
   const NavPage({super.key});
@@ -50,9 +51,14 @@ class _NavPageState extends ConsumerState<NavPage> {
               children: [
                 ActiveOrderBar(
                   onViewTap: () {
-                    Navigator.of(
-                      context,
-                    ).push(AppPageRoute(builder: (_) => const OrdersPage()));
+                    final activeOrder = ref.read(activeOrderProvider);
+                    if (activeOrder != null) {
+                      Navigator.of(context).push(
+                        AppPageRoute(
+                          builder: (_) => OrderDetailsPage(order: activeOrder),
+                        ),
+                      );
+                    }
                   },
                 ),
                 CartBar(

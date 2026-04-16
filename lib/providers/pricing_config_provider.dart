@@ -2,11 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/db_collections.dart';
 
-// Pricing config — fetched once and cached
-final pricingConfigProvider = FutureProvider<Map<String, dynamic>>((ref) async {
-  final doc = await FirebaseFirestore.instance
+// Pricing config — listens for real-time updates
+final pricingConfigProvider = StreamProvider<Map<String, dynamic>>((ref) {
+  return FirebaseFirestore.instance
       .collection(DbCollections.pricingConfig)
       .doc('defaults')
-      .get();
-  return (doc.exists ? doc.data() : null) ?? {};
+      .snapshots()
+      .map((doc) => (doc.exists ? doc.data() : null) ?? {});
 });

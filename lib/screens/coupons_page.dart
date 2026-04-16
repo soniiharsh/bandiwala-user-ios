@@ -11,10 +11,13 @@ class CouponsPage extends ConsumerStatefulWidget {
   final double cartAmount;
   final Map<String, double> vendorSubtotals;
 
+  final bool isDelivery;
+
   const CouponsPage({
     super.key,
     required this.cartAmount,
     this.vendorSubtotals = const {},
+    this.isDelivery = false,
   });
 
   @override
@@ -97,7 +100,7 @@ class _CouponsPageState extends ConsumerState<CouponsPage> {
     }
 
     final globalCoupons = (globalAsync.valueOrNull ?? [])
-        .where((c) => c.couponType != 'free_delivery')
+        .where((c) => widget.isDelivery || c.couponType != 'free_delivery')
         .toList();
     final redemptions = redemptionsAsync.valueOrNull ?? {};
 
@@ -108,7 +111,7 @@ class _CouponsPageState extends ConsumerState<CouponsPage> {
       }
     }
     final vendorCoupons = vendorCouponMap.values
-        .where((c) => c.couponType != 'free_delivery')
+        .where((c) => widget.isDelivery || c.couponType != 'free_delivery')
         .toList();
     final allEmpty = globalCoupons.isEmpty && vendorCoupons.isEmpty;
 
@@ -122,7 +125,10 @@ class _CouponsPageState extends ConsumerState<CouponsPage> {
               padding: EdgeInsets.symmetric(vertical: 12),
               child: CircularProgressIndicator(),
             )
-          else if (_searchFound == true && _searchResult != null)
+          else if (_searchFound == true &&
+              _searchResult != null &&
+              (widget.isDelivery ||
+                  _searchResult!.couponType != 'free_delivery'))
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: _CouponCard(
@@ -141,7 +147,11 @@ class _CouponsPageState extends ConsumerState<CouponsPage> {
                 },
               ),
             )
-          else if (_searchFound == false)
+          else if (_searchFound == false ||
+              (_searchFound == true &&
+                  _searchResult != null &&
+                  !widget.isDelivery &&
+                  _searchResult!.couponType == 'free_delivery'))
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: Text(

@@ -107,13 +107,17 @@ class _CartPageState extends ConsumerState<CartPage> {
     if (vendorIds.isEmpty) {
       allSupportDelivery = false;
     } else {
-      for (final vid in vendorIds) {
-        final v = ref.read(vendorStreamProvider(vid)).valueOrNull;
-        if (v == null || !v.isDeliveryAvailable) {
-          allSupportDelivery = false;
-          break;
-        }
+    for (final vid in vendorIds) {
+      // Use watch in build to have maps ready, but in methods we might need to read the latest value
+      final vendorsAsync = ref.read(vendorsStreamProvider);
+      final vendorsList = vendorsAsync.valueOrNull ?? [];
+      final v = vendorsList.firstWhere((v) => v.id == vid, orElse: () => null as dynamic);
+      
+      if (v == null || !v.isDeliveryAvailable) {
+        allSupportDelivery = false;
+        break;
       }
+    }
     }
 
     if (allSupportDelivery && _selectedAddress == null) {

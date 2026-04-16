@@ -11,6 +11,7 @@ import '../models/app_user.dart';
 import 'nav_page.dart';
 import 'login_page.dart';
 import 'update_required_page.dart';
+import 'no_internet_page.dart';
 import '../core/theme/theme.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
@@ -52,6 +53,15 @@ class _SplashPageState extends ConsumerState<SplashPage> {
       final appUser = results[1] as AppUser?;
       final versionResult = results[2] as _VersionResult;
 
+      if (versionResult.isUnknown) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const NoInternetPage(),
+          ),
+        );
+        return;
+      }
+
       if (versionResult.isOutdated) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
@@ -81,11 +91,12 @@ class _SplashPageState extends ConsumerState<SplashPage> {
       final packageInfo = await PackageInfo.fromPlatform();
       current = packageInfo.version;
     } catch (_) {
-      // Can't read own version — treat as outdated to be safe.
+      // Can't read own version
       return const _VersionResult(
         currentVersion: '',
         minimumVersion: '',
-        isOutdated: true,
+        isOutdated: false,
+        isUnknown: true,
       );
     }
 
@@ -94,25 +105,26 @@ class _SplashPageState extends ConsumerState<SplashPage> {
           .collection(DbCollections.latestVersion)
           .limit(1)
           .get();
-      print("Document count: ${snap.docs.length}");
 
       if (snap.docs.isEmpty) {
-        // No version document configured — block the app until one is set.
+        // No version document configured — output is unknown.
         return _VersionResult(
           currentVersion: current,
           minimumVersion: 'unknown',
-          isOutdated: true,
+          isOutdated: false,
+          isUnknown: true,
         );
       }
       final data = snap.docs.first.data();
 
       final minimum = data['minimum-version'];
       if (minimum is! String || minimum.isEmpty) {
-        // Malformed version field — treat as outdated.
+        // Malformed version field — output is unknown.
         return _VersionResult(
           currentVersion: current,
           minimumVersion: 'unknown',
-          isOutdated: true,
+          isOutdated: false,
+          isUnknown: true,
         );
       }
 
@@ -120,22 +132,25 @@ class _SplashPageState extends ConsumerState<SplashPage> {
         currentVersion: current,
         minimumVersion: minimum,
         isOutdated: _isOlderVersion(current, minimum),
+        isUnknown: false,
       );
     } on FirebaseException catch (e) {
-      // Network/unavailable — give benefit of the doubt.
-      debugPrint(
-        'Version check Firestore error: ${e.code} ${e.message} ------------------------------------------------------------------------------------',
-      );
-      return _VersionResult.upToDate(current);
-    } catch (e) {
-      // Unexpected error — treat as outdated.
-      debugPrint(
-        'Version check unexpected error: $e ------------------------------------------------------------------------------------',
-      );
+      // Network/unavailable/permission error — output is unknown.
+      debugPrint('Version check Firestore error: ${e.code} ${e.message}');
       return _VersionResult(
         currentVersion: current,
         minimumVersion: '',
-        isOutdated: true,
+        isOutdated: false,
+        isUnknown: true,
+      );
+    } catch (e) {
+      // Unexpected error — output is unknown.
+      debugPrint('Version check unexpected error: $e');
+      return _VersionResult(
+        currentVersion: current,
+        minimumVersion: '',
+        isOutdated: false,
+        isUnknown: true,
       );
     }
   }
@@ -193,16 +208,19 @@ class _VersionResult {
   final String currentVersion;
   final String minimumVersion;
   final bool isOutdated;
+  final bool isUnknown;
 
   const _VersionResult({
     required this.currentVersion,
     required this.minimumVersion,
     required this.isOutdated,
+    required this.isUnknown,
   });
 
   factory _VersionResult.upToDate(String current) => _VersionResult(
-    currentVersion: current,
-    minimumVersion: '',
-    isOutdated: false,
-  );
+        currentVersion: current,
+        minimumVersion: '',
+        isOutdated: false,
+        isUnknown: false,
+      );
 }
