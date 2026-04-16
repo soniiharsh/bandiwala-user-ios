@@ -7,6 +7,7 @@ import '../providers/orders_provider.dart';
 import '../core/theme/theme.dart';
 import '../widgets/skeletons.dart';
 import 'track_order_page.dart';
+import 'order_details_page.dart';
 
 const kBandiWalaYellow = AppColors.primary;
 
@@ -88,167 +89,175 @@ class _OrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: cs.shadow.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => OrderDetailsPage(order: order)),
       ),
-      child: Column(
-        children: [
-          // Order Header
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: cs.outlineVariant, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: cs.shadow.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Order Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: kBandiWalaYellow.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.receipt_long,
+                      color: kBandiWalaYellow,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '#${order.id.substring(0, order.id.length > 6 ? 6 : order.id.length).toUpperCase()}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          order.createdAt != null
+                              ? DateFormat(
+                                  'dd MMM yyyy, hh:mm a',
+                                ).format(order.createdAt!)
+                              : 'Date N/A',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _buildStatusBadge(order.status),
+                ],
               ),
             ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: kBandiWalaYellow.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.receipt_long,
-                    color: kBandiWalaYellow,
-                    size: 20,
+
+            // Vendors List
+            if (order.itemsByVendor.isNotEmpty)
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                itemCount: order.itemsByVendor.length,
+                separatorBuilder: (_, __) => const Divider(height: 24),
+                itemBuilder: (_, index) {
+                  final vendorOrder = order.itemsByVendor.values.elementAt(
+                    index,
+                  );
+                  return _VendorSection(vendorOrder: vendorOrder);
+                },
+              ),
+
+            // Order Footer
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                    width: 1,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
                     children: [
+                      Icon(
+                        Icons.payments_outlined,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 6),
                       Text(
-                        '#${order.id.substring(0, order.id.length > 6 ? 6 : order.id.length).toUpperCase()}',
+                        'Total Amount',
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: cs.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        order.createdAt != null
-                            ? DateFormat(
-                                'dd MMM yyyy, hh:mm a',
-                              ).format(order.createdAt!)
-                            : 'Date N/A',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: cs.onSurfaceVariant,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
-                ),
-                _buildStatusBadge(order.status),
-              ],
-            ),
-          ),
-
-          // Vendors List
-          if (order.itemsByVendor.isNotEmpty)
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              itemCount: order.itemsByVendor.length,
-              separatorBuilder: (_, __) => const Divider(height: 24),
-              itemBuilder: (_, index) {
-                final vendorOrder = order.itemsByVendor.values.elementAt(index);
-                return _VendorSection(vendorOrder: vendorOrder);
-              },
-            ),
-
-          // Order Footer
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(
-                  color: Theme.of(context).colorScheme.outlineVariant,
-                  width: 1,
-                ),
+                  Text(
+                    '₹${order.grandTotal.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: kBandiWalaYellow,
+                    ),
+                  ),
+                ],
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.payments_outlined,
-                      size: 16,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Total Amount',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
+            if (order.status == OrderStatus.outForDelivery &&
+                order.deliveryAgentLocation != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TrackOrderPage(
+                          latitude: order.deliveryAgentLocation!['latitude']!,
+                          longitude: order.deliveryAgentLocation!['longitude']!,
+                          orderId: order.id,
+                        ),
                       ),
                     ),
-                  ],
-                ),
-                Text(
-                  '₹${order.grandTotal.toStringAsFixed(0)}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: kBandiWalaYellow,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (order.status == OrderStatus.outForDelivery &&
-              order.deliveryAgentLocation != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => TrackOrderPage(
-                        latitude: order.deliveryAgentLocation!['latitude']!,
-                        longitude: order.deliveryAgentLocation!['longitude']!,
-                        orderId: order.id,
+                    icon: const Icon(Icons.location_on, size: 16),
+                    label: const Text('Track Order'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: kBandiWalaYellow,
+                      side: const BorderSide(color: kBandiWalaYellow),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ),
-                  ),
-                  icon: const Icon(Icons.location_on, size: 16),
-                  label: const Text('Track Order'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: kBandiWalaYellow,
-                    side: const BorderSide(color: kBandiWalaYellow),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -352,7 +361,6 @@ class _VendorSection extends StatelessWidget {
                 ),
               ),
             ),
-
           ],
         ),
         const SizedBox(height: 12),

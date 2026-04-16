@@ -6,6 +6,7 @@ import '../providers/cart_provider.dart';
 import '../providers/vendors_provider.dart';
 import '../providers/items_provider.dart';
 import '../providers/coupons_provider.dart';
+import '../providers/orders_provider.dart';
 import '../models/coupon.dart';
 import '../models/item.dart';
 import '../core/theme/theme.dart';
@@ -13,7 +14,7 @@ import '../widgets/cart_bar.dart';
 import '../widgets/active_order_bar.dart';
 import '../widgets/item_customization_sheet.dart';
 import 'cart_page.dart';
-import 'orders_page.dart';
+import 'order_details_page.dart';
 import '../widgets/vendor_card.dart'; // WishlistManager + WishlistVendor
 import '../widgets/skeletons.dart';
 import '../core/navigation/app_page_route.dart';
@@ -206,9 +207,14 @@ class _VendorDetailTabState extends ConsumerState<_VendorDetailTab> {
           children: [
             ActiveOrderBar(
               onViewTap: () {
-                Navigator.of(
-                  context,
-                ).push(AppPageRoute(builder: (_) => const OrdersPage()));
+                final activeOrder = ref.read(activeOrderProvider);
+                if (activeOrder != null) {
+                  Navigator.of(context).push(
+                    AppPageRoute(
+                      builder: (_) => OrderDetailsPage(order: activeOrder),
+                    ),
+                  );
+                }
               },
             ),
             CartBar(
