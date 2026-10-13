@@ -1,0 +1,239 @@
+name: iOS Release CI/CD
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      build_signed_ipa:
+        description: 'Build signed IPA using repository secrets'
+        required: false
+        type: boolean
+        default: false
+      upload_testflight:
+        description: 'Upload signed IPA to TestFlight (requires App Store Connect API keys)'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 1: Unsigned Release Build & Validation
+  # Always runs on PR / Push to verify code integrity and compilation
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-unsigned:
+    name: Build iOS (Release, Unsigned)
+    runs-on: macos-14
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: |
+          echo "Available Xcode versions:"
+          ls -d /Applications/Xcode* || true
+          # Select latest Xcode 16 or Xcode 15 available on macos-14 runner
+          if [ -d "/Applications/Xcode_16.0.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.0.app
+          elif [ -d "/Applications/Xcode_15.4.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_15.4.app
+          fi
+          xcodebuild -version
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Print Flutter & Dart Environment
+        run: |
+          flutter --version
+          dart --version
+
+      - name: Prepare Environment Secrets (.env & Secrets.xcconfig)
+        run: |
+          # 1. Prepare .env for Flutter asset bundle
+          if [ -n "${{ secrets.ENV_FILE }}" ]; then
+            echo "${{ secrets.ENV_FILE }}" > .env
+            echo "Loaded .env from repository secret ENV_FILE"
+          elif [ ! -f ".env" ]; then
+            cp .env.example .env
+            echo "Created fallback .env from .env.example"
+          fi
+
+          # 2. Prepare ios/Flutter/Secrets.xcconfig for Google Maps API Key
+          if [ -n "${{ secrets.GOOGLE_MAPS_API_KEY }}" ]; then
+            echo "GOOGLE_MAPS_API_KEY = ${{ secrets.GOOGLE_MAPS_API_KEY }}" > ios/Flutter/Secrets.xcconfig
+            echo "Generated Secrets.xcconfig with repository secret"
+          elif [ ! -f "ios/Flutter/Secrets.xcconfig" ]; then
+            cp ios/Flutter/Secrets.xcconfig.example ios/Flutter/Secrets.xcconfig
+            echo "Created fallback Secrets.xcconfig from template"
+          fi
+
+      - name: Install Flutter Dependencies
+        run: flutter pub get
+
+      - name: Run Static Analysis
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run Automated Tests
+        run: flutter test
+
+      - name: Set up CocoaPods
+        run: |
+          pod --version
+          cd ios
+          pod install --repo-update
+          cd ..
+
+      - name: Build iOS Release (Unsigned)
+        run: |
+          flutter build ios --release --no-codesign --verbose
+
+      - name: Package Runner.app
+        run: |
+          cd build/ios/iphoneos
+          zip -r Runner.app.zip Runner.app
+          cd ../../..
+
+      - name: Upload Unsigned App Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandiwala-user-ios-release-unsigned
+          path: build/ios/iphoneos/Runner.app.zip
+          retention-days: 14
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 2: Signed IPA Build & TestFlight Distribution
+  # Runs only when manually triggered or when Apple signing secrets are supplied
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-signed:
+    name: Build Signed IPA & TestFlight
+    runs-on: macos-14
+    timeout-minutes: 60
+    if: ${{ github.event.inputs.build_signed_ipa == 'true' || github.event.inputs.upload_testflight == 'true' }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: |
+          if [ -d "/Applications/Xcode_16.0.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.0.app
+          elif [ -d "/Applications/Xcode_15.4.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_15.4.app
+          fi
+          xcodebuild -version
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Prepare Environment Secrets (.env & Secrets.xcconfig)
+        run: |
+          if [ -n "${{ secrets.ENV_FILE }}" ]; then
+            echo "${{ secrets.ENV_FILE }}" > .env
+          elif [ ! -f ".env" ]; then
+            cp .env.example .env
+          fi
+
+          if [ -n "${{ secrets.GOOGLE_MAPS_API_KEY }}" ]; then
+            echo "GOOGLE_MAPS_API_KEY = ${{ secrets.GOOGLE_MAPS_API_KEY }}" > ios/Flutter/Secrets.xcconfig
+          elif [ ! -f "ios/Flutter/Secrets.xcconfig" ]; then
+            cp ios/Flutter/Secrets.xcconfig.example ios/Flutter/Secrets.xcconfig
+          fi
+
+      - name: Install Apple Distribution Certificate and Provisioning Profile
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD || 'temporary-build-pwd-123' }}
+        run: |
+          if [ -z "$BUILD_CERTIFICATE_BASE64" ] || [ -z "$BUILD_PROVISION_PROFILE_BASE64" ]; then
+            echo "::error::Apple Distribution Certificate or Provisioning Profile secret is missing."
+            exit 1
+          fi
+
+          # Create variables
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          # Decode certificate and provisioning profile
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o "$CERTIFICATE_PATH"
+          echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o "$PP_PATH"
+
+          # Create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate to keychain
+          security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+          # Apply provisioning profile
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: Install Flutter & CocoaPods Dependencies
+        run: |
+          flutter pub get
+          cd ios
+          pod install --repo-update
+          cd ..
+
+      - name: Build IPA (Signed)
+        run: |
+          flutter build ipa --release --verbose
+
+      - name: Upload Signed IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandiwala-user-ios-release-signed
+          path: build/ios/ipa/*.ipa
+          retention-days: 30
+
+      - name: Upload to TestFlight
+        if: ${{ github.event.inputs.upload_testflight == 'true' }}
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          if [ -z "$APP_STORE_CONNECT_KEY_ID" ] || [ -z "$APP_STORE_CONNECT_PRIVATE_KEY" ]; then
+            echo "::error::App Store Connect API credentials missing for TestFlight upload."
+            exit 1
+          fi
+
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$APP_STORE_CONNECT_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8
+
+          IPA_PATH=$(ls build/ios/ipa/*.ipa | head -n 1)
+          echo "Uploading $IPA_PATH to TestFlight..."
+
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$IPA_PATH" \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+
+      - name: Clean up temporary keychain
+        if: always()
+        run: |
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
+          rm -f ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision || true
