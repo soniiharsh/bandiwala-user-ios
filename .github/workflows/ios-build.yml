@@ -18,14 +18,11 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Disable Swift Package Manager
-        run: flutter config --no-enable-swift-package-manager
-
-      - name: Check Flutter installation
-        run: flutter --version
-
-      - name: Install dependencies
-        run: flutter pub get
+      - name: Install dependencies (sync Firebase versions)
+        run: |
+          flutter pub get
+          flutter pub upgrade firebase_core firebase_auth firebase_messaging firebase_analytics cloud_firestore firebase_app_check
+          flutter pub deps | grep -i firebase
 
       - name: Build unsigned iOS app
         run: flutter build ios --release --no-codesign
