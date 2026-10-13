@@ -8,6 +8,14 @@
           "fileOutput": "android/app/google-services.json"
         }
       },
+      "ios": {
+        "default": {
+          "projectId": "bandiwala-a7ff8",
+          "appId": "1:905053340668:ios:b63188318c1d4376232879",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
       "dart": {
         "lib/firebase_options.dart": {
           "projectId": "bandiwala-a7ff8",
